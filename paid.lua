@@ -37625,7 +37625,7 @@ local function decode_bundle()
     local lookup = {}
     for i = 1, #b64chars do lookup[string.byte(b64chars, i)] = i - 1 end
     local padded = raw
-    if #padded % 4 ~= 0 then padded = padded .. string.rep("=", 4 - (#padded %% 4)) end
+    if #padded % 4 ~= 0 then padded = padded .. string.rep("=", 4 - (#padded % 4)) end
     local output = ""
     for i = 1, #padded, 4 do
         local a = lookup[string.byte(padded, i)] or 0
@@ -37633,13 +37633,13 @@ local function decode_bundle()
         local c = lookup[string.byte(padded, i+2)] or 0
         local d = lookup[string.byte(padded, i+3)] or 0
         local n = a * 262144 + b * 4096 + c * 64 + d
-        output = output .. string.char(bit32.rshift(n, 16) %% 256, bit32.rshift(n, 8) %% 256, n %% 256)
+        output = output .. string.char(bit32.rshift(n, 16) % 256, bit32.rshift(n, 8) % 256, n % 256)
     end
     output = output:sub(1, 5642053)
     local key_bytes = DECODE_KEY
     local result = {}
     for i = 1, #output do
-        local k = string.byte(key_bytes, ((i-1) %% #key_bytes) + 1)
+        local k = string.byte(key_bytes, ((i-1) % #key_bytes) + 1)
         result[i] = string.char(bit32.bxor(string.byte(output, i), k))
     end
     return table.concat(result)
@@ -37652,7 +37652,7 @@ if not success or type(result) ~= "string" or #result ~= EXPECTED_LENGTH then
 end
 
 local hash = 0
-for i = 1, #result do hash = (hash * 31 + string.byte(result, i)) %% 2147483647 end
+for i = 1, #result do hash = (hash * 31 + string.byte(result, i)) % 2147483647 end
 if hash ~= EXPECTED_HASH then
     warn("[ENRIQUE] Runtime bundle checksum mismatch.")
     return
