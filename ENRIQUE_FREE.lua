@@ -7,99 +7,7 @@
     Loadstring: loadstring(game:HttpGet("https://raw.githubusercontent.com/azabyssal-maker/ENRIQUE-A/main/ENRIQUE_FREE.lua", true))()
 --]]
 
---[[ ENRIQUE FREE Utilities ]]
-local _BC={3,0,2,1,4,1,10,3,0,2,1,4,1,10};
-local _SP={"makefolder","ENRIQUE"};
-local function _VM(pc) local stk={} local sp=0 while true do local op=_BC[pc] if op==1 then local hi=_BC[pc+1] local lo=_BC[pc+2] sp=sp+1 stk[sp]=hi*256+lo pc=pc+3 elseif op==2 then sp=sp+1 stk[sp]=_SP[_BC[pc+1]+1] pc=pc+2 elseif op==3 then sp=sp+1 stk[sp]=_G[_SP[_BC[pc+1]+1]] pc=pc+2 elseif op==4 then local n=_BC[pc+1] local args={} for i=1,n do args[i]=stk[sp-n+i] end local fn=stk[sp-n] sp=sp-n-1 if (math.floor(1.5)==1) and (type(fn)=="function") then fn(table.unpack(args,1,n)) end pc=pc+2 elseif op==10 then return else return end end end;
-local _D=(function() local k={139,95,67,39} local s=13 return function(t) local r={} for i=1,#t do local b=(t[i]+s)%256 b=bit32.bxor(b,(k[((i-1)%4)+1]+((i-1+s)%11))%256) r[i]=string.char(b) end return table.concat(r) end end)();
-local function safe_connections(obj, signal)
-local ok, list = pcall(function()
-if getconnections then return getconnections(obj[signal]) end
-if get_signal_cons then return get_signal_cons(obj[signal]) end
-return nil
-end)
-if ok and list then return list end
-return {}
-end
-local function make_fake_input(centerX,centerY)
-return setmetatable({},{
-__index=function(value,key)
-if key=="UserInputType" then return Enum.UserInputType.Touch end
-if key=="KeyCode" then return Enum.KeyCode.Unknown end
-if key=="Position" then return Vector3.new(centerX,centerY,0) end
-if key=="IsProcessed" or key=="IsGameProcessedEvent" then return false end
-return nil
-end
-})
-end
-local function gui_center(button)
-local ok,size=pcall(function() return button.AbsoluteSize end)
-local ok2,pos=pcall(function() return button.AbsolutePosition end)
-if ok and ok2 and size and pos then return pos.X+size.X*.5,pos.Y+size.Y*.5 end
-local camera=workspace.CurrentCamera
-local viewport=camera and camera.ViewportSize or Vector2.new(1080,1920)
-return viewport.X*.5,viewport.Y*.72
-end
-local function press_gui_button(button, holdTime)
-if not button then return false end
-holdTime = holdTime or 0.25
-local centerX, centerY = gui_center(button)
-local fakeInput = make_fake_input(centerX, centerY)
-local clicked = false
--- 1) Try TouchButton first: real touch down, hold, up
-if button:IsA("TouchButton") then
-local virtualInput = VirtualInputManager
-if not virtualInput then local okVim, vimValue = pcall(function() return game:GetService("VirtualInputManager") end) if okVim then virtualInput = vimValue end end
-if virtualInput and virtualInput.SendTouchEvent then
-local okD = pcall(function() virtualInput:SendTouchEvent(1, true, centerX, centerY) end)
-if okD then
-clicked = true
-task.wait(holdTime)
-pcall(function() virtualInput:SendTouchEvent(1, false, centerX, centerY) end)
-end
-end
-if not clicked then
-pcall(function() for _,c in ipairs(safe_connections(button,"MouseButton1Down") or {}) do if type(c.Function)=="function" then c.Function(fakeInput) clicked=true end end end)
-task.wait(holdTime)
-pcall(function() for _,c in ipairs(safe_connections(button,"MouseButton1Up") or {}) do if type(c.Function)=="function" then c.Function(fakeInput) end end end)
-if not clicked then
-pcall(function() for _,c in ipairs(safe_connections(button,"Activated") or {}) do if type(c.Function)=="function" then c.Function(fakeInput,false) clicked=true end end end)
-end
-end
-return clicked
-end
--- 2) BindableEvent/Function
-if button:IsA("BindableEvent") then pcall(function() button:Fire() end) return true end
-if button:IsA("BindableFunction") then pcall(function() button:Invoke() end) return true end
--- 3) Regular GuiButton: down signal, hold, up signal
-pcall(function() if firesignal and button.MouseButton1Down then firesignal(button.MouseButton1Down, fakeInput) clicked=true end end)
-pcall(function() for _,c in ipairs(safe_connections(button,"MouseButton1Down") or {}) do if type(c.Function)=="function" then c.Function(fakeInput) clicked=true end end end)
-pcall(function() for _,c in ipairs(safe_connections(button,"InputBegan") or {}) do if type(c.Function)=="function" then c.Function(fakeInput) clicked=true end end end)
-if clicked then task.wait(holdTime) end
-pcall(function() if firesignal and button.MouseButton1Up then firesignal(button.MouseButton1Up, fakeInput) end end)
-pcall(function() if firesignal and button.MouseButton1Click then firesignal(button.MouseButton1Click) end end)
-pcall(function() for _,c in ipairs(safe_connections(button,"MouseButton1Up") or {}) do if type(c.Function)=="function" then c.Function(fakeInput) end end end)
-pcall(function() if firesignal and button.Activated then firesignal(button.Activated, fakeInput, false) end end)
--- 4) Real VirtualInput fallback: touch/mouse hold on button
-if not clicked then
-local virtualInput = VirtualInputManager
-if not virtualInput then local okVim, vimValue = pcall(function() return game:GetService("VirtualInputManager") end) if okVim then virtualInput = vimValue end end
-if virtualInput and virtualInput.SendTouchEvent then
-local okD = pcall(function() virtualInput:SendTouchEvent(1, true, centerX, centerY) end)
-if okD then clicked = true task.wait(holdTime) pcall(function() virtualInput:SendTouchEvent(1, false, centerX, centerY) end) end
-elseif virtualInput and virtualInput.SendMouseButtonEvent then
-local okD = pcall(function() virtualInput:SendMouseButtonEvent(centerX, centerY, 0, true, game, 1) end)
-if okD then clicked = true task.wait(holdTime) pcall(function() virtualInput:SendMouseButtonEvent(centerX, centerY, 0, false, game, 1) end) end
-end
-end
-return clicked
-end
-local _PARRY_PATCH = { ready = false }
--- V54: remote/PRY parry layer removed (hookfunction on getrenv debug/info = kick + lag risk). Parry uses keypress only.
-
-
-
---[[ Uikitty UI Library ]]
+--[[ Uikitty UI Library (embedded) ]]
 if not LPH_OBFUSCATED then
 	LPH_ENCFUNC = function(callback)
 		return callback
@@ -4481,12 +4389,10 @@ return library
 
 
 
-
 -- ENRIQUE FREE Anime Background System
 local function injectAnimeBackground()
-    task.wait(1) -- Wait for UI to fully create
+    task.wait(1)
     pcall(function()
-        -- Find the main ScreenGui
         local gui = nil
         for _, v in ipairs(CoreGui:GetChildren()) do
             if (v.Name == 'ENRIQUE_FREE_UI' or v.Name == '_angeli') and v:IsA('ScreenGui') then
@@ -4496,7 +4402,6 @@ local function injectAnimeBackground()
         end
         if not gui then return end
         
-        -- Find the main container frame
         local container = nil
         for _, v in ipairs(gui:GetDescendants()) do
             if v:IsA('Frame') and v.Size and v.Size.X.Scale > 0.3 then
@@ -4506,7 +4411,6 @@ local function injectAnimeBackground()
         end
         if not container then return end
         
-        -- Create anime background
         local bg = Instance.new("ImageLabel")
         bg.Name = "ENRIQUE_AnimeBG"
         bg.Size = UDim2.new(1, 0, 1, 0)
@@ -4517,14 +4421,12 @@ local function injectAnimeBackground()
         bg.ZIndex = 0
         bg.Parent = container
         
-        -- Add rainbow border animation
         local stroke = Instance.new("UIStroke")
         stroke.Color = Color3.fromRGB(255, 100, 150)
         stroke.Thickness = 2
         stroke.Transparency = 0.3
         stroke.Parent = container
         
-        -- Animate
         task.spawn(function()
             local hue = 0
             while bg and bg.Parent do
@@ -4535,13 +4437,12 @@ local function injectAnimeBackground()
             end
         end)
         
-        -- Rename main GUI to ENRIQUE FREE
         gui.Name = "ENRIQUE_FREE_UI"
     end)
 end
 task.spawn(injectAnimeBackground)
 
---[[ Core Logic ]]
+--[[ Core Logic - Auto Parry, Spam, Detection, Remote Hooking ]]
 repeat task.wait() until game:IsLoaded()
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -5148,11 +5049,7 @@ if track.Name:find("Grab") or track.Name:find("Parry") then track:Stop(0.1) end
 end
 end)
 
-
-
 --[[ Features & UI ]]
-
-
 local UI = Library._new("ENRIQUE FREE")
 
 local MainCat = UI:create_category("Main")
