@@ -4385,7 +4385,7 @@ function library.load_manager(self: runtime_typeof)
 	return manager
 end
 
-return library
+_LIBRARY = library
 
 
 
