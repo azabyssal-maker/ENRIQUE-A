@@ -1,3 +1,21 @@
+if not base64_decode then
+function base64_decode(s)
+local b="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+s=s:gsub("[^"..b.."=".."","")
+return(s:gsub(".",function(x)
+if x=="="then return""end
+local r,f="",(b:find(x)-1)
+for i=6,1,-1 do r=r..(f%2^i-f%2^(i-1)>0 and"1"or"0")end
+return r
+end):gsub("%d%d%d?%d?%d?%d?%d?%d?",function(x)
+if #x~=8 then return""end
+local c=0
+for i=1,8 do c=c+(x:sub(i,i)=="1"and 2^(8-i)or 0)end
+return string.char(c)
+end))
+end
+end
+
 local _k=base64_decode("g1mB40VYKYMBKTkhztNXBH+T5pYLBslxs1fZSyb6tnsEm4la4c05Y/+jfPEfgu9icf1GnfN6bUEPIzEQ7GffDA==")
 local _k1=_k:sub(1,48)
 local _k2=_k:sub(49,64)
