@@ -354,7 +354,12 @@ end
 return baseCFrame * rotation
 end
 
-local function GetParryData()
+local _gpdCache = nil
+local _gpdCacheTime = 0
+local function GetParryData(force)
+if not force and _gpdCache and (os.clock() - _gpdCacheTime) < 0.1 then
+return _gpdCache[1], _gpdCache[2], _gpdCache[3]
+end
 local viewportSize = Camera.ViewportSize
 local centerPos = { viewportSize.X / 2, viewportSize.Y / 2 }
 local events = {}
@@ -364,7 +369,10 @@ local screenPos, isOnScreen = Camera:WorldToScreenPoint(v.HumanoidRootPart.Posit
 if isOnScreen then events[tostring(v)] = screenPos end
 end
 end
-return Camera.CFrame, events, centerPos
+local result = { Camera.CFrame, events, centerPos }
+_gpdCache = result
+_gpdCacheTime = os.clock()
+return result[1], result[2], result[3]
 end
 
 local recentParries=0
@@ -451,15 +459,29 @@ local function RemoteReady()
     return _captured ~= nil and _token ~= nil
 end
 
+local _lastTokenCache = nil
+local _lastTokenUid = nil
+local _lastTokenTime = 0
 local function SendParry()
     if not RemoteReady() or not parryContextAllowed() or AbilityBlocked() then return false end
     local remote = _captured.remote
     local cap = _reverted[remote] or (_captured.args)
     if not cap then return false end
 
-    local okTok, token = pcall(_tokenize, cap[2])
-    if not (okTok and token) then return false end
+    -- Cache token per remote uid (token only depends on time + uid)
+    local token
+    if _lastTokenCache and _lastTokenUid == cap[2] and os.clock() - _lastTokenTime < 0.5 then
+        token = _lastTokenCache
+    else
+        local okTok, tok = pcall(_tokenize, cap[2])
+        if not (okTok and tok) then return false end
+        token = tok
+        _lastTokenCache = tok
+        _lastTokenUid = cap[2]
+        _lastTokenTime = os.clock()
+    end
 
+    -- Reuse cached parry data when spamming fast (avoids lag)
     local cf, events, mouse = GetParryData()
     cf = ApplyCurveToCFrame(cf)
 
@@ -9034,17 +9056,24 @@ local function CreateSpamUI()
             Stroke.Color = Color3.fromRGB(255, 90, 90)
             
             manualSpamLoop = task.spawn(function()
+                local nextFire = 0
+                local rate = math.clamp(manualSpamRate, 1, 10000)
+                local interval = 1 / rate
                 while manualSpamEnabled do
-                    if type(getgenv().ENRIQUE_SendParry) == "function" then
-                        local success = getgenv().ENRIQUE_SendParry()
-                        if not success then
-                            print("[Manual Spam] ENRIQUE_SendParry thất bại, kiểm tra đã capture packet chưa")
+                    local now = os.clock()
+                    if now >= nextFire then
+                        nextFire = now + interval
+                        if type(getgenv().ENRIQUE_SendParry) == "function" then
+                            local success = getgenv().ENRIQUE_SendParry()
+                            if not success then
+                                nextFire = now + 0.05
+                            end
+                        else
+                            print("[Manual Spam] ENRIQUE_SendParry chưa sẵn sàng, hãy parry 1 lần để capture")
+                            break
                         end
-                    else
-                        print("[Manual Spam] ENRIQUE_SendParry chưa sẵn sàng, hãy parry 1 lần để capture")
-                        break
                     end
-                    task.wait(1 / manualSpamRate)
+                    task.wait()
                 end
             end)
         else
