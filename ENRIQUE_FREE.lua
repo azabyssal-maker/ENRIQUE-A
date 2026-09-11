@@ -253,8 +253,8 @@ task.spawn(function()
  end
 end)
 
-getgenv().CSKRDetectionState=Det
-getgenv().CSKRAbilityDetectionState=Det
+getgenv().ENRIQUEDetectionState=Det
+getgenv().ENRIQUEAbilityDetectionState=Det
 
 local function GetPing()
 local success, result = pcall(function()
@@ -605,50 +605,9 @@ end
 end)
 
 -- ENRIQUE FREE UI Wrapper
-local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/ffgringoxp123-code/Code/refs/heads/main/Uikitty_with_ColorPicker.lua.txt"))()
+local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/azabyssal-maker/ENRIQUE-A/main/ENRIQUE_UIKITTY.lua"))()
 
--- Post-modify: rename GUI, add anime BG, change colors
-task.spawn(function()
-    task.wait(2)
-    pcall(function()
-        for _, gui in ipairs(game:GetService("CoreGui"):GetChildren()) do
-            if gui:IsA("ScreenGui") then
-                gui.Name = "ENRIQUE_FREE"
-                -- Add anime background to main frame
-                for _, desc in ipairs(gui:GetDescendants()) do
-                    if desc:IsA("Frame") and desc.Size and desc.Size.X.Scale > 0.4 then
-                        local bg = Instance.new("ImageLabel")
-                        bg.Name = "ENRIQUE_BG"
-                        bg.Size = UDim2.new(1,0,1,0)
-                        bg.BackgroundTransparency = 1
-                        bg.Image = "rbxassetid://92296849858473"
-                        bg.ImageTransparency = 0.87
-                        bg.ScaleType = Enum.ScaleType.Stretch
-                        bg.ZIndex = 0
-                        bg.Parent = desc
-                        -- Pink anime stroke
-                        local s = Instance.new("UIStroke")
-                        s.Color = Color3.fromRGB(255, 105, 180)
-                        s.Thickness = 1.5
-                        s.Transparency = 0.3
-                        s.Parent = desc
-                        break
-                    end
-                end
-                -- Rename toggle button
-                for _, desc in ipairs(gui:GetDescendants()) do
-                    if desc:IsA("ImageLabel") and desc.Image and desc.Image:find("86955036432319") then
-                        desc.Image = "rbxassetid://92296849858473"
-                    end
-                end
-                break
-            end
-        end
-    end)
-end)
-
-
-local UI = Library._new("ENRIQUE FREE")
+local UI = Library._new()
 
 local MainCat = UI:create_category("Main")
 local Parry = MainCat:create_tab("Parry", "rbxassetid://swords")
@@ -8383,13 +8342,13 @@ local function StopStaffDetection()
 end
 local function StartStaffDetection()
     StopStaffDetection()
-    getgenv().CSKRStaffDetected=getgenv().CSKRStaffDetected or {}
+    getgenv().ENRIQUEStaffDetected=getgenv().ENRIQUEStaffDetected or {}
     StaffConn=Players.PlayerAdded:Connect(function(plr)
         if not getgenv().StaffDetection or plr==player then return end
         task.spawn(function()
             local ok,rank=pcall(function() return plr:GetRankInGroup(12836673) end)
-            if not ok or rank<10 or getgenv().CSKRStaffDetected[plr.UserId] then return end
-            getgenv().CSKRStaffDetected[plr.UserId]=true
+            if not ok or rank<10 or getgenv().ENRIQUEStaffDetected[plr.UserId] then return end
+            getgenv().ENRIQUEStaffDetected[plr.UserId]=true
             if StaffAction=="Kick" then
                 player:Kick("Staff joined the server.")
             else
@@ -8633,7 +8592,7 @@ do
     local function create_ball_stats_gui()
         if BallStatsState.gui then return end
         local gui=Instance.new("ScreenGui")
-        gui.Name="CSKRBallMetrics"
+        gui.Name="ENRIQUEBallMetrics"
         gui.ResetOnSpawn=false
         gui.IgnoreGuiInset=true
         gui.DisplayOrder=99
