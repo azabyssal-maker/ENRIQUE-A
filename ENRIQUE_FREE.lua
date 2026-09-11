@@ -8266,22 +8266,70 @@ UnlockGroup:create_toggle("unlock_all", {
 })
 UnlockGroup:create_toggle("skin_changer", {
     title = "Skin Changer",
-    default = false,
+    default = getgenv().skinChanger or false,
     callback = function(state)
         getgenv().skinChanger = state
-        if state then
+        if state and getgenv().swordModel ~= "" then
             if getgenv().updateSword then task.spawn(getgenv().updateSword) end
+        end
+    end,
+})
+
+local skinInput = UnlockGroup:create_textbox("skin_name_input", {
+    title = "Sword Name",
+    default = getgenv().swordModel or "",
+    height = 28,
+    callback = function(value)
+        getgenv().swordModel = value
+        getgenv().swordAnimations = value
+        getgenv().swordFX = value
+    end,
+})
+
+UnlockGroup:create_button({
+    title = "Apply Skin",
+    callback = function()
+        local name = skinInput:get_value()
+        if name and name ~= "" then
+            getgenv().swordModel = name
+            getgenv().swordAnimations = name
+            getgenv().swordFX = name
+            getgenv().skinChanger = true
+            if getgenv().updateSword then task.spawn(getgenv().updateSword) end
+            print("[ENRIQUE] Skin applied: " .. name)
         end
     end,
 })
 
 UnlockGroup:create_toggle("explosion_changer", {
     title = "Explosion Changer",
-    default = false,
+    default = getgenv().explosionChanger or false,
     callback = function(state)
         getgenv().explosionChanger = state
         if state then
             if getgenv().updateExplosion then task.spawn(getgenv().updateExplosion) end
+        end
+    end,
+})
+
+local explosionInput = UnlockGroup:create_textbox("explosion_name_input", {
+    title = "Explosion Name",
+    default = getgenv().explosionFX or "",
+    height = 28,
+    callback = function(value)
+        getgenv().explosionFX = value
+    end,
+})
+
+UnlockGroup:create_button({
+    title = "Apply Explosion",
+    callback = function()
+        local name = explosionInput:get_value()
+        if name and name ~= "" then
+            getgenv().explosionFX = name
+            getgenv().explosionChanger = true
+            if getgenv().updateExplosion then task.spawn(getgenv().updateExplosion) end
+            print("[ENRIQUE] Explosion applied: " .. name)
         end
     end,
 })
@@ -8924,5 +8972,262 @@ ParryRight:create_slider("spam_rate", {
     rounding = true,
     callback = function(value)
         manualSpamRate = value
+    end,
+})
+
+
+-- ============================================================
+-- MUSIC TAB
+-- ============================================================
+local SettingsCat = UI:create_category("Settings")
+local MusicTab = SettingsCat:create_tab("Music", "rbxassetid://note")
+local MusicGroup = MusicTab:create_group("Music Player", "left")
+
+local musicList = {
+    ["C418 - Sweden (Minecraft)"] = 142376088,
+    ["Lofi Hip Hop"] = 1837849285,
+    ["Epic Orchestra"] = 3188149454,
+    ["Chill Vibes"] = 5765663824,
+    ["Anime Opening"] = 6798257929,
+    ["Trap Beat"] = 9043992642,
+    ["Phonk Drift"] = 8495961287,
+    ["Minecraft Volume Alpha"] = 5189330598,
+    ["Moonlight Sonata"] = 9045790449,
+    ["Blade Ball BGM"] = 7649043594,
+}
+
+local musicNames = {}
+for name, _ in pairs(musicList) do
+    table.insert(musicNames, name)
+end
+table.sort(musicNames)
+
+local currentMusicId = musicList[musicNames[1]]
+local currentSound = nil
+
+MusicGroup:create_dropdown("music_select", {
+    title = "Select Music",
+    options = musicNames,
+    callback = function(value)
+        currentMusicId = musicList[value]
+    end,
+})
+
+MusicGroup:create_button({
+    title = "Play Music",
+    callback = function()
+        pcall(function()
+            if currentSound then
+                currentSound:Stop()
+                currentSound:Destroy()
+            end
+            currentSound = Instance.new("Sound")
+            currentSound.SoundId = "rbxassetid://" .. tostring(currentMusicId)
+            currentSound.Volume = 0.5
+            currentSound.Looped = true
+            currentSound.Parent = game:GetService("SoundService")
+            currentSound:Play()
+            print("[ENRIQUE] Playing music: " .. tostring(currentMusicId))
+        end)
+    end,
+})
+
+MusicGroup:create_button({
+    title = "Stop Music",
+    callback = function()
+        pcall(function()
+            if currentSound then
+                currentSound:Stop()
+                currentSound:Destroy()
+                currentSound = nil
+            end
+        end)
+    end,
+})
+
+MusicGroup:create_slider("music_volume", {
+    title = "Volume",
+    minimum = 0,
+    maximum = 100,
+    default = 50,
+    rounding = true,
+    callback = function(value)
+        if currentSound then
+            currentSound.Volume = value / 100
+        end
+    end,
+})
+
+-- ============================================================
+-- UI SETTINGS TAB
+-- ============================================================
+local UISettingsTab = SettingsCat:create_tab("UI Settings", "rbxassetid://globe")
+local UISettingsGroup = UISettingsTab:create_group("Settings", "left")
+
+UISettingsGroup:create_button({
+    title = "Hide UI",
+    callback = function()
+        if UI and UI._ui then
+            UI._ui.Enabled = false
+            print("[ENRIQUE] UI hidden. Re-execute script to show again.")
+        end
+    end,
+})
+
+local bgInput = UISettingsGroup:create_textbox("bg_image_id", {
+    title = "Background Image ID",
+    default = "16014323157",
+    height = 28,
+    callback = function(value)
+        -- Update background image on the fly
+        pcall(function()
+            local mainGui = UI._ui
+            if mainGui then
+                for _, desc in ipairs(mainGui:GetDescendants()) do
+                    if desc.Name == "ENRIQUE_BG" and desc:IsA("ImageLabel") then
+                        desc.Image = "rbxassetid://" .. value
+                    end
+                end
+            end
+        end)
+    end,
+})
+
+UISettingsGroup:create_button({
+    title = "Apply Background",
+    callback = function()
+        local bgId = bgInput:get_value()
+        if bgId and bgId ~= "" then
+            pcall(function()
+                local mainGui = UI._ui
+                if mainGui then
+                    for _, desc in ipairs(mainGui:GetDescendants()) do
+                        if desc.Name == "ENRIQUE_BG" and desc:IsA("ImageLabel") then
+                            desc.Image = "rbxassetid://" .. bgId
+                        end
+                    end
+                end
+            end)
+            print("[ENRIQUE] Background image updated: " .. bgId)
+        end
+    end,
+})
+
+local UISettingsRight = UISettingsTab:create_group("Account", "right")
+
+UISettingsRight:create_button({
+    title = "Show UI",
+    callback = function()
+        if UI and UI._ui then
+            UI._ui.Enabled = true
+        end
+    end,
+})
+
+UISettingsRight:create_button({
+    title = "Reset UI Size",
+    callback = function()
+        if UI and UI._ui then
+            for _, child in ipairs(UI._ui:GetChildren()) do
+                if child:IsA("Frame") and child.Size == UDim2.fromOffset(750, 500) then
+                    -- Already at default
+                end
+            end
+        end
+    end,
+})
+
+-- ============================================================
+-- PROFILE SAVE TAB
+-- ============================================================
+local ProfileTab = SettingsCat:create_tab("Profile", "rbxassetid://swords")
+local ProfileGroup = ProfileTab:create_group("Save / Load", "left")
+
+local profileNameInput = ProfileGroup:create_textbox("profile_name", {
+    title = "Profile Name",
+    default = "Default",
+    height = 28,
+})
+
+ProfileGroup:create_button({
+    title = "Save Settings",
+    callback = function()
+        local profileName = profileNameInput:get_value() or "Default"
+        pcall(function()
+            local settings = {
+                skinChanger = getgenv().skinChanger or false,
+                swordModel = getgenv().swordModel or "",
+                explosionChanger = getgenv().explosionChanger or false,
+                explosionFX = getgenv().explosionFX or "",
+                bgImageId = "16014323157",
+            }
+            local json = game:GetService("HttpService"):JSONEncode(settings)
+            if writefile then
+                writefile("ENRIQUE_FREE_" .. profileName .. ".json", json)
+                print("[ENRIQUE] Settings saved to: " .. profileName)
+            end
+        end)
+    end,
+})
+
+ProfileGroup:create_button({
+    title = "Load Settings",
+    callback = function()
+        local profileName = profileNameInput:get_value() or "Default"
+        pcall(function()
+            if readfile then
+                local raw = readfile("ENRIQUE_FREE_" .. profileName .. ".json")
+                if raw and raw ~= "" then
+                    local settings = game:GetService("HttpService"):JSONDecode(raw)
+                    if settings.swordModel then
+                        getgenv().swordModel = settings.swordModel
+                        getgenv().swordAnimations = settings.swordModel
+                        getgenv().swordFX = settings.swordModel
+                    end
+                    if settings.skinChanger then
+                        getgenv().skinChanger = true
+                        if getgenv().updateSword then task.spawn(getgenv().updateSword) end
+                    end
+                    if settings.explosionFX then
+                        getgenv().explosionFX = settings.explosionFX
+                    end
+                    if settings.explosionChanger then
+                        getgenv().explosionChanger = true
+                        if getgenv().updateExplosion then task.spawn(getgenv().updateExplosion) end
+                    end
+                    print("[ENRIQUE] Settings loaded from: " .. profileName)
+                end
+            end
+        end)
+    end,
+})
+
+ProfileGroup:create_button({
+    title = "Delete Profile",
+    callback = function()
+        local profileName = profileNameInput:get_value() or "Default"
+        pcall(function()
+            if delfile then
+                delfile("ENRIQUE_FREE_" .. profileName .. ".json")
+                print("[ENRIQUE] Profile deleted: " .. profileName)
+            end
+        end)
+    end,
+})
+
+local ProfileRight = ProfileTab:create_group("Info", "right")
+ProfileRight:create_button({
+    title = "List Saved Profiles",
+    callback = function()
+        pcall(function()
+            if listfiles then
+                local files = listfiles("")
+                for _, file in ipairs(files) do
+                    if file:find("ENRIQUE_FREE_") then
+                        print("[ENRIQUE] Profile: " .. file)
+                    end
+                end
+            end
+        end)
     end,
 })
