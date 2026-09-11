@@ -34,7 +34,7 @@ local cfg = {
 parry = true,
 spam = false,
 trigger = false,
-cps = 2000,
+cps = 1000,
 accuracy = 50,
 randomPingAccuracy = false,
 autoSpam = false,
@@ -480,7 +480,7 @@ local function SendParry()
 
     -- Cache token per remote uid (token only depends on time + uid)
     local token
-    if _lastTokenCache and _lastTokenUid == cap[2] and os.clock() - _lastTokenTime < 0.5 then
+    if _lastTokenCache and _lastTokenUid == cap[2] and os.clock() - _lastTokenTime < 1.5 then
         token = _lastTokenCache
     else
         local okTok, tok = pcall(_tokenize, cap[2])
@@ -9086,19 +9086,23 @@ local function CreateSpamUI()
                             break
                         end
                     end
-                    -- Fire as many packets as this frame allows (true rate, no per-frame cap)
+                    -- Smart burst: adapts to ping so it never floods the network
                     local now = os.clock()
+                    local ping = GetPing()
+                    local burstMax = 6
+                    if ping > 150 then burstMax = 3 end
+                    if ping > 220 then burstMax = 1 end
                     local guard = 0
-                    while now >= nextFire and guard < 24 do
+                    while now >= nextFire and guard < burstMax do
                         local success = sendFn()
                         if not success then
-                            nextFire = os.clock() + 0.02
+                            nextFire = now + 0.02
                             break
                         end
                         nextFire = nextFire + interval
                         guard = guard + 1
                     end
-                    if nextFire < now - 0.25 then
+                    if nextFire < now - 0.3 then
                         nextFire = now
                     end
                     task.wait()
@@ -9161,8 +9165,8 @@ ParryRight:create_toggle("manual_spam", {
 ParryRight:create_slider("spam_rate", {
     title = "Spam Rate",
     minimum = 1,
-    maximum = 10000,
-    default = 500,
+    maximum = 1000,
+    default = 300,
     rounding = true,
     callback = function(value)
         manualSpamRate = value
