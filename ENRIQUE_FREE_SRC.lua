@@ -33,7 +33,7 @@ local cfg = {
 parry = true,
 spam = false,
 trigger = false,
-cps = 1000,
+cps = 2000,
 accuracy = 50,
 randomPingAccuracy = false,
 autoSpam = false,
@@ -9103,7 +9103,7 @@ ParryRight:create_toggle("manual_spam", {
 ParryRight:create_slider("spam_rate", {
     title = "Spam Rate",
     minimum = 1,
-    maximum = 5000,
+    maximum = 10000,
     default = 500,
     rounding = true,
     callback = function(value)
@@ -9334,7 +9334,18 @@ local profileDropdown = ProfileGroup:create_dropdown("profile_select", {
             task.delay(0.6, function()
                 pcall(function() UI._ui:Destroy() end)
                 local url = "https://raw.githubusercontent.com/azabyssal-maker/ENRIQUE-A/main/ENRIQUE_FREE.lua"
-                loadstring(game:HttpGet(url, true))()
+                -- Use cached source first so reload works even if network is slow
+                local src = getgenv().__enrique_source
+                pcall(function()
+                    src = src or game:HttpGet(url, true)
+                    getgenv().__enrique_source = src
+                end)
+                local chunk = src or game:HttpGet(url, true)
+                if chunk and chunk ~= "" then
+                    loadstring(chunk)()
+                else
+                    notifyUI("[Profile] Reload failed (network)")
+                end
             end)
         end
     end,
@@ -9374,10 +9385,13 @@ ProfileGroup:create_button({
                 if not alreadyExists then
                     table.insert(savedProfileNames, profileName)
                 end
-                -- Rebuild the dropdown list fully and select the saved name
+                -- Rebuild the dropdown list, select + auto-open it so the name is VISIBLE
                 pcall(function()
                     profileDropdown:set_options(savedProfileNames)
                     profileDropdown:set_value(profileName, true)
+                    task.delay(0.1, function()
+                        pcall(function() profileDropdown:unfold(true) end)
+                    end)
                 end)
                 notifyUI("[Profile] Saved: " .. profileName .. " (" .. tostring(#allFlags) .. " settings)")
             else
