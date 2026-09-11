@@ -9056,22 +9056,32 @@ local function CreateSpamUI()
             Stroke.Color = Color3.fromRGB(255, 90, 90)
             
             manualSpamLoop = task.spawn(function()
-                local nextFire = 0
+                local nextFire = os.clock()
                 local rate = math.clamp(manualSpamRate, 1, 10000)
                 local interval = 1 / rate
+                local sendFn = getgenv().ENRIQUE_SendParry
                 while manualSpamEnabled do
-                    local now = os.clock()
-                    if now >= nextFire then
-                        nextFire = now + interval
-                        if type(getgenv().ENRIQUE_SendParry) == "function" then
-                            local success = getgenv().ENRIQUE_SendParry()
-                            if not success then
-                                nextFire = now + 0.05
-                            end
-                        else
+                    if type(sendFn) ~= "function" then
+                        sendFn = getgenv().ENRIQUE_SendParry
+                        if type(sendFn) ~= "function" then
                             print("[Manual Spam] ENRIQUE_SendParry chưa sẵn sàng, hãy parry 1 lần để capture")
                             break
                         end
+                    end
+                    -- Fire as many packets as this frame allows (true rate, no per-frame cap)
+                    local now = os.clock()
+                    local guard = 0
+                    while now >= nextFire and guard < 256 do
+                        local success = sendFn()
+                        if not success then
+                            nextFire = os.clock() + 0.02
+                            break
+                        end
+                        nextFire = nextFire + interval
+                        guard = guard + 1
+                    end
+                    if nextFire < now - 0.25 then
+                        nextFire = now
                     end
                     task.wait()
                 end
