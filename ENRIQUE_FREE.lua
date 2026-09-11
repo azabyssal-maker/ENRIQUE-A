@@ -7786,6 +7786,40 @@ end
 getgenv().__runUnlockAll = runUnlockAll
 
 
+
+-- ============================================================
+-- AUTO-LOAD PERSISTENT SETTINGS ON STARTUP
+-- ============================================================
+task.spawn(function()
+    task.wait(1)
+    pcall(function()
+        local DATAFILE = "Azure/auto_config.json"
+        if isfile and isfile(DATAFILE) and readfile then
+            local data = game:GetService("HttpService"):JSONDecode(readfile(DATAFILE))
+            local savedSword = data["Skin.LastEquippedSword"]
+            local savedExplosion = data["Explosion.LastEquippedExplosion"]
+            if type(savedSword) == "string" and savedSword ~= "" then
+                ensureBackend()
+                task.wait(0.5)
+                getgenv().swordModel = savedSword
+                getgenv().swordAnimations = savedSword
+                getgenv().swordFX = savedSword
+                getgenv().skinChanger = true
+                if getgenv().updateSword then task.spawn(getgenv().updateSword) end
+                print("[ENRIQUE AUTO] Skin restored: " .. savedSword)
+            end
+            if type(savedExplosion) == "string" and savedExplosion ~= "" then
+                ensureBackend()
+                task.wait(0.3)
+                getgenv().explosionFX = savedExplosion
+                getgenv().explosionChanger = true
+                if getgenv().updateExplosion then task.spawn(getgenv().updateExplosion) end
+                print("[ENRIQUE AUTO] Explosion restored: " .. savedExplosion)
+            end
+        end
+    end)
+end)
+
 local VisualCat = UI:create_category("Visual")
 local Detection = VisualCat:create_tab("Detection", "rbxassetid://shield")
 local ESP = VisualCat:create_tab("ESP", "rbxassetid://eye")
@@ -8264,40 +8298,68 @@ UnlockGroup:create_toggle("unlock_all", {
         end
     end,
 })
+
+-- Helper: ensure backend init + notify helper
+local function ensureBackend()
+    if type(__initUnlockAllBackend) == "function" then
+        pcall(__initUnlockAllBackend)
+    end
+end
+local function notifyUI(msg)
+    pcall(function() UI:notify(msg) end)
+end
+
 UnlockGroup:create_toggle("skin_changer", {
     title = "Skin Changer",
     default = getgenv().skinChanger or false,
     callback = function(state)
         getgenv().skinChanger = state
-        if state and getgenv().swordModel ~= "" then
-            if getgenv().updateSword then task.spawn(getgenv().updateSword) end
+        if state then
+            ensureBackend()
+            task.wait(0.3)
+            if getgenv().swordModel and getgenv().swordModel ~= "" and getgenv().updateSword then
+                task.spawn(getgenv().updateSword)
+                notifyUI("[Skin] Enabled: " .. getgenv().swordModel)
+            else
+                notifyUI("[Skin] Enabled — enter sword name below and press Apply")
+            end
+        else
+            notifyUI("[Skin] Disabled")
         end
     end,
 })
 
 local skinInput = UnlockGroup:create_textbox("skin_name_input", {
-    title = "Sword Name",
+    title = "Sword Name (enter exact name)",
     default = getgenv().swordModel or "",
     height = 28,
-    callback = function(value)
-        getgenv().swordModel = value
-        getgenv().swordAnimations = value
-        getgenv().swordFX = value
-    end,
 })
 
 UnlockGroup:create_button({
     title = "Apply Skin",
     callback = function()
         local name = skinInput:get_value()
-        if name and name ~= "" then
-            getgenv().swordModel = name
-            getgenv().swordAnimations = name
-            getgenv().swordFX = name
-            getgenv().skinChanger = true
-            if getgenv().updateSword then task.spawn(getgenv().updateSword) end
-            print("[ENRIQUE] Skin applied: " .. name)
+        if not name or name == "" then
+            notifyUI("[Skin] Enter a sword name first")
+            return
         end
+        ensureBackend()
+        task.wait(0.2)
+        getgenv().swordModel = name
+        getgenv().swordAnimations = name
+        getgenv().swordFX = name
+        getgenv().skinChanger = true
+        if getgenv().updateSword then
+            task.spawn(getgenv().updateSword)
+        end
+        if getgenv().updateSword then
+            task.spawn(getgenv().updateSword)
+        end
+        -- Save to persistent config
+        if getgenv().saveLastEquippedSword then
+            getgenv().saveLastEquippedSword(name)
+        end
+        notifyUI("[Skin] Equipped: " .. name)
     end,
 })
 
@@ -8307,7 +8369,16 @@ UnlockGroup:create_toggle("explosion_changer", {
     callback = function(state)
         getgenv().explosionChanger = state
         if state then
-            if getgenv().updateExplosion then task.spawn(getgenv().updateExplosion) end
+            ensureBackend()
+            task.wait(0.3)
+            if getgenv().explosionFX and getgenv().explosionFX ~= "" and getgenv().updateExplosion then
+                task.spawn(getgenv().updateExplosion)
+                notifyUI("[Explosion] Enabled: " .. getgenv().explosionFX)
+            else
+                notifyUI("[Explosion] Enabled — enter explosion name below and press Apply")
+            end
+        else
+            notifyUI("[Explosion] Disabled")
         end
     end,
 })
@@ -8316,21 +8387,31 @@ local explosionInput = UnlockGroup:create_textbox("explosion_name_input", {
     title = "Explosion Name",
     default = getgenv().explosionFX or "",
     height = 28,
-    callback = function(value)
-        getgenv().explosionFX = value
-    end,
 })
 
 UnlockGroup:create_button({
     title = "Apply Explosion",
     callback = function()
         local name = explosionInput:get_value()
-        if name and name ~= "" then
-            getgenv().explosionFX = name
-            getgenv().explosionChanger = true
-            if getgenv().updateExplosion then task.spawn(getgenv().updateExplosion) end
-            print("[ENRIQUE] Explosion applied: " .. name)
+        if not name or name == "" then
+            notifyUI("[Explosion] Enter an explosion name first")
+            return
         end
+        ensureBackend()
+        task.wait(0.2)
+        getgenv().explosionFX = name
+        getgenv().explosionChanger = true
+        if getgenv().setExplosionChanger then
+            getgenv().setExplosionChanger(name)
+        end
+        if getgenv().updateExplosion then
+            task.spawn(getgenv().updateExplosion)
+        end
+        -- Save to persistent config
+        if getgenv().saveLastEquippedExplosion then
+            getgenv().saveLastEquippedExplosion(name)
+        end
+        notifyUI("[Explosion] Equipped: " .. name)
     end,
 })
 
@@ -9164,7 +9245,9 @@ ProfileGroup:create_button({
             local json = game:GetService("HttpService"):JSONEncode(settings)
             if writefile then
                 writefile("ENRIQUE_FREE_" .. profileName .. ".json", json)
-                print("[ENRIQUE] Settings saved to: " .. profileName)
+                notifyUI("[Profile] Saved: " .. profileName)
+            else
+                notifyUI("[Profile] Save not supported")
             end
         end)
     end,
@@ -9175,27 +9258,38 @@ ProfileGroup:create_button({
     callback = function()
         local profileName = profileNameInput:get_value() or "Default"
         pcall(function()
-            if readfile then
-                local raw = readfile("ENRIQUE_FREE_" .. profileName .. ".json")
-                if raw and raw ~= "" then
+            if readfile and isfile then
+                local path = "ENRIQUE_FREE_" .. profileName .. ".json"
+                if isfile(path) then
+                    local raw = readfile(path)
                     local settings = game:GetService("HttpService"):JSONDecode(raw)
-                    if settings.swordModel then
+                    ensureBackend()
+                    task.wait(0.2)
+                    if settings.swordModel and settings.swordModel ~= "" then
                         getgenv().swordModel = settings.swordModel
                         getgenv().swordAnimations = settings.swordModel
                         getgenv().swordFX = settings.swordModel
+                        getgenv().skinChanger = settings.skinChanger or false
+                        if getgenv().skinChanger and getgenv().updateSword then
+                            task.spawn(getgenv().updateSword)
+                        end
+                        if getgenv().saveLastEquippedSword then
+                            getgenv().saveLastEquippedSword(settings.swordModel)
+                        end
                     end
-                    if settings.skinChanger then
-                        getgenv().skinChanger = true
-                        if getgenv().updateSword then task.spawn(getgenv().updateSword) end
-                    end
-                    if settings.explosionFX then
+                    if settings.explosionFX and settings.explosionFX ~= "" then
                         getgenv().explosionFX = settings.explosionFX
+                        getgenv().explosionChanger = settings.explosionChanger or false
+                        if getgenv().explosionChanger and getgenv().updateExplosion then
+                            task.spawn(getgenv().updateExplosion)
+                        end
+                        if getgenv().saveLastEquippedExplosion then
+                            getgenv().saveLastEquippedExplosion(settings.explosionFX)
+                        end
                     end
-                    if settings.explosionChanger then
-                        getgenv().explosionChanger = true
-                        if getgenv().updateExplosion then task.spawn(getgenv().updateExplosion) end
-                    end
-                    print("[ENRIQUE] Settings loaded from: " .. profileName)
+                    notifyUI("[Profile] Loaded: " .. profileName)
+                else
+                    notifyUI("[Profile] Not found: " .. profileName)
                 end
             end
         end)
@@ -9207,9 +9301,14 @@ ProfileGroup:create_button({
     callback = function()
         local profileName = profileNameInput:get_value() or "Default"
         pcall(function()
-            if delfile then
-                delfile("ENRIQUE_FREE_" .. profileName .. ".json")
-                print("[ENRIQUE] Profile deleted: " .. profileName)
+            if delfile and isfile then
+                local path = "ENRIQUE_FREE_" .. profileName .. ".json"
+                if isfile(path) then
+                    delfile(path)
+                    notifyUI("[Profile] Deleted: " .. profileName)
+                else
+                    notifyUI("[Profile] Not found: " .. profileName)
+                end
             end
         end)
     end,
