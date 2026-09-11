@@ -461,11 +461,9 @@ local function RemoteReady()
     return _captured ~= nil and _token ~= nil
 end
 
-local _lastTokenCache = nil
-local _lastTokenUid = nil
-local _lastTokenTime = 0
 local lastCtxTime = 0
 local lastCtxOk = false
+local _spamPacket = nil
 local function SendParry()
     -- Fast-path: re-check full context at most 5x/sec while spamming
     local ctime = os.clock()
@@ -478,24 +476,30 @@ local function SendParry()
     local cap = _reverted[remote] or (_captured.args)
     if not cap then return false end
 
-    -- Cache token per remote uid (token only depends on time + uid)
-    local token
-    if _lastTokenCache and _lastTokenUid == cap[2] and os.clock() - _lastTokenTime < 1.5 then
-        token = _lastTokenCache
-    else
-        local okTok, tok = pcall(_tokenize, cap[2])
-        if not (okTok and tok) then return false end
-        token = tok
-        _lastTokenCache = tok
-        _lastTokenUid = cap[2]
-        _lastTokenTime = os.clock()
-    end
+    -- FRESH token every packet: Blade Ball token rotates every ~10ms,
+    -- stale tokens are rejected by the server. Token math is cheap.
+    local okTok, token = pcall(_tokenize, cap[2])
+    if not (okTok and token) then return false end
 
-    -- Reuse cached parry data when spamming fast (avoids lag)
+    -- Reuse cached CFrame/events (only refreshed 10x/sec), no re-scan lag
     local cf, events, mouse = GetParryData()
     cf = ApplyCurveToCFrame(cf)
 
-    local packet = { cap[1], cap[2], token, cap[4] or 0.5, cf, events, mouse, false }
+    -- Reuse one packet table (zero garbage)
+    local packet = _spamPacket
+    if not packet then
+        packet = { cap[1], cap[2], token, cap[4] or 0.5, cf, events, mouse, false }
+        _spamPacket = packet
+    else
+        packet[1] = cap[1]
+        packet[2] = cap[2]
+        packet[3] = token
+        packet[4] = cap[4] or 0.5
+        packet[5] = cf
+        packet[6] = events
+        packet[7] = mouse
+        packet[8] = false
+    end
 
     local fired
     if _captured.isInvoke then
@@ -9075,8 +9079,6 @@ local function CreateSpamUI()
             
             manualSpamLoop = task.spawn(function()
                 local nextFire = os.clock()
-                local rate = math.clamp(manualSpamRate, 1, 10000)
-                local interval = 1 / rate
                 local sendFn = getgenv().ENRIQUE_SendParry
                 while manualSpamEnabled do
                     if type(sendFn) ~= "function" then
@@ -9086,23 +9088,24 @@ local function CreateSpamUI()
                             break
                         end
                     end
-                    -- Smart burst: adapts to ping so it never floods the network
+                    -- Token-window pacing: ~10ms/parry is the server's real
+                    -- max cadence. Over-shooting only causes lag + false flags.
                     local now = os.clock()
                     local ping = GetPing()
-                    local burstMax = 6
-                    if ping > 150 then burstMax = 3 end
-                    if ping > 220 then burstMax = 1 end
+                    local pacing = 0.010
+                    if ping > 150 then pacing = 0.015 end
+                    if ping > 220 then pacing = 0.025 end
                     local guard = 0
-                    while now >= nextFire and guard < burstMax do
+                    while now >= nextFire and guard < 8 do
                         local success = sendFn()
                         if not success then
-                            nextFire = now + 0.02
+                            nextFire = now + pacing
                             break
                         end
-                        nextFire = nextFire + interval
+                        nextFire = nextFire + pacing
                         guard = guard + 1
                     end
-                    if nextFire < now - 0.3 then
+                    if nextFire < now - 0.15 then
                         nextFire = now
                     end
                     task.wait()
@@ -9163,10 +9166,10 @@ ParryRight:create_toggle("manual_spam", {
 })
 
 ParryRight:create_slider("spam_rate", {
-    title = "Spam Rate",
+    title = "Spam Strength",
     minimum = 1,
-    maximum = 1000,
-    default = 300,
+    maximum = 100,
+    default = 100,
     rounding = true,
     callback = function(value)
         manualSpamRate = value
