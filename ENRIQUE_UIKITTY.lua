@@ -416,7 +416,7 @@ function library._init(self: _runtime)
 	create_outline(container)
 
 	_create_tween(tween_service, container, _new_tween_info(0.5, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
-		Size = _udim2_from_offset(600, 400),
+		Size = _udim2_from_offset(750, 500),
 	}):Play()
 
 -- ENRIQUE FREE: anime background
@@ -433,9 +433,9 @@ local _enrique_bg = create_new('ImageLabel', {
 })
 
 local _enrique_stroke = create_new('UIStroke', {
-    Color = Color3.fromRGB(255, 105, 180),
-    Thickness = 2,
-    Transparency = 0.25,
+    Color = Color3.fromRGB(255, 0, 0),
+    Thickness = 3,
+    Transparency = 0.2,
     Parent = container,
 })
 
@@ -483,7 +483,7 @@ local _enrique_stroke = create_new('UIStroke', {
 
 			local screen_scale = (viewport_size.X / 1400) * 1.4375
 			self._ui_scale = _clamp(
-				_min(screen_scale, (viewport_size.X * 0.95) / 600, (viewport_size.Y * 0.95) / 400),
+				_min(screen_scale, (viewport_size.X * 0.95) / 750, (viewport_size.Y * 0.95) / 500),
 				0.503125,
 				1.4375
 			)
@@ -532,7 +532,7 @@ local _enrique_stroke = create_new('UIStroke', {
 	})
 
 	local mobile_toggle = create_new('TextButton', {
-		BackgroundColor3 = Color3.fromRGB(180, 60, 120),
+		BackgroundColor3 = Color3.fromRGB(180, 0, 0),
 		AnchorPoint = _new_vector2(0.5, 0),
 		Position = _new_udim2(0.5, 0, 0, 12),
 		Size = _new_udim2(0, 40, 0, 40),
@@ -613,28 +613,19 @@ local _enrique_stroke = create_new('UIStroke', {
 
 	local logo_area = create_new('Frame', {
 		BackgroundTransparency = 1,
-		Size = _new_udim2(1, 0, 0, 48),
+		Size = _new_udim2(1, 0, 0, 68),
 		Parent = sidebar,
-	})
-
-	create_new('ImageLabel', {
-		BackgroundTransparency = 1,
-		Position = _new_udim2(0, (10 + 10), 0, 0),
-		Size = _new_udim2(1, -((10 + 10) + 10), 1, 0),
-		Image = 'rbxassetid://16014323157',
-		ImageColor3 = Color3.fromRGB(255, 255, 255),
-		ScaleType = Enum.ScaleType.Fit,
-		Parent = logo_area,
 	})
 
 	create_new('TextLabel', {
     BackgroundTransparency = 1,
-    Size = _new_udim2(1, 0, 0, 18),
+    Size = _new_udim2(1, 0, 1, 0),
     Font = Enum.Font.GothamBold,
     Text = 'ENRIQUE FREE',
-    TextColor3 = Color3.fromRGB(255, 105, 180),
-    TextSize = 13,
+    TextColor3 = Color3.fromRGB(255, 0, 0),
+    TextSize = 22,
     TextXAlignment = Enum.TextXAlignment.Center,
+    TextYAlignment = Enum.TextYAlignment.Center,
     Parent = logo_area,
 })
 

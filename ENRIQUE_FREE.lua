@@ -8264,6 +8264,28 @@ UnlockGroup:create_toggle("unlock_all", {
         end
     end,
 })
+UnlockGroup:create_toggle("skin_changer", {
+    title = "Skin Changer",
+    default = false,
+    callback = function(state)
+        getgenv().skinChanger = state
+        if state then
+            if getgenv().updateSword then task.spawn(getgenv().updateSword) end
+        end
+    end,
+})
+
+UnlockGroup:create_toggle("explosion_changer", {
+    title = "Explosion Changer",
+    default = false,
+    callback = function(state)
+        getgenv().explosionChanger = state
+        if state then
+            if getgenv().updateExplosion then task.spawn(getgenv().updateExplosion) end
+        end
+    end,
+})
+
 
 local DetectionLeft = Detection:create_group("Ability Detection", "left")
 DetectionLeft:create_toggle("detection_infinity", {
