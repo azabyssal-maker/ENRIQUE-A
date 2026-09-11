@@ -8299,7 +8299,7 @@ UnlockGroup:create_toggle("unlock_all", {
     end,
 })
 
--- Helper: ensure backend init + notify helper
+-- Helpers
 local function ensureBackend()
     if type(__initUnlockAllBackend) == "function" then
         pcall(__initUnlockAllBackend)
@@ -8309,26 +8309,7 @@ local function notifyUI(msg)
     pcall(function() UI:notify(msg) end)
 end
 
-UnlockGroup:create_toggle("skin_changer", {
-    title = "Skin Changer",
-    default = getgenv().skinChanger or false,
-    callback = function(state)
-        getgenv().skinChanger = state
-        if state then
-            ensureBackend()
-            task.wait(0.3)
-            if getgenv().swordModel and getgenv().swordModel ~= "" and getgenv().updateSword then
-                task.spawn(getgenv().updateSword)
-                notifyUI("[Skin] Enabled: " .. getgenv().swordModel)
-            else
-                notifyUI("[Skin] Enabled — enter sword name below and press Apply")
-            end
-        else
-            notifyUI("[Skin] Disabled")
-        end
-    end,
-})
-
+-- SKIN CHANGER: input + apply button visible from start (no need to enable first)
 local skinInput = UnlockGroup:create_textbox("skin_name_input", {
     title = "Sword Name (enter exact name)",
     default = getgenv().swordModel or "",
@@ -8352,10 +8333,6 @@ UnlockGroup:create_button({
         if getgenv().updateSword then
             task.spawn(getgenv().updateSword)
         end
-        if getgenv().updateSword then
-            task.spawn(getgenv().updateSword)
-        end
-        -- Save to persistent config
         if getgenv().saveLastEquippedSword then
             getgenv().saveLastEquippedSword(name)
         end
@@ -8363,26 +8340,27 @@ UnlockGroup:create_button({
     end,
 })
 
-UnlockGroup:create_toggle("explosion_changer", {
-    title = "Explosion Changer",
-    default = getgenv().explosionChanger or false,
+UnlockGroup:create_toggle("skin_changer", {
+    title = "Skin Changer",
+    default = getgenv().skinChanger or false,
     callback = function(state)
-        getgenv().explosionChanger = state
+        getgenv().skinChanger = state
         if state then
             ensureBackend()
-            task.wait(0.3)
-            if getgenv().explosionFX and getgenv().explosionFX ~= "" and getgenv().updateExplosion then
-                task.spawn(getgenv().updateExplosion)
-                notifyUI("[Explosion] Enabled: " .. getgenv().explosionFX)
+            task.wait(0.2)
+            if getgenv().swordModel and getgenv().swordModel ~= "" and getgenv().updateSword then
+                task.spawn(getgenv().updateSword)
+                notifyUI("[Skin] Enabled: " .. getgenv().swordModel)
             else
-                notifyUI("[Explosion] Enabled — enter explosion name below and press Apply")
+                notifyUI("[Skin] Enabled")
             end
         else
-            notifyUI("[Explosion] Disabled")
+            notifyUI("[Skin] Disabled")
         end
     end,
 })
 
+-- EXPLOSION CHANGER: input + apply button visible from start
 local explosionInput = UnlockGroup:create_textbox("explosion_name_input", {
     title = "Explosion Name",
     default = getgenv().explosionFX or "",
@@ -8407,11 +8385,30 @@ UnlockGroup:create_button({
         if getgenv().updateExplosion then
             task.spawn(getgenv().updateExplosion)
         end
-        -- Save to persistent config
         if getgenv().saveLastEquippedExplosion then
             getgenv().saveLastEquippedExplosion(name)
         end
         notifyUI("[Explosion] Equipped: " .. name)
+    end,
+})
+
+UnlockGroup:create_toggle("explosion_changer", {
+    title = "Explosion Changer",
+    default = getgenv().explosionChanger or false,
+    callback = function(state)
+        getgenv().explosionChanger = state
+        if state then
+            ensureBackend()
+            task.wait(0.2)
+            if getgenv().explosionFX and getgenv().explosionFX ~= "" and getgenv().updateExplosion then
+                task.spawn(getgenv().updateExplosion)
+                notifyUI("[Explosion] Enabled: " .. getgenv().explosionFX)
+            else
+                notifyUI("[Explosion] Enabled")
+            end
+        else
+            notifyUI("[Explosion] Disabled")
+        end
     end,
 })
 
@@ -9219,19 +9216,84 @@ UISettingsRight:create_button({
 })
 
 -- ============================================================
+
+-- ============================================================
 -- PROFILE SAVE TAB
 -- ============================================================
 local ProfileTab = SettingsCat:create_tab("Profile", "rbxassetid://swords")
 local ProfileGroup = ProfileTab:create_group("Save / Load", "left")
 
+-- Scan existing saved profiles from disk
+local savedProfileNames = {}
+pcall(function()
+    if listfiles then
+        local files = listfiles("")
+        for _, file in ipairs(files) do
+            if file:find("ENRIQUE_FREE_") and file:find("%.json$") then
+                local name = file:gsub("^ENRIQUE_FREE_", ""):gsub("%.json$", "")
+                table.insert(savedProfileNames, name)
+            end
+        end
+    end
+end)
+if #savedProfileNames == 0 then table.insert(savedProfileNames, "Default") end
+
+-- Dropdown: selecting a saved profile auto-loads it
+local profileDropdown = ProfileGroup:create_dropdown("profile_select", {
+    title = "Saved Profiles (click to load)",
+    options = savedProfileNames,
+    callback = function(value)
+        if value and value ~= "" then
+            notifyUI("[Profile] Loading: " .. value)
+            pcall(function()
+                if readfile and isfile then
+                    local path = "ENRIQUE_FREE_" .. value .. ".json"
+                    if isfile(path) then
+                        local raw = readfile(path)
+                        local settings = game:GetService("HttpService"):JSONDecode(raw)
+                        ensureBackend()
+                        task.wait(0.2)
+                        if settings.swordModel and settings.swordModel ~= "" then
+                            getgenv().swordModel = settings.swordModel
+                            getgenv().swordAnimations = settings.swordModel
+                            getgenv().swordFX = settings.swordModel
+                            getgenv().skinChanger = settings.skinChanger or false
+                            if getgenv().skinChanger and getgenv().updateSword then
+                                task.spawn(getgenv().updateSword)
+                            end
+                            if getgenv().saveLastEquippedSword then
+                                getgenv().saveLastEquippedSword(settings.swordModel)
+                            end
+                        end
+                        if settings.explosionFX and settings.explosionFX ~= "" then
+                            getgenv().explosionFX = settings.explosionFX
+                            getgenv().explosionChanger = settings.explosionChanger or false
+                            if getgenv().explosionChanger and getgenv().updateExplosion then
+                                task.spawn(getgenv().updateExplosion)
+                            end
+                            if getgenv().saveLastEquippedExplosion then
+                                getgenv().saveLastEquippedExplosion(settings.explosionFX)
+                            end
+                        end
+                        notifyUI("[Profile] Loaded: " .. value)
+                    else
+                        notifyUI("[Profile] File missing: " .. value)
+                    end
+                end
+            end)
+        end
+    end,
+})
+
+-- Textbox: enter new profile name to save
 local profileNameInput = ProfileGroup:create_textbox("profile_name", {
-    title = "Profile Name",
+    title = "New Profile Name",
     default = "Default",
     height = 28,
 })
 
 ProfileGroup:create_button({
-    title = "Save Settings",
+    title = "Save Profile",
     callback = function()
         local profileName = profileNameInput:get_value() or "Default"
         pcall(function()
@@ -9240,57 +9302,21 @@ ProfileGroup:create_button({
                 swordModel = getgenv().swordModel or "",
                 explosionChanger = getgenv().explosionChanger or false,
                 explosionFX = getgenv().explosionFX or "",
-                bgImageId = "16014323157",
             }
             local json = game:GetService("HttpService"):JSONEncode(settings)
             if writefile then
                 writefile("ENRIQUE_FREE_" .. profileName .. ".json", json)
+                local alreadyExists = false
+                for _, name in ipairs(savedProfileNames) do
+                    if name == profileName then alreadyExists = true break end
+                end
+                if not alreadyExists then
+                    profileDropdown:add_option(profileName)
+                    table.insert(savedProfileNames, profileName)
+                end
                 notifyUI("[Profile] Saved: " .. profileName)
             else
                 notifyUI("[Profile] Save not supported")
-            end
-        end)
-    end,
-})
-
-ProfileGroup:create_button({
-    title = "Load Settings",
-    callback = function()
-        local profileName = profileNameInput:get_value() or "Default"
-        pcall(function()
-            if readfile and isfile then
-                local path = "ENRIQUE_FREE_" .. profileName .. ".json"
-                if isfile(path) then
-                    local raw = readfile(path)
-                    local settings = game:GetService("HttpService"):JSONDecode(raw)
-                    ensureBackend()
-                    task.wait(0.2)
-                    if settings.swordModel and settings.swordModel ~= "" then
-                        getgenv().swordModel = settings.swordModel
-                        getgenv().swordAnimations = settings.swordModel
-                        getgenv().swordFX = settings.swordModel
-                        getgenv().skinChanger = settings.skinChanger or false
-                        if getgenv().skinChanger and getgenv().updateSword then
-                            task.spawn(getgenv().updateSword)
-                        end
-                        if getgenv().saveLastEquippedSword then
-                            getgenv().saveLastEquippedSword(settings.swordModel)
-                        end
-                    end
-                    if settings.explosionFX and settings.explosionFX ~= "" then
-                        getgenv().explosionFX = settings.explosionFX
-                        getgenv().explosionChanger = settings.explosionChanger or false
-                        if getgenv().explosionChanger and getgenv().updateExplosion then
-                            task.spawn(getgenv().updateExplosion)
-                        end
-                        if getgenv().saveLastEquippedExplosion then
-                            getgenv().saveLastEquippedExplosion(settings.explosionFX)
-                        end
-                    end
-                    notifyUI("[Profile] Loaded: " .. profileName)
-                else
-                    notifyUI("[Profile] Not found: " .. profileName)
-                end
             end
         end)
     end,
@@ -9305,6 +9331,18 @@ ProfileGroup:create_button({
                 local path = "ENRIQUE_FREE_" .. profileName .. ".json"
                 if isfile(path) then
                     delfile(path)
+                    for i, name in ipairs(savedProfileNames) do
+                        if name == profileName then
+                            table.remove(savedProfileNames, i)
+                            break
+                        end
+                    end
+                    local newOpts = {}
+                    for _, name in ipairs(savedProfileNames) do
+                        table.insert(newOpts, name)
+                    end
+                    if #newOpts == 0 then table.insert(newOpts, "Default") end
+                    profileDropdown:set_options(newOpts)
                     notifyUI("[Profile] Deleted: " .. profileName)
                 else
                     notifyUI("[Profile] Not found: " .. profileName)
@@ -9330,3 +9368,4 @@ ProfileRight:create_button({
         end)
     end,
 })
+
