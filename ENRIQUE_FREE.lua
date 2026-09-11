@@ -604,7 +604,49 @@ if track.Name:find("Grab") or track.Name:find("Parry") then track:Stop(0.1) end
 end
 end)
 
-local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/azabyssal-maker/ENRIQUE-A/main/ENRIQUE_UI.lua", true))()
+-- ENRIQUE FREE UI Wrapper
+local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/ffgringoxp123-code/Code/refs/heads/main/Uikitty_with_ColorPicker.lua.txt"))()
+
+-- Post-modify: rename GUI, add anime BG, change colors
+task.spawn(function()
+    task.wait(2)
+    pcall(function()
+        for _, gui in ipairs(game:GetService("CoreGui"):GetChildren()) do
+            if gui:IsA("ScreenGui") then
+                gui.Name = "ENRIQUE_FREE"
+                -- Add anime background to main frame
+                for _, desc in ipairs(gui:GetDescendants()) do
+                    if desc:IsA("Frame") and desc.Size and desc.Size.X.Scale > 0.4 then
+                        local bg = Instance.new("ImageLabel")
+                        bg.Name = "ENRIQUE_BG"
+                        bg.Size = UDim2.new(1,0,1,0)
+                        bg.BackgroundTransparency = 1
+                        bg.Image = "rbxassetid://92296849858473"
+                        bg.ImageTransparency = 0.87
+                        bg.ScaleType = Enum.ScaleType.Stretch
+                        bg.ZIndex = 0
+                        bg.Parent = desc
+                        -- Pink anime stroke
+                        local s = Instance.new("UIStroke")
+                        s.Color = Color3.fromRGB(255, 105, 180)
+                        s.Thickness = 1.5
+                        s.Transparency = 0.3
+                        s.Parent = desc
+                        break
+                    end
+                end
+                -- Rename toggle button
+                for _, desc in ipairs(gui:GetDescendants()) do
+                    if desc:IsA("ImageLabel") and desc.Image and desc.Image:find("86955036432319") then
+                        desc.Image = "rbxassetid://92296849858473"
+                    end
+                end
+                break
+            end
+        end
+    end)
+end)
+
 
 local UI = Library._new("ENRIQUE FREE")
 
