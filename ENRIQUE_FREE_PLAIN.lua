@@ -376,6 +376,8 @@ return result[1], result[2], result[3]
 end
 
 local recentParries=0
+local rpWindowStart=0
+local lastAnimTime=0
 
 local _token
 for _, Function in getgc(true) do
@@ -462,8 +464,16 @@ end
 local _lastTokenCache = nil
 local _lastTokenUid = nil
 local _lastTokenTime = 0
+local lastCtxTime = 0
+local lastCtxOk = false
 local function SendParry()
-    if not RemoteReady() or not parryContextAllowed() or AbilityBlocked() then return false end
+    -- Fast-path: re-check full context at most 5x/sec while spamming
+    local ctime = os.clock()
+    if ctime - (lastCtxTime or 0) > 0.2 then
+        lastCtxTime = ctime
+        lastCtxOk = RemoteReady() and parryContextAllowed() and not AbilityBlocked()
+    end
+    if not lastCtxOk then return false end
     local remote = _captured.remote
     local cap = _reverted[remote] or (_captured.args)
     if not cap then return false end
@@ -495,10 +505,18 @@ local function SendParry()
     end
 
     if fired then
-        recentParries = (recentParries or 0) + 1
-        task.delay(.5, function() recentParries = math.max((recentParries or 1) - 1, 0) end)
+        local st = os.clock()
+        if st - (rpWindowStart or 0) > 0.5 then
+            rpWindowStart = st
+            recentParries = 1
+        else
+            recentParries = (recentParries or 0) + 1
+        end
+        if cfg.animfix and st - (lastAnimTime or 0) > 0.05 then
+            lastAnimTime = st
+            task.spawn(PlayParryAnimation)
+        end
     end
-    if fired and cfg.animfix then task.spawn(PlayParryAnimation) end
     return fired
 end
 
@@ -9071,7 +9089,7 @@ local function CreateSpamUI()
                     -- Fire as many packets as this frame allows (true rate, no per-frame cap)
                     local now = os.clock()
                     local guard = 0
-                    while now >= nextFire and guard < 256 do
+                    while now >= nextFire and guard < 24 do
                         local success = sendFn()
                         if not success then
                             nextFire = os.clock() + 0.02
