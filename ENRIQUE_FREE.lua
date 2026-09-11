@@ -883,4 +883,4 @@ ParryRight:create_toggle("manual_spam", {
             end
         end
     end,
-}
+}# ENRIQUE FREE V55 - Core (33KB)
