@@ -9277,41 +9277,38 @@ UISettingsRight:create_button({
 
 -- ============================================================
 -- ============================================================
--- PROFILE SAVE TAB (per-user, saves ALL settings)
+-- ============================================================
+-- PROFILE SAVE TAB (per-user single-file storage)
 -- ============================================================
 local ProfileTab = SettingsCat:create_tab("Profile", "rbxassetid://swords")
 local ProfileGroup = ProfileTab:create_group("Save / Load", "left")
 
--- Per-user folder: ENRIQUE_profiles/<username>/
+-- Every user has their OWN file: ENRIQUE_profiles_<username>.json
 local playerName = (function()
     local p = game:GetService("Players").LocalPlayer
     return p and p.Name or "Unknown"
 end)()
-local profileFolder = "ENRIQUE_profiles/" .. playerName
-pcall(function()
-    if makefolder and not isfolder("ENRIQUE_profiles") then
-        makefolder("ENRIQUE_profiles")
-    end
-    if makefolder and not isfolder(profileFolder) then
-        makefolder(profileFolder)
-    end
-end)
+local profileFile = "ENRIQUE_profiles_" .. playerName .. ".json"
 
--- Scan existing saved profiles (per-user only)
-local savedProfileNames = {}
+-- Load the user's profile index (all their saved profiles in one file)
+local profileData = {}
 pcall(function()
-    if listfiles and isfolder and isfolder(profileFolder) then
-        local files = listfiles(profileFolder)
-        for _, file in ipairs(files) do
-            if file:find("%.json$") then
-                local name = file:gsub("%.json$", "")
-                local last = name:match("([^/\\]+)$")
-                if last then name = last end
-                table.insert(savedProfileNames, name)
-            end
+    if readfile and isfile and isfile(profileFile) then
+        local raw = readfile(profileFile)
+        local decoded = game:GetService("HttpService"):JSONDecode(raw)
+        if type(decoded) == "table" then
+            profileData = decoded
         end
     end
 end)
+
+-- Profile names for the dropdown
+local savedProfileNames = {}
+for name, _ in pairs(profileData) do
+    if type(name) == "string" and name ~= "" then
+        table.insert(savedProfileNames, name)
+    end
+end
 if #savedProfileNames == 0 then table.insert(savedProfileNames, "Default") end
 
 -- Dropdown: click a saved profile to load ALL settings + reload UI
@@ -9320,27 +9317,23 @@ local profileDropdown = ProfileGroup:create_dropdown("profile_select", {
     options = savedProfileNames,
     callback = function(value)
         if value and value ~= "" then
-            pcall(function()
-                local path = profileFolder .. "/" .. value .. ".json"
-                if readfile and isfile and isfile(path) then
-                    local raw = readfile(path)
-                    local allFlags = game:GetService("HttpService"):JSONDecode(raw)
-                    -- Write all flags to library._flags (for UI defaults on reload)
-                    for k, v in pairs(allFlags) do
-                        library._flags[k] = v
-                    end
-                    -- Store for runtime restore at script top
-                    getgenv().__enrique_saved = allFlags
-                    -- Destroy current UI and re-execute for full restore
-                    notifyUI("[Profile] Loading: " .. value .. " ...")
-                    task.delay(0.6, function()
-                        pcall(function() UI._ui:Destroy() end)
-                        local url = "https://raw.githubusercontent.com/azabyssal-maker/ENRIQUE-A/main/ENRIQUE_FREE.lua"
-                        loadstring(game:HttpGet(url, true))()
-                    end)
-                else
-                    notifyUI("[Profile] Not found: " .. value)
-                end
+            local allFlags = profileData[value]
+            if type(allFlags) ~= "table" then
+                notifyUI("[Profile] Not found: " .. value)
+                return
+            end
+            -- Write all flags to library._flags (for UI defaults on reload)
+            for k, v in pairs(allFlags) do
+                library._flags[k] = v
+            end
+            -- Store for runtime restore at script top
+            getgenv().__enrique_saved = allFlags
+            -- Destroy current UI and re-execute for full restore
+            notifyUI("[Profile] Loading: " .. value .. " ...")
+            task.delay(0.6, function()
+                pcall(function() UI._ui:Destroy() end)
+                local url = "https://raw.githubusercontent.com/azabyssal-maker/ENRIQUE-A/main/ENRIQUE_FREE.lua"
+                loadstring(game:HttpGet(url, true))()
             end)
         end
     end,
@@ -9357,18 +9350,22 @@ ProfileGroup:create_button({
     title = "Save Profile",
     callback = function()
         local profileName = profileNameInput:get_value() or "Default"
+        if profileName == "" then
+            notifyUI("[Profile] Enter a name first")
+            return
+        end
         pcall(function()
             -- Save ENTIRE UI flags table (all toggles, sliders, dropdowns, keys)
             local allFlags = {}
             for k, v in pairs(library._flags) do
-                allFlags[k] = v
-            end
-            local json = game:GetService("HttpService"):JSONEncode(allFlags)
-            if writefile and makefolder then
-                if not isfolder(profileFolder) then
-                    makefolder(profileFolder)
+                if type(k) == "string" then
+                    allFlags[k] = v
                 end
-                writefile(profileFolder .. "/" .. profileName .. ".json", json)
+            end
+            profileData[profileName] = allFlags
+            local json = game:GetService("HttpService"):JSONEncode(profileData)
+            if writefile then
+                writefile(profileFile, json)
                 local alreadyExists = false
                 for _, name in ipairs(savedProfileNames) do
                     if name == profileName then alreadyExists = true break end
@@ -9390,26 +9387,26 @@ ProfileGroup:create_button({
     callback = function()
         local profileName = profileNameInput:get_value() or "Default"
         pcall(function()
-            if delfile and isfile then
-                local path = profileFolder .. "/" .. profileName .. ".json"
-                if isfile(path) then
-                    delfile(path)
-                    for i, name in ipairs(savedProfileNames) do
-                        if name == profileName then
-                            table.remove(savedProfileNames, i)
-                            break
-                        end
-                    end
-                    local newOpts = {}
-                    for _, name in ipairs(savedProfileNames) do
-                        table.insert(newOpts, name)
-                    end
-                    if #newOpts == 0 then table.insert(newOpts, "Default") end
-                    profileDropdown:set_options(newOpts)
-                    notifyUI("[Profile] Deleted: " .. profileName)
-                else
-                    notifyUI("[Profile] Not found: " .. profileName)
+            if profileData[profileName] ~= nil then
+                profileData[profileName] = nil
+                if writefile then
+                    writefile(profileFile, game:GetService("HttpService"):JSONEncode(profileData))
                 end
+                for i, name in ipairs(savedProfileNames) do
+                    if name == profileName then
+                        table.remove(savedProfileNames, i)
+                        break
+                    end
+                end
+                local newOpts = {}
+                for _, name in ipairs(savedProfileNames) do
+                    table.insert(newOpts, name)
+                end
+                if #newOpts == 0 then table.insert(newOpts, "Default") end
+                profileDropdown:set_options(newOpts)
+                notifyUI("[Profile] Deleted: " .. profileName)
+            else
+                notifyUI("[Profile] Not found: " .. profileName)
             end
         end)
     end,
@@ -9420,65 +9417,19 @@ ProfileRight:create_button({
     title = "List My Profiles",
     callback = function()
         pcall(function()
-            if listfiles and isfolder and isfolder(profileFolder) then
-                local files = listfiles(profileFolder)
-                for _, file in ipairs(files) do
-                    print("[ENRIQUE] Your profile: " .. file)
-                end
-                notifyUI("[Profile] Check console (F9) for list")
+            local names = {}
+            for name, _ in pairs(profileData) do
+                table.insert(names, name)
             end
+            if #names == 0 then
+                notifyUI("[Profile] No saved profiles yet")
+                return
+            end
+            for _, name in ipairs(names) do
+                print("[ENRIQUE] Your profile: " .. name)
+            end
+            notifyUI("[Profile] Check console (F9) for list")
         end)
     end,
 })
-
-
--- LATE RESTORE: apply flags that need late-defined variables
-task.delay(1.5, function()
-    local saved = getgenv().__enrique_saved
-    if type(saved) ~= "table" then return end
-    pcall(function()
-        if saved.manual_spam ~= nil then manualSpamEnabled = (saved.manual_spam == true) end
-        if saved.spam_rate ~= nil then manualSpamRate = tonumber(saved.spam_rate) or 500 end
-        -- World sky
-        if saved.world_sky_changer ~= nil and saved.world_sky_changer == true then
-            if getgenv().applySky then pcall(getgenv().applySky) end
-        end
-        -- Hit sounds
-        if saved.hit_sounds ~= nil and saved.hit_sounds == true then
-            getgenv().hitSoundsEnabled = true
-        end
-        if saved.hit_sound_volume ~= nil then getgenv().hitSoundVolume = tonumber(saved.hit_sound_volume) end
-        if saved.hit_sound_type and tostring(saved.hit_sound_type) ~= "" then
-            getgenv().hitSoundType = tostring(saved.hit_sound_type)
-        end
-        -- Ball trail
-        if saved.ball_trail ~= nil and saved.ball_trail == true then
-            getgenv().ballTrailEnabled = true
-        end
-        -- Ability ESP
-        if saved.ability_esp ~= nil and saved.ability_esp == true then
-            getgenv().abilityESPEnabled = true
-        end
-        -- Ball Statistic
-        if saved.ball_statistic ~= nil and saved.ball_statistic == true then
-            getgenv().ballStatEnabled = true
-        end
-        -- Unlock all backend
-        if saved.unlock_all ~= nil and saved.unlock_all == true then
-            ensureBackend()
-            task.wait(0.3)
-            if getgenv().__runUnlockAll then pcall(getgenv().__runUnlockAll) end
-        end
-        -- Skin
-        if saved.skin_changer ~= nil and saved.skin_changer == true and getgenv().updateSword then
-            pcall(getgenv().updateSword)
-        end
-        -- Explosion
-        if saved.explosion_changer ~= nil and saved.explosion_changer == true and getgenv().updateExplosion then
-            pcall(getgenv().updateExplosion)
-        end
-        getgenv().__enrique_saved = nil
-        print("[ENRIQUE] Late state restore complete")
-    end)
-end)
 
