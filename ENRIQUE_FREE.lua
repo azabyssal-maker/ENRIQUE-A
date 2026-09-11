@@ -1,6 +1,7 @@
 -- ENRIQUE FREE V55 Encrypted
 local key="hJEz4vHLcPD/4CETrGPTaPsGLnE6RP1lpbmGiXv5daU="
 local sig="ENRIQ"
+local _unpack=table.unpack or unpack
 local function b64d(s)
 local a="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
 s=s:gsub("[^"..a.."]","")
@@ -8,7 +9,7 @@ local r={} local n=0 local b={}
 for i=1,#s do local c=s:sub(i,i)
 if c=="="then break end n=n*64+(a:find(c)-1)
 if i%4==0 or i==#s then for j=2,0,-1 do b[#b+1]=n/(2^(j*8))%256 end n=0 end end
-return string.char(table.unpack(b))
+return string.char(_unpack(b))
 end
 local sd=game:HttpGet("https://raw.githubusercontent.com/azabyssal-maker/ENRIQUE-A/main/ENRIQUE_DATA.txt",true)
 local k=b64d(key)
