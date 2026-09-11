@@ -33,7 +33,7 @@ local cfg = {
 parry = true,
 spam = false,
 trigger = false,
-cps = 200,
+cps = 1000,
 accuracy = 50,
 randomPingAccuracy = false,
 autoSpam = false,
@@ -570,7 +570,7 @@ if spamActive and RemoteReady() then
 local delay = 1 / math.max(cfg.cps or 200, 1)
 if tick() - lastSpamTime >= delay then SendParry() lastSpamTime = tick() end
 end
-task.wait(0.001)
+task.wait()
 end
 end)
 
@@ -9103,7 +9103,7 @@ ParryRight:create_toggle("manual_spam", {
 ParryRight:create_slider("spam_rate", {
     title = "Spam Rate",
     minimum = 1,
-    maximum = 1000,
+    maximum = 5000,
     default = 500,
     rounding = true,
     callback = function(value)
@@ -9315,6 +9315,7 @@ if #savedProfileNames == 0 then table.insert(savedProfileNames, "Default") end
 local profileDropdown = ProfileGroup:create_dropdown("profile_select", {
     title = "Saved Profiles (click to load)",
     options = savedProfileNames,
+    hide_selected_option = false,
     callback = function(value)
         if value and value ~= "" then
             local allFlags = profileData[value]
@@ -9371,9 +9372,13 @@ ProfileGroup:create_button({
                     if name == profileName then alreadyExists = true break end
                 end
                 if not alreadyExists then
-                    profileDropdown:add_option(profileName)
                     table.insert(savedProfileNames, profileName)
                 end
+                -- Rebuild the dropdown list fully and select the saved name
+                pcall(function()
+                    profileDropdown:set_options(savedProfileNames)
+                    profileDropdown:set_value(profileName, true)
+                end)
                 notifyUI("[Profile] Saved: " .. profileName .. " (" .. tostring(#allFlags) .. " settings)")
             else
                 notifyUI("[Profile] Save not supported")
@@ -9404,6 +9409,7 @@ ProfileGroup:create_button({
                 end
                 if #newOpts == 0 then table.insert(newOpts, "Default") end
                 profileDropdown:set_options(newOpts)
+                pcall(function() profileDropdown:set_value(newOpts[1], true) end)
                 notifyUI("[Profile] Deleted: " .. profileName)
             else
                 notifyUI("[Profile] Not found: " .. profileName)
