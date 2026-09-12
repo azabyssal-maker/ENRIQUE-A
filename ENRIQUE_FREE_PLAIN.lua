@@ -668,12 +668,12 @@ end
 
 task.spawn(function()
     task.wait(0.5)
-    if not _restoreCapture() and not _autoArm.ready and not InputCapable() then
+    if not _restoreCapture() and not _autoArm.ready then
         -- auto-arm may still be initializing; the task.spawn above
-        -- handles it separately — print only if every path fails
+        -- handles it separately — print only if both paths fail
         task.delay(5, function()
-            if not _autoArm.ready and not InputCapable() then
-                print("[ENRIQUE] No keypress/mouse1click support and no remote — hit parry ONCE to capture via hook fallback.")
+            if not _autoArm.ready then
+                print("[ENRIQUE] If auto-arm failed, hit parry ONCE to capture via hook fallback.")
             end
         end)
     end
@@ -683,86 +683,19 @@ local function RemoteReady()
     return _captured ~= nil and _token ~= nil
 end
 
--- ============================================================
--- INPUT-BASED PARRY (primary)
--- Blade Ball added remote protection: directly firing the parry
--- RemoteEvent now gets rejected server-side, so the old auto-arm /
--- hook-capture remotes can't register a parry. The method used by
--- working updated scripts is to SIMULATE the parry key press (F /
--- mouse1), letting the game's own input handler build + send the
--- packet. That cannot be blocked — it IS the real game code.
--- ============================================================
-local _lastInputParry = 0
-local function InputCapable()
-    return (type(keypress) == "function" and type(keyrelease) == "function")
-        or type(mouse1click) == "function"
-end
-
-local function DoParryInput()
-    local ok = false
-    pcall(function()
-        if type(keypress) == "function" and type(keyrelease) == "function" then
-            keypress(0x46) -- F = parry key
-            local hold = 0.008 + (math.random() * 0.012)
-            task.delay(hold, function()
-                pcall(function() keyrelease(0x46) end)
-            end)
-            ok = true
-        elseif type(mouse1click) == "function" then
-            mouse1click()
-            ok = true
-        elseif type(keypress) == "function" then
-            keypress(0x46)
-            task.delay(0.05, function()
-                pcall(function()
-                    if type(keyrelease) == "function" then keyrelease(0x46) end
-                end)
-            end)
-            ok = true
-        end
-    end)
-    return ok
-end
-
-local function _parryBookkeeping()
-    local st = os.clock()
-    if st - (rpWindowStart or 0) > 0.5 then
-        rpWindowStart = st
-        recentParries = 1
-    else
-        recentParries = (recentParries or 0) + 1
-    end
-    if cfg.animfix and st - (lastAnimTime or 0) > 0.05 then
-        lastAnimTime = st
-        task.spawn(PlayParryAnimation)
-    end
-end
-
 local _spamPacket = nil
 local function SendParry()
-    if not parryContextAllowed() then return false end
-
-    -- PRIMARY: input simulation. The game itself builds + sends the
-    -- parry packet, so the new remote protection can't block it.
-    if InputCapable() then
-        local now = os.clock()
-        if now - _lastInputParry < 0.012 then return false end
-        _lastInputParry = now
-        local ok = DoParryInput()
-        if ok then _parryBookkeeping() end
-        return ok
-    end
-
-    -- FALLBACK: packet remote (auto-arm upvalues first, then hook
-    -- capture). Only used on executors without keypress/mouse1click.
     local ready = _autoArm.ready or (RemoteReady() and _tokReady)
     if not ready then return false end
+    if not parryContextAllowed() then return false end
 
     -- Reuse cached CFrame/events (refreshed 10x/sec)
     local cf, events, mouse = GetParryData()
     cf = ApplyCurveToCFrame(cf)
 
-    -- AUTO-ARM: builds payload from game module upvalues.
+    -- FAST PATH: auto-arm — builds payload from game module upvalues.
+    -- Works instantly on load, survives Blade Ball updates (re-reads
+    -- upvalues each time the payload is built).
     if _autoArm.ready then
         local payload = _buildAutoArmPayload(cf, events, mouse)
         if payload then
@@ -770,7 +703,12 @@ local function SendParry()
                 _autoArm.remote:FireServer(unpack(payload))
             end)
             if fired then
-                _parryBookkeeping()
+                local st = os.clock()
+                if st - (rpWindowStart or 0) > 0.5 then rpWindowStart = st; recentParries = 1
+                else recentParries = (recentParries or 0) + 1 end
+                if cfg.animfix and st - (lastAnimTime or 0) > 0.05 then
+                    lastAnimTime = st; task.spawn(PlayParryAnimation)
+                end
                 return true
             end
         end
@@ -809,7 +747,17 @@ local function SendParry()
     end
 
     if fired then
-        _parryBookkeeping()
+        local st = os.clock()
+        if st - (rpWindowStart or 0) > 0.5 then
+            rpWindowStart = st
+            recentParries = 1
+        else
+            recentParries = (recentParries or 0) + 1
+        end
+        if cfg.animfix and st - (lastAnimTime or 0) > 0.05 then
+            lastAnimTime = st
+            task.spawn(PlayParryAnimation)
+        end
     end
     return fired
 end
@@ -819,29 +767,15 @@ getgenv().ENRIQUE_SendParry=SendParry
 local function ProcessAutoParry(ball)
 if not cfg.parry or spamActive then return end
 local bID = ball:GetDebugId()
-if ball:GetAttribute("target") ~= player.Name then return end
-if not InputCapable() and parried_balls[bID] then return end
+if ball:GetAttribute("target") ~= player.Name or parried_balls[bID] then return end
 local charPart = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
 local z = ball:FindFirstChild("zoomies")
 if not charPart or not z then return end
 local velocity = z.VectorVelocity
 if velocity.Magnitude < 0.01 then return end
 local dist = (charPart.Position - ball.Position).Magnitude
-if InputCapable() then
-    -- Input mode: the F press only parries when the ball is already
-    -- inside the game's parry window, so keep pressing while it is in
-    -- range (SendParry rate-limits itself). The speed-based lead covers
-    -- fast balls so the input lands at the right moment.
-    local pingSec = math.clamp(LastPing or 60, 10, 300) / 1000
-    local window = 16 + math.min(velocity.Magnitude * (pingSec * 0.5 + 0.017) + 8, 22)
-    local toPlayer = (charPart.Position - ball.Position).Unit
-    local dot = toPlayer:Dot(velocity.Unit)
-    if dist <= window and dot > -0.25 then SendParry() end
-    return
-end
--- Packet mode: parry when the ball reaches the parry window (original
--- distance logic). REACTION is instant: no cached context, fires the
--- same frame it enters range.
+-- Parry when the ball reaches the parry window (original distance logic).
+-- REACTION is instant: no cached context, fires the same frame it enters range.
 local threshold = CalculateParryDistance(ball, velocity, charPart)
 if dist <= threshold or dist <= 20 then
     if SendParry() then
@@ -857,23 +791,17 @@ local function ProcessTriggerBot(ball)
 if not (cfg.trigger or manualTBActive) then return end
 if ball:GetAttribute("target") ~= player.Name then return end
 local bID = ball:GetDebugId()
-if not InputCapable() and triggered_balls[bID] then return end
+if triggered_balls[bID] then return end
 local root = player.Character and player.Character.PrimaryPart
 local z = ball:FindFirstChild("zoomies")
 if not root or not z then return end
 local dist = (root.Position - ball.Position).Magnitude
 local range = math.max(cfg.tbRange or 24, 8)
 if dist <= range then
-    if InputCapable() then
-        -- Input mode: keep pressing while in range so the swing lands
-        -- exactly when the ball enters the parry window.
-        SendParry()
-        return
-    end
-    -- Single clean parry per ball trip. Mark BEFORE firing to prevent double-parry.
-    triggered_balls[bID] = true
-    ball:GetAttributeChangedSignal("target"):Once(function() triggered_balls[bID] = nil end)
-    SendParry()
+-- Single clean parry per ball trip. Mark BEFORE firing to prevent double-parry.
+triggered_balls[bID] = true
+ball:GetAttributeChangedSignal("target"):Once(function() triggered_balls[bID] = nil end)
+SendParry()
 end
 end
 
@@ -934,13 +862,9 @@ end
 task.spawn(function()
 local hb = RunService.Heartbeat
 while true do
-if spamActive and (InputCapable() or _autoArm.ready or (RemoteReady() and _tokReady)) then
--- Input path: ~1 press/frame — fast, matches the server-side parry
--- cap, no lag. Packet path: burst per frame scaled from cps.
-local n = 1
-if not InputCapable() then
-    n = math.clamp(math.floor(math.max(cfg.cps or 1500, 60) / 48), 1, 30)
-end
+if spamActive and (_autoArm.ready or (RemoteReady() and _tokReady)) then
+-- Burst per frame, scaled from cps. No ping polling, no timers.
+local n = math.clamp(math.floor(math.max(cfg.cps or 1500, 60) / 48), 1, 30)
 for _ = 1, n do SendParry() end
 end
 hb:Wait()
@@ -948,7 +872,7 @@ end
 end)
 
 RunService.Heartbeat:Connect(function()
-if not InputCapable() and not (_autoArm.ready or RemoteReady()) then return end
+if not (_autoArm.ready or RemoteReady()) then return end
 local balls=workspace:FindFirstChild("Balls")
 if balls then
  for _,v in ipairs(balls:GetChildren()) do
