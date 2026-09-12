@@ -17,10 +17,13 @@ local function parryContextAllowed()
  local c=player.Character local h=c and c:FindFirstChildOfClass("Humanoid") local r=c and (c.PrimaryPart or c:FindFirstChild("HumanoidRootPart"))
  if not c or not h or h.Health<=0 or not r or c:GetAttribute("Stunned") or c:GetAttribute("DoNotParry") or c:GetAttribute("IsFrozen") then return false end
  if c.Parent==workspace:FindFirstChild("Alive") then return true end
- if cfg.lobbyParry and player:GetAttribute("LobbyParry") and not player:GetAttribute("InLobbyParryCooldown") then return true end
- if player:GetAttribute("LobbyTraining") and c.Parent==workspace:FindFirstChild("Dead") then return true end
- local sp=workspace:FindFirstChild("Spawn") local lt=sp and sp:FindFirstChild("LobbyTraining") local area=lt and lt:FindFirstChild("TrainingArea")
- if area and area:IsA("BasePart") then local q=area.CFrame:PointToObjectSpace(r.Position) return math.abs(q.X)<=area.Size.X/2+2 and math.abs(q.Z)<=area.Size.Z/2+2 and math.abs(q.Y)<=area.Size.Y/2+20 end
+ -- Lobby + training ground are both controlled by the Lobby Auto Parry toggle.
+ if cfg.lobbyParry then
+  if player:GetAttribute("LobbyParry") and not player:GetAttribute("InLobbyParryCooldown") then return true end
+  if player:GetAttribute("LobbyTraining") and c.Parent==workspace:FindFirstChild("Dead") then return true end
+  local sp=workspace:FindFirstChild("Spawn") local lt=sp and sp:FindFirstChild("LobbyTraining") local area=lt and lt:FindFirstChild("TrainingArea")
+  if area and area:IsA("BasePart") then local q=area.CFrame:PointToObjectSpace(r.Position) return math.abs(q.X)<=area.Size.X/2+2 and math.abs(q.Z)<=area.Size.Z/2+2 and math.abs(q.Y)<=area.Size.Y/2+20 end
+ end
  return false
 end
 
@@ -602,38 +605,28 @@ local APState = setmetatable({}, {__mode="k"})
 
 local function ProcessAutoParry(ball)
 if not cfg.parry or spamActive then return end
-local bID = ball:GetDebugId()
-if ball:GetAttribute("target") ~= player.Name or parried_balls[bID] then return end
+if ball:GetAttribute("target") ~= player.Name then return end
 local charPart = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
 local z = ball:FindFirstChild("zoomies")
 if not charPart or not z then return end
 local velocity = z.VectorVelocity
 if velocity.Magnitude < 0.01 then return end
 -- Reaction lead: predict where the ball will be when the packet reaches
--- the server, so even 100 accuracy reacts fast and never parries late.
+-- the server, so it reacts fast and never parries late.
 local lead = math.clamp((LastPing or 100) / 1000 + 1 / 60, 0.02, 0.18)
 local predicted = ball.Position + velocity * lead
 local dist = (charPart.Position - predicted).Magnitude
 local threshold = CalculateParryDistance(ball, velocity, charPart)
 if dist <= threshold or dist <= 20 then
-    -- Fail-safe: one dropped packet must never let the ball through, so
-    -- re-fire up to 4 times (0.06s apart) until a parry registers.
+    -- Cooldown-based, never permanent: if the first parry misses (ball is
+    -- still alive and coming, frozen then unfrozen, bounced back...) we
+    -- parry again after 0.3s. A missed attempt never locks us out.
     local st = APState[ball]
-    if not st then st = { t = 0, n = 0, done = false } APState[ball] = st end
-    if not st.done and (st.n == 0 or (os.clock() - st.t >= 0.06 and st.n < 4)) then
-        st.t = os.clock()
-        st.n = st.n + 1
-        if SendParry() then
-            st.done = true
-            parried_balls[bID] = true
-            ball:GetAttributeChangedSignal("target"):Once(function()
-                parried_balls[bID] = nil
-                local s = APState[ball]
-                if s then s.done = false s.n = 0 end
-            end)
-        elseif st.n >= 4 then
-            st.done = true
-        end
+    if not st then st = { t = 0 } APState[ball] = st end
+    local now = os.clock()
+    if now - st.t >= 0.3 then
+        st.t = now
+        if not SendParry() then SendParry() end
     end
 end
 end
@@ -645,8 +638,6 @@ local TBState = setmetatable({}, {__mode="k"})
 local function ProcessTriggerBot(ball)
 if not (cfg.trigger or manualTBActive) then return end
 if ball:GetAttribute("target") ~= player.Name then return end
-local bID = ball:GetDebugId()
-if triggered_balls[bID] then return end
 local root = player.Character and player.Character.PrimaryPart
 local z = ball:FindFirstChild("zoomies")
 if not root or not z then return end
@@ -657,23 +648,14 @@ local predicted = ball.Position + velocity * lead
 local dist = (root.Position - predicted).Magnitude
 local range = math.max(cfg.tbRange or 24, 8)
 if dist <= range then
-    -- Fail-safe: keep trying up to 3 times so TB never just whiffs.
+    -- Cooldown-based: never permanent, so a missed first parry still gets
+    -- a second chance (frozen -> unfrozen, bounced back, etc).
     local st = TBState[ball]
-    if not st then st = { t = 0, n = 0, done = false } TBState[ball] = st end
-    if not st.done and (st.n == 0 or (os.clock() - st.t >= 0.06 and st.n < 3)) then
-        st.t = os.clock()
-        st.n = st.n + 1
-        if SendParry() then
-            st.done = true
-            triggered_balls[bID] = true
-            ball:GetAttributeChangedSignal("target"):Once(function()
-                triggered_balls[bID] = nil
-                local s = TBState[ball]
-                if s then s.done = false s.n = 0 end
-            end)
-        elseif st.n >= 3 then
-            st.done = true
-        end
+    if not st then st = { t = 0 } TBState[ball] = st end
+    local now = os.clock()
+    if now - st.t >= 0.3 then
+        st.t = now
+        if not SendParry() then SendParry() end
     end
 end
 end
@@ -800,7 +782,7 @@ do
         -- Auto Spam
         if saved.auto_spam ~= nil then cfg.autoSpam = saved.auto_spam == true end
         if saved.trigger_bot ~= nil then cfg.trigger = saved.trigger_bot == true end
-        if saved.tb_range ~= nil then cfg.tbRange = math.max(tonumber(saved.tb_range) or 24, 8) end
+        if saved.tb_range ~= nil then cfg.tbRange = math.clamp(tonumber(saved.tb_range) or 24, 8, 100) end
         if saved.manual_tb ~= nil then cfg.manualTB = saved.manual_tb == true end
         if saved.target_change_stop ~= nil then cfg.targetChangeStop = saved.target_change_stop == true end
         if saved.animation_fix ~= nil then cfg.animfix = saved.animation_fix == true end
@@ -956,7 +938,7 @@ TBGroup:create_toggle("trigger_bot", {
 TBGroup:create_slider("tb_range", {
     title = "TB Range",
     minimum = 8,
-    maximum = 45,
+    maximum = 100,
     default = math.round(cfg.tbRange or 24),
     rounding = true,
     callback = function(value) cfg.tbRange = math.max(value, 8) end,
