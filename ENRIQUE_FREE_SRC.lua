@@ -410,15 +410,23 @@ task.spawn(function()
         end
         if not SC then return end
 
-        local PRY = SC:WaitForChild("PRY", 15)
-        if not PRY then return end
+        local PRY = SC:FindFirstChild("PRY")
+            or SC:WaitForChild("PRY", 15)
+        if not PRY then
+            warn("[ENRIQUE] PRY module not found under SwordsController!")
+            return
+        end
 
         local ParryFn = require(PRY)
         local getupvals = debug.getupvalues or getupvalues
         if not getupvals then return end
 
         local ups = getupvals(ParryFn)
-        if not ups or #ups < 8 then return end
+        if not ups or #ups < 8 then
+            warn("[ENRIQUE] PRY upvalue count", ups and #ups or "nil",
+                 "- expected >=8. Your executor may be unsupported.")
+            return
+        end
 
         _autoArm.keyTable    = ups[3]
         _autoArm.transformFn = ups[4]
@@ -429,7 +437,10 @@ task.spawn(function()
         local rok, remote = pcall(
             _autoArm.netModule.RemoteEvent,
             _autoArm.netModule, _autoArm.remoteId)
-        if not rok or not remote then return end
+        if not rok or not remote then
+            warn("[ENRIQUE] Parry remote resolve failed:", tostring(remote))
+            return
+        end
 
         _autoArm.remote = remote
         _autoArm.ready = true
@@ -635,17 +646,11 @@ local function RemoteReady()
     return _captured ~= nil and _token ~= nil
 end
 
-local lastCtxTime = 0
-local lastCtxOk = false
 local _spamPacket = nil
 local function SendParry()
-    local ctime = os.clock()
-    if ctime - (lastCtxTime or 0) > 0.2 then
-        lastCtxTime = ctime
-        lastCtxOk = _autoArm.ready or (RemoteReady() and _tokReady)
-        if lastCtxOk then lastCtxOk = parryContextAllowed() and not AbilityBlocked() end
-    end
-    if not lastCtxOk then return false end
+    local ready = _autoArm.ready or (RemoteReady() and _tokReady)
+    if not ready then return false end
+    if not parryContextAllowed() then return false end
 
     -- Reuse cached CFrame/events (refreshed 10x/sec)
     local cf, events, mouse = GetParryData()
@@ -724,24 +729,16 @@ getgenv().ENRIQUE_SendParry=SendParry
 
 local function ProcessAutoParry(ball)
 if not cfg.parry or spamActive then return end
+if ball:GetAttribute("target") ~= player.Name then return end
 local bID = ball:GetDebugId()
-if ball:GetAttribute("target") ~= player.Name or parried_balls[bID] then return end
-if Is_Curved(ball) then return end
-local charPart = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
-local z = ball:FindFirstChild("zoomies")
-if not charPart or not z then return end
-local velocity = z.VectorVelocity
-local ballPos = ball.Position
-local playerPos = charPart.Position
-local dist = (playerPos - ballPos).Magnitude
-local threshold = CalculateParryDistance(ball, velocity, charPart)
-if dist <= threshold or dist <= 20 then
--- Only mark as parried when the packet actually went through, so a failed
--- send is retried on the next frame instead of locking this ball out.
+if parried_balls[bID] then return end
+if not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then return end
+-- INSTANT REACTION: fire the instant the ball targets us, regardless of
+-- distance. The server decides parry validity; firing early ensures our
+-- packet arrives at the server in time — even from across the map.
 if SendParry() then
-parried_balls[bID] = true
-ball:GetAttributeChangedSignal("target"):Once(function() parried_balls[bID] = nil end)
-end
+    parried_balls[bID] = true
+    ball:GetAttributeChangedSignal("target"):Once(function() parried_balls[bID] = nil end)
 end
 end
 
@@ -824,7 +821,7 @@ local hb = RunService.Heartbeat
 while true do
 if spamActive and (_autoArm.ready or (RemoteReady() and _tokReady)) then
 -- Burst per frame, scaled from cps. No ping polling, no timers.
-local n = math.clamp(math.floor(math.max(cfg.cps or 1200, 60) / 60), 1, 24)
+local n = math.clamp(math.floor(math.max(cfg.cps or 1500, 60) / 48), 1, 30)
 for _ = 1, n do SendParry() end
 end
 hb:Wait()
@@ -9432,7 +9429,7 @@ local function CreateSpamUI()
                     local dt = now - lastFrame
                     lastFrame = now
                     if dt < 0 or dt > 0.25 then dt = 1 / 60 end
-                    local n = math.clamp(math.floor(dt * (150 + manualSpamRate * 12)) + 1, 2, 24)
+                    local n = math.clamp(math.floor(dt * (200 + manualSpamRate * 15)) + 1, 3, 30)
                     for _ = 1, n do
                         sendFn()
                     end
