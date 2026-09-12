@@ -290,27 +290,47 @@ RunService.Heartbeat:Connect(function(dt) local old=AI.frame AI.frame=old+((dt o
 
 local function ClosestOpponent() local root=player.Character and player.Character.PrimaryPart local alive=workspace:FindFirstChild("Alive") if not root or not alive then return end local best,res=math.huge,nil for _,c in ipairs(alive:GetChildren()) do if c~=player.Character and c.PrimaryPart then local d=(c.PrimaryPart.Position-root.Position).Magnitude if d<best then best,res=d,c end end end return res end
 
+-- Cached nearest opponent: full scan only ~5x/sec, hot paths read the cache.
+local function AIOpponent()
+ if not AI.oppAt or os.clock()-AI.oppAt>0.18 then
+  AI.oppAt=os.clock()
+  AI.opp=ClosestOpponent()
+ end
+ return AI.opp
+end
+
 local function CalculateParryDistance(ball,velocity,root)
  local speed=velocity.Magnitude local ping=LastPing or 100
- -- Fixed reaction-time window: every ball is parried the SAME time before
- -- impact, so Parry Accuracy 1 and 100 both react instantly and never feel
- -- slow or inconsistent. Speed only scales the distance (fast ball = farther).
- local reaction = 0.10 + math.clamp(ping/350, 0, 0.12)
- reaction = reaction + (math.clamp(RuntimeAccuracy,1,100)-50)/50*0.03
- if reaction < 0.08 then reaction = 0.08 end
+ -- Accuracy 1..100 ALL stay strong: reaction window never goes below
+ -- the full-speed baseline, 100 just pushes slightly further.
+ local acc=math.clamp(RuntimeAccuracy,1,100)
+ local reaction = 0.10 + (acc-1)/99*0.04 + math.clamp(ping/350,0,0.12)
+ if reaction < 0.10 then reaction = 0.10 end
  local result = speed*reaction + 6
- if result > 46 then result = 46 end
- if cfg.aiDetection then result = result + math.clamp(speed*AI.extra,0,8) end
+ -- AI detection: ping/framerate-aware extra reach.
+ if cfg.aiDetection then
+  result = result + math.clamp(speed*AI.extra,0,30)
+  if speed>=750 then result=math.max(result,9.5+speed*.025) end
+ end
+ -- AI patterns: motion history (accel/turn) + nearest opponent push.
  if cfg.aiPatterns then
   local now=os.clock() local h=AI.motion[ball]
   if h then
    local dt=math.clamp(now-h.time,1/240,.15)
-   local acc=(velocity-h.velocity).Magnitude/dt
+   local accv=(velocity-h.velocity).Magnitude/dt
    local turn=velocity.Magnitude>0 and h.velocity.Magnitude>0 and math.acos(math.clamp(velocity.Unit:Dot(h.velocity.Unit),-1,1)) or 0
-   result=result+math.clamp(acc*.0008+speed*turn*.03,0,6)
+   result=result+math.clamp(accv*.0015+speed*turn*.07,0,20)
   end
   AI.motion[ball]={velocity=velocity,time=now}
+  local o=AIOpponent()
+  if o and o.PrimaryPart then
+   local to=root.Position-o.PrimaryPart.Position
+   if to.Magnitude>0 then
+    result=result+math.clamp(math.max(o.PrimaryPart.AssemblyLinearVelocity:Dot(to.Unit),0)*.1,0,12)
+   end
+  end
  end
+ if result > 60 then result = 60 end
  return result
 end
 
@@ -588,7 +608,7 @@ local velocity = z.VectorVelocity
 if velocity.Magnitude < 0.01 then return end
 -- Reaction lead: predict where the ball will be when the packet reaches
 -- the server, so even 100 accuracy reacts fast and never parries late.
-local lead = math.clamp((LastPing or 100) / 1000 + 1 / 120, 0.016, 0.12)
+local lead = math.clamp((LastPing or 100) / 1000 + 1 / 60, 0.02, 0.18)
 local predicted = ball.Position + velocity * lead
 local dist = (charPart.Position - predicted).Magnitude
 local threshold = CalculateParryDistance(ball, velocity, charPart)
