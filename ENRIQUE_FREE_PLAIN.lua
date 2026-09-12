@@ -17,7 +17,7 @@ local function parryContextAllowed()
  local c=player.Character local h=c and c:FindFirstChildOfClass("Humanoid") local r=c and (c.PrimaryPart or c:FindFirstChild("HumanoidRootPart"))
  if not c or not h or h.Health<=0 or not r or c:GetAttribute("Stunned") or c:GetAttribute("DoNotParry") or c:GetAttribute("IsFrozen") then return false end
  if c.Parent==workspace:FindFirstChild("Alive") then return true end
- if player:GetAttribute("LobbyParry") and not player:GetAttribute("InLobbyParryCooldown") then return true end
+ if cfg.lobbyParry and player:GetAttribute("LobbyParry") and not player:GetAttribute("InLobbyParryCooldown") then return true end
  if player:GetAttribute("LobbyTraining") and c.Parent==workspace:FindFirstChild("Dead") then return true end
  local sp=workspace:FindFirstChild("Spawn") local lt=sp and sp:FindFirstChild("LobbyTraining") local area=lt and lt:FindFirstChild("TrainingArea")
  if area and area:IsA("BasePart") then local q=area.CFrame:PointToObjectSpace(r.Position) return math.abs(q.X)<=area.Size.X/2+2 and math.abs(q.Z)<=area.Size.Z/2+2 and math.abs(q.Y)<=area.Size.Y/2+20 end
@@ -35,6 +35,7 @@ end
 
 local cfg = {
 parry = true,
+lobbyParry = true,
 spam = false,
 trigger = false,
 tbRange = 24,
@@ -597,6 +598,8 @@ end
 getgenv().ENRIQUE_SendParry=SendParry
 getgenv().ENRIQUE_SendParryFast=SendParryFast
 
+local APState = setmetatable({}, {__mode="k"})
+
 local function ProcessAutoParry(ball)
 if not cfg.parry or spamActive then return end
 local bID = ball:GetDebugId()
@@ -613,14 +616,31 @@ local predicted = ball.Position + velocity * lead
 local dist = (charPart.Position - predicted).Magnitude
 local threshold = CalculateParryDistance(ball, velocity, charPart)
 if dist <= threshold or dist <= 20 then
-    if SendParry() then
-        parried_balls[bID] = true
-        ball:GetAttributeChangedSignal("target"):Once(function() parried_balls[bID] = nil end)
+    -- Fail-safe: one dropped packet must never let the ball through, so
+    -- re-fire up to 4 times (0.06s apart) until a parry registers.
+    local st = APState[ball]
+    if not st then st = { t = 0, n = 0, done = false } APState[ball] = st end
+    if not st.done and (st.n == 0 or (os.clock() - st.t >= 0.06 and st.n < 4)) then
+        st.t = os.clock()
+        st.n = st.n + 1
+        if SendParry() then
+            st.done = true
+            parried_balls[bID] = true
+            ball:GetAttributeChangedSignal("target"):Once(function()
+                parried_balls[bID] = nil
+                local s = APState[ball]
+                if s then s.done = false s.n = 0 end
+            end)
+        elseif st.n >= 4 then
+            st.done = true
+        end
     end
 end
 end
 
 local manualTBActive = false
+
+local TBState = setmetatable({}, {__mode="k"})
 
 local function ProcessTriggerBot(ball)
 if not (cfg.trigger or manualTBActive) then return end
@@ -630,16 +650,31 @@ if triggered_balls[bID] then return end
 local root = player.Character and player.Character.PrimaryPart
 local z = ball:FindFirstChild("zoomies")
 if not root or not z then return end
+local velocity = z.VectorVelocity
 -- Reaction lead: same prediction so TB reacts earlier, not later.
 local lead = math.clamp((LastPing or 100) / 1000 + 1 / 120, 0.016, 0.12)
 local predicted = ball.Position + velocity * lead
 local dist = (root.Position - predicted).Magnitude
 local range = math.max(cfg.tbRange or 24, 8)
 if dist <= range then
--- Single clean parry per ball trip. Mark BEFORE firing to prevent double-parry.
-triggered_balls[bID] = true
-ball:GetAttributeChangedSignal("target"):Once(function() triggered_balls[bID] = nil end)
-SendParry()
+    -- Fail-safe: keep trying up to 3 times so TB never just whiffs.
+    local st = TBState[ball]
+    if not st then st = { t = 0, n = 0, done = false } TBState[ball] = st end
+    if not st.done and (st.n == 0 or (os.clock() - st.t >= 0.06 and st.n < 3)) then
+        st.t = os.clock()
+        st.n = st.n + 1
+        if SendParry() then
+            st.done = true
+            triggered_balls[bID] = true
+            ball:GetAttributeChangedSignal("target"):Once(function()
+                triggered_balls[bID] = nil
+                local s = TBState[ball]
+                if s then s.done = false s.n = 0 end
+            end)
+        elseif st.n >= 3 then
+            st.done = true
+        end
+    end
 end
 end
 
@@ -752,6 +787,7 @@ do
     if type(saved) == "table" then
         -- Auto Parry
         if saved.auto_parry ~= nil then cfg.parry = saved.auto_parry == true end
+        if saved.lobby_parry ~= nil then cfg.lobbyParry = saved.lobby_parry == true end
         if saved.parry_accuracy ~= nil then cfg.accuracy = tonumber(saved.parry_accuracy) or cfg.accuracy end
         if saved.humanizer ~= nil then cfg.randomPingAccuracy = saved.humanizer == true end
         if saved.curve_type ~= nil and tostring(saved.curve_type) ~= "" then cfg.curveType = tostring(saved.curve_type) end
@@ -818,6 +854,12 @@ ParryLeft:create_toggle("auto_parry", {
     title = "Auto Parry",
     default = cfg.parry == true,
     callback = function(value) cfg.parry = value end,
+})
+
+ParryLeft:create_toggle("lobby_parry", {
+    title = "Lobby Auto Parry",
+    default = cfg.lobbyParry == true,
+    callback = function(value) cfg.lobbyParry = value end,
 })
 
 ParryLeft:create_slider("parry_accuracy", {
