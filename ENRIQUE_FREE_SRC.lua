@@ -445,7 +445,7 @@ local function _hook(remote)
                 if _is_valid(a) then
                     if not _reverted[self] then _reverted[self] = a end
                     if not _captured then
-                        _captured = { remote = self, isInvoke = isInvok }
+                        _captured = { remote = self, isInvoke = isInvok, fireFn = old(self, key) }
                         print("[ENRIQUE] CAPTURED parry remote -> ready:", self:GetFullName())
                     end
                 end
@@ -473,6 +473,62 @@ local function RemoteReady()
     return _captured ~= nil and _token ~= nil
 end
 
+recentParries = recentParries or 0
+
+-- Cheap decay for the parry counter: one task total, never per packet.
+task.spawn(function()
+    while true do
+        task.wait(0.5)
+        recentParries = math.max((recentParries or 0) - 1, 0)
+    end
+end)
+
+local _lastAnimAt = 0
+local function MaybePlayAnim()
+    if not cfg.animfix then return end
+    local now = os.clock()
+    if now - _lastAnimAt < 0.1 then return end
+    _lastAnimAt = now
+    task.spawn(PlayParryAnimation)
+end
+
+-- Reused packet table: burst spam must not allocate ~2k tables/sec.
+local _packet = { nil, nil, nil, 0.5, CFrame.new(), {}, {}, false }
+
+local function BuildPacket(cap, token)
+    local cf, events, mouse = GetParryData()
+    cf = ApplyCurveToCFrame(cf)
+    local p = _packet
+    p[1] = cap[1]
+    p[2] = cap[2]
+    p[3] = token
+    p[4] = cap[4] or 0.5
+    p[5] = cf
+    p[6] = events
+    p[7] = mouse
+    p[8] = false
+    return p
+end
+
+local function FireDirect(p)
+    local fired
+    if _captured.fireFn then
+        fired = pcall(_captured.fireFn, _captured.remote, unpack(p))
+    else
+        local remote = _captured.remote
+        if _captured.isInvoke then
+            fired = pcall(function() remote:InvokeServer(unpack(p)) end)
+        else
+            fired = pcall(function() remote:FireServer(unpack(p)) end)
+        end
+    end
+    if fired then
+        recentParries = (recentParries or 0) + 1
+        MaybePlayAnim()
+    end
+    return fired
+end
+
 local function SendParry()
     if not RemoteReady() or not parryContextAllowed() or AbilityBlocked() then return false end
     local remote = _captured.remote
@@ -484,27 +540,25 @@ local function SendParry()
     local okTok, token = pcall(_tokenize, cap[2])
     if not (okTok and token) then return false end
 
-    local cf, events, mouse = GetParryData()
-    cf = ApplyCurveToCFrame(cf)
+    return FireDirect(BuildPacket(cap, token))
+end
 
-    local packet = { cap[1], cap[2], token, cap[4] or 0.5, cf, events, mouse, false }
+-- Burst fast path: context is checked once per frame by the spam loops,
+-- so each packet skips the attribute checks and the metatable hook.
+local function SendParryFast()
+    if not RemoteReady() then return false end
+    local remote = _captured.remote
+    local cap = _reverted[remote] or (_captured.args)
+    if not cap then return false end
 
-    local fired
-    if _captured.isInvoke then
-        fired = pcall(function() remote:InvokeServer(unpack(packet)) end)
-    else
-        fired = pcall(function() remote:FireServer(unpack(packet)) end)
-    end
+    local okTok, token = pcall(_tokenize, cap[2])
+    if not (okTok and token) then return false end
 
-    if fired then
-        recentParries = (recentParries or 0) + 1
-        task.delay(.5, function() recentParries = math.max((recentParries or 1) - 1, 0) end)
-    end
-    if fired and cfg.animfix then task.spawn(PlayParryAnimation) end
-    return fired
+    return FireDirect(BuildPacket(cap, token))
 end
 
 getgenv().ENRIQUE_SendParry=SendParry
+getgenv().ENRIQUE_SendParryFast=SendParryFast
 
 local function ProcessAutoParry(ball)
 if not cfg.parry or spamActive then return end
@@ -605,9 +659,11 @@ task.spawn(function()
 local hb = RunService.Heartbeat
 while true do
 if spamActive and RemoteReady() then
--- Frame-burst scaled from cps. Fast but bounded per frame.
-local n = math.clamp(math.floor(math.max(cfg.cps or 1000, 60) / 60), 1, 30)
-for _ = 1, n do SendParry() end
+if parryContextAllowed() and not AbilityBlocked() then
+-- Frame-burst scaled from cps, capped to keep the game smooth.
+local n = math.clamp(math.floor(math.max(cfg.cps or 1000, 60) / 60), 1, 24)
+for _ = 1, n do SendParryFast() end
+end
 end
 hb:Wait()
 end
@@ -9197,12 +9253,12 @@ local function CreateSpamUI()
             Stroke.Color = Color3.fromRGB(255, 90, 90)
             
             manualSpamLoop = task.spawn(function()
-                local sendFn = getgenv().ENRIQUE_SendParry
+                local sendFn = getgenv().ENRIQUE_SendParryFast or getgenv().ENRIQUE_SendParry
                 local hb = RunService.RenderStepped
                 local lastFrame = os.clock()
                 while manualSpamEnabled do
                     if type(sendFn) ~= "function" then
-                        sendFn = getgenv().ENRIQUE_SendParry
+                        sendFn = getgenv().ENRIQUE_SendParryFast or getgenv().ENRIQUE_SendParry
                         if type(sendFn) ~= "function" then
                             print("[Manual Spam] ENRIQUE_SendParry chưa sẵn sàng, hãy parry 1 lần để capture")
                             break
@@ -9210,11 +9266,15 @@ local function CreateSpamUI()
                     end
                     -- Frame-time burst: zero ping polling, zero per-packet
                     -- coroutines. Scaled by Spam Strength slider.
+                    if not parryContextAllowed() or AbilityBlocked() then
+                        hb:Wait()
+                        continue
+                    end
                     local now = os.clock()
                     local dt = now - lastFrame
                     lastFrame = now
                     if dt < 0 or dt > 0.25 then dt = 1 / 60 end
-                    local n = math.clamp(math.floor(dt * (400 + manualSpamRate * 15)) + 1, 3, 40)
+                    local n = math.clamp(math.floor(dt * (400 + manualSpamRate * 15)) + 1, 3, 28)
                     for _ = 1, n do
                         sendFn()
                     end
