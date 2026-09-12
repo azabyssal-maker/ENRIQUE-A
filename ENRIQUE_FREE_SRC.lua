@@ -263,10 +263,20 @@ return StatsService.Network.ServerStatsItem["Data Ping"]:GetValue()
 end)
 return success and result or 100
 end
+
+-- Ping is refreshed in the background ONLY, never polled inside spam/detection
+-- loops. Hot paths read this plain number: zero overhead, no StatsService hits.
+local LastPing = 100
+task.spawn(function()
+ while true do
+  LastPing = GetPing()
+  task.wait(0.4)
+ end
+end)
 task.spawn(function()
  while task.wait(1) do
   if cfg.randomPingAccuracy then
-   local ping=GetPing()
+   local ping=LastPing
    if ping>=90 then RuntimeAccuracy=4
    elseif ping<=50 then RuntimeAccuracy=math.random(70,100)
    else RuntimeAccuracy=math.clamp(tonumber(cfg.accuracy) or 50,1,100) end
@@ -275,12 +285,12 @@ task.spawn(function()
 end)
 
 local AI={ping=100,frame=1/60,jitter=0,extra=0,last=0,motion=setmetatable({},{__mode="k"})}
-RunService.Heartbeat:Connect(function(dt) local old=AI.frame AI.frame=old+((dt or 1/60)-old)*.12 AI.jitter=AI.jitter+(math.abs((dt or 1/60)-old)-AI.jitter)*.15 if os.clock()-AI.last>.25 then AI.last=os.clock() local p=GetPing() AI.ping=AI.ping+(p-AI.ping)*.22 end if not cfg.aiDetection then AI.extra=0 elseif AI.ping>=220 or AI.frame>=.065 then AI.extra=.05 elseif AI.ping>=140 or AI.frame>=.035 then AI.extra=.028 elseif AI.ping>=85 then AI.extra=.012 else AI.extra=0 end end)
+RunService.Heartbeat:Connect(function(dt) local old=AI.frame AI.frame=old+((dt or 1/60)-old)*.12 AI.jitter=AI.jitter+(math.abs((dt or 1/60)-old)-AI.jitter)*.15 if os.clock()-AI.last>.25 then AI.last=os.clock() local p=LastPing AI.ping=AI.ping+(p-AI.ping)*.22 end if not cfg.aiDetection then AI.extra=0 elseif AI.ping>=220 or AI.frame>=.065 then AI.extra=.05 elseif AI.ping>=140 or AI.frame>=.035 then AI.extra=.028 elseif AI.ping>=85 then AI.extra=.012 else AI.extra=0 end end)
 
 local function ClosestOpponent() local root=player.Character and player.Character.PrimaryPart local alive=workspace:FindFirstChild("Alive") if not root or not alive then return end local best,res=math.huge,nil for _,c in ipairs(alive:GetChildren()) do if c~=player.Character and c.PrimaryPart then local d=(c.PrimaryPart.Position-root.Position).Magnitude if d<best then best,res=d,c end end end return res end
 
 local function CalculateParryDistance(ball,velocity,root)
- local speed=velocity.Magnitude local ping=GetPing() local capped=math.min(math.max(speed-9.5,0),650) local div=(2.4+capped*.002)*(0.75+(math.clamp(RuntimeAccuracy,1,100)-1)*(3/99)) local modern=math.clamp(ping/100,5,17)+math.max(speed/div,9.5) local legacy=speed/math.max(2.4,RuntimeAccuracy/8)+ping/10 local result=math.max(modern,legacy)
+ local speed=velocity.Magnitude local ping=LastPing local capped=math.min(math.max(speed-9.5,0),650) local div=(2.4+capped*.002)*(0.75+(math.clamp(RuntimeAccuracy,1,100)-1)*(3/99)) local modern=math.clamp(ping/100,5,17)+math.max(speed/div,9.5) local legacy=speed/math.max(2.4,RuntimeAccuracy/8)+ping/10 local result=math.max(modern,legacy)
  if cfg.aiDetection then result=result+math.clamp(speed*AI.extra,0,30) if speed>=750 then result=math.max(result,9.5+speed*.025) end end
  if cfg.aiPatterns then local now=os.clock() local h=AI.motion[ball] if h then local dt=math.clamp(now-h.time,1/240,.15) local acc=(velocity-h.velocity).Magnitude/dt local turn=velocity.Magnitude>0 and h.velocity.Magnitude>0 and math.acos(math.clamp(velocity.Unit:Dot(h.velocity.Unit),-1,1)) or 0 result=result+math.clamp(acc*.0015+speed*turn*.07,0,20) end AI.motion[ball]={velocity=velocity,time=now} local o=ClosestOpponent() if o and o.PrimaryPart then local to=root.Position-o.PrimaryPart.Position if to.Magnitude>0 then result=result+math.clamp(math.max(o.PrimaryPart.AssemblyLinearVelocity:Dot(to.Unit),0)*.1,0,12) end end end
  return result
@@ -299,7 +309,7 @@ if distanceToBall <= 25 then return false end
 local Speed = Velocity.Magnitude
 local Direction = (Character.PrimaryPart.Position - ball.Position).Unit
 local Dot = Direction:Dot(Velocity.Unit)
-local Ping = GetPing() / 1000
+local Ping = LastPing / 1000
 local Distance = (Character.PrimaryPart.Position - ball.Position).Magnitude
 local Reach_Time = Distance / Speed - Ping
 local Radians = math.rad(math.asin(math.clamp(Dot, -1, 1)))
@@ -356,23 +366,29 @@ end
 
 local _gpdCache = nil
 local _gpdCacheTime = 0
+local _gpdEvents = {}
+local _gpdCenter = { 0, 0 }
+local _aliveFolder = workspace:FindFirstChild("Alive")
 local function GetParryData(force)
-if not force and _gpdCache and (os.clock() - _gpdCacheTime) < 0.1 then
-return _gpdCache[1], _gpdCache[2], _gpdCache[3]
+if not force and _gpdCacheTime ~= 0 and (os.clock() - _gpdCacheTime) < 0.1 then
+return _gpdCache, _gpdEvents, _gpdCenter
 end
+if not _aliveFolder then _aliveFolder = workspace:FindFirstChild("Alive") end
 local viewportSize = Camera.ViewportSize
-local centerPos = { viewportSize.X / 2, viewportSize.Y / 2 }
-local events = {}
-for _, v in pairs(workspace.Alive:GetChildren()) do
+_gpdCenter[1] = viewportSize.X / 2
+_gpdCenter[2] = viewportSize.Y / 2
+table.clear(_gpdEvents)
+if _aliveFolder then
+for _, v in pairs(_aliveFolder:GetChildren()) do
 if v ~= player.Character and v:FindFirstChild("HumanoidRootPart") then
 local screenPos, isOnScreen = Camera:WorldToScreenPoint(v.HumanoidRootPart.Position)
-if isOnScreen then events[tostring(v)] = screenPos end
+if isOnScreen then _gpdEvents[tostring(v)] = screenPos end
 end
 end
-local result = { Camera.CFrame, events, centerPos }
-_gpdCache = result
+end
+_gpdCache = Camera.CFrame
 _gpdCacheTime = os.clock()
-return result[1], result[2], result[3]
+return _gpdCache, _gpdEvents, _gpdCenter
 end
 
 local recentParries=0
@@ -393,17 +409,20 @@ for _, Function in getgc(true) do
     if _token then break end
 end
 
+local _tokBuf = table.create(16)
+local _tokReady = false
 local function _tokenize(_remote_uid)
     local time = tostring(math.floor(workspace:GetServerTimeNow() * 100))
     local key = _token(_remote_uid, 'TIME')
-    local characters = table.create(#time)
-    for index = 1, #time do
-        characters[index] = string.char(bit32.bxor(
+    local n = #time
+    local klen = #key
+    for index = 1, n do
+        _tokBuf[index] = string.char(bit32.bxor(
             (string.byte(time, index) + index) % 256,
-            string.byte(key, (index - 1) % #key + 1)
+            string.byte(key, (index - 1) % klen + 1)
         ))
     end
-    return table.concat(characters)
+    return table.concat(_tokBuf, "", 1, n)
 end
 
 local _reverted = {}
@@ -431,11 +450,15 @@ local function _hook(remote)
             return function(_, ...)
                 local a = {...}
                 if _is_valid(a) then
-                    if not _reverted[self] then _reverted[self] = a end
-                    if not _captured then
-                        _captured = { remote = self, isInvoke = isInvok }
-                        print("[ENRIQUE] CAPTURED parry remote -> ready:", self:GetFullName())
-                    end
+                if not _reverted[self] then _reverted[self] = a end
+                if not _captured then
+                    _captured = { remote = self, isInvoke = isInvok, raw = old(self, key) }
+                    print("[ENRIQUE] CAPTURED parry remote -> ready:", self:GetFullName())
+                end
+                if not _tokReady then
+                    local okT, tkn = pcall(_tokenize, a[2])
+                    if okT and tkn then _tokReady = true end
+                end
                 end
                 if isInvok then return old(self, key)(_, unpack(a)) end
                 return old(self, key)(_, unpack(a))
@@ -469,12 +492,14 @@ local function SendParry()
     local ctime = os.clock()
     if ctime - (lastCtxTime or 0) > 0.2 then
         lastCtxTime = ctime
-        lastCtxOk = RemoteReady() and parryContextAllowed() and not AbilityBlocked()
+        lastCtxOk = RemoteReady() and _tokReady and parryContextAllowed() and not AbilityBlocked()
     end
     if not lastCtxOk then return false end
     local remote = _captured.remote
-    local cap = _reverted[remote] or (_captured.args)
+    local cap = _reverted[remote]
     if not cap then return false end
+    local raw = _captured.raw
+    if not raw then return false end
 
     -- FRESH token every packet: Blade Ball token rotates every ~10ms,
     -- stale tokens are rejected by the server. Token math is cheap.
@@ -501,12 +526,9 @@ local function SendParry()
         packet[8] = false
     end
 
-    local fired
-    if _captured.isInvoke then
-        fired = pcall(function() remote:InvokeServer(unpack(packet)) end)
-    else
-        fired = pcall(function() remote:FireServer(unpack(packet)) end)
-    end
+    -- Call the captured raw remote function directly: skips the capture
+    -- metatable wrapper ({...} + unpack double-pass) and per-call closures.
+    local fired = pcall(raw, nil, unpack(packet))
 
     if fired then
         local st = os.clock()
@@ -592,7 +614,7 @@ local function ProcessAutoSpam(ball)
  local enemy=AS.target if not enemy or not enemy.PrimaryPart or not target then return end
 
  local speed=z.VectorVelocity.Magnitude if speed<.001 then return end
- local ping=math.clamp(GetPing()/10,1,16)
+local ping=math.clamp(LastPing/10,1,16)
 
  local distMult = math.max(cfg.distanceMultiplier or 1.0, 0.8)
  local max=(ping+math.min(speed/6,255)+math.clamp(speed*AI.extra,0,35))*distMult
@@ -610,12 +632,14 @@ local function ProcessAutoSpam(ball)
 end
 
 task.spawn(function()
+local hb = RunService.Heartbeat
 while true do
-if spamActive and RemoteReady() then
-local delay = 1 / math.max(cfg.cps or 200, 1)
-if tick() - lastSpamTime >= delay then SendParry() lastSpamTime = tick() end
+if spamActive and RemoteReady() and _tokReady then
+-- Burst per frame, scaled from cps. No ping polling, no timers.
+local n = math.clamp(math.floor(math.max(cfg.cps or 1000, 60) / 120), 1, 20)
+for _ = 1, n do SendParry() end
 end
-task.wait()
+hb:Wait()
 end
 end)
 
@@ -9078,8 +9102,9 @@ local function CreateSpamUI()
             Stroke.Color = Color3.fromRGB(255, 90, 90)
             
             manualSpamLoop = task.spawn(function()
-                local nextFire = os.clock()
                 local sendFn = getgenv().ENRIQUE_SendParry
+                local hb = RunService.RenderStepped
+                local lastFrame = os.clock()
                 while manualSpamEnabled do
                     if type(sendFn) ~= "function" then
                         sendFn = getgenv().ENRIQUE_SendParry
@@ -9088,27 +9113,17 @@ local function CreateSpamUI()
                             break
                         end
                     end
-                    -- Token-window pacing: ~10ms/parry is the server's real
-                    -- max cadence. Over-shooting only causes lag + false flags.
+                    -- Frame-time burst: zero ping polling, zero per-packet
+                    -- coroutines. Scaled by Spam Strength slider.
                     local now = os.clock()
-                    local ping = GetPing()
-                    local pacing = 0.010
-                    if ping > 150 then pacing = 0.015 end
-                    if ping > 220 then pacing = 0.025 end
-                    local guard = 0
-                    while now >= nextFire and guard < 8 do
-                        local success = sendFn()
-                        if not success then
-                            nextFire = now + pacing
-                            break
-                        end
-                        nextFire = nextFire + pacing
-                        guard = guard + 1
+                    local dt = now - lastFrame
+                    lastFrame = now
+                    if dt < 0 or dt > 0.25 then dt = 1 / 60 end
+                    local n = math.clamp(math.floor(dt * (100 + manualSpamRate * 5)) + 1, 2, 12)
+                    for _ = 1, n do
+                        sendFn()
                     end
-                    if nextFire < now - 0.15 then
-                        nextFire = now
-                    end
-                    task.wait()
+                    hb:Wait()
                 end
             end)
         else
@@ -9517,4 +9532,3 @@ ProfileRight:create_button({
         end)
     end,
 })
-
