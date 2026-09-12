@@ -630,7 +630,7 @@ if dist <= threshold or dist <= 20 then
     local st = APState[ball]
     if not st then st = { t = 0 } APState[ball] = st end
     local now = os.clock()
-    if now - st.t >= 0.15 then
+    if now - st.t >= 0.02 then
         st.t = now
         if not SendParry() then SendParry() end
     end
@@ -659,7 +659,7 @@ if dist <= range then
     local st = TBState[ball]
     if not st then st = { t = 0 } TBState[ball] = st end
     local now = os.clock()
-    if now - st.t >= 0.2 then
+    if now - st.t >= 0.02 then
         st.t = now
         if not SendParry() then SendParry() end
     end
