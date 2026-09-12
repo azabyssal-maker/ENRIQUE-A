@@ -386,6 +386,93 @@ local recentParries=0
 local rpWindowStart=0
 local lastAnimTime=0
 
+-- ============================================================
+-- AUTO-ARM: Extract parry info directly from the game's PRY
+-- module upvalues. No manual parry needed — armed instantly.
+-- Falls back to old hook-based capture if the module path changes.
+-- ============================================================
+local _autoArm = {ready = false, remote = nil, keyTable = nil,
+    transformFn = nil, netModule = nil, remoteId = nil, parryHash = nil}
+
+task.spawn(function()
+    pcall(function()
+        repeat task.wait(0.3) until game:IsLoaded()
+        local RS = game:GetService("ReplicatedStorage")
+        local Controllers = RS:FindFirstChild("Controllers")
+            or RS:WaitForChild("Controllers", 30)
+        if not Controllers then return end
+
+        local SC = nil
+        for _, child in ipairs(Controllers:GetChildren()) do
+            if child.Name:sub(1, 14) == "SwordsController" then
+                SC = child; break
+            end
+        end
+        if not SC then return end
+
+        local PRY = SC:WaitForChild("PRY", 15)
+        if not PRY then return end
+
+        local ParryFn = require(PRY)
+        local getupvals = debug.getupvalues or getupvalues
+        if not getupvals then return end
+
+        local ups = getupvals(ParryFn)
+        if not ups or #ups < 8 then return end
+
+        _autoArm.keyTable    = ups[3]
+        _autoArm.transformFn = ups[4]
+        _autoArm.netModule   = ups[6]
+        _autoArm.remoteId    = ups[7]
+        _autoArm.parryHash   = ups[8]
+
+        local rok, remote = pcall(
+            _autoArm.netModule.RemoteEvent,
+            _autoArm.netModule, _autoArm.remoteId)
+        if not rok or not remote then return end
+
+        _autoArm.remote = remote
+        _autoArm.ready = true
+        print("[ENRIQUE] Auto-arm OK:", remote:GetFullName())
+    end)
+end)
+
+local function _buildAutoArmPayload(cf, events, mouse)
+    if not _autoArm.ready then return nil end
+    local kt = _autoArm.keyTable
+    if not kt then return nil end
+    local keyIndex = kt[3]
+    local currentKey = kt[1] and kt[1][keyIndex]
+    if not currentKey then return nil end
+
+    local okT, transformed = pcall(_autoArm.transformFn, currentKey, "TIME")
+    if not okT or not transformed then
+        okT, transformed = pcall(_autoArm.transformFn, currentKey)
+        if not okT or not transformed then return nil end
+    end
+
+    local timeStr = tostring(math.floor(workspace:GetServerTimeNow() * 100))
+    local klen = #transformed
+    local tc = {}
+    for i = 1, #timeStr do
+        local kb = string.byte(transformed, (i - 1) % klen + 1)
+        local tb = (string.byte(timeStr, i) + i) % 256
+        tc[i] = string.char(bit32.bxor(tb, kb))
+    end
+
+    return {
+        _autoArm.parryHash,
+        currentKey,
+        table.concat(tc),
+        0.5,
+        cf,
+        events,
+        mouse,
+        false,
+    }
+end
+
+-- Old getgc-based _token fallback (for hook path, kept as backup)
 local _token
 for _, Function in getgc(true) do
     if type(Function) ~= 'function' then continue end
@@ -533,8 +620,14 @@ end
 
 task.spawn(function()
     task.wait(0.5)
-    if not _restoreCapture() then
-        print("[ENRIQUE] Not armed yet - hit parry ONCE in game to capture, then it stays armed.")
+    if not _restoreCapture() and not _autoArm.ready then
+        -- auto-arm may still be initializing; the task.spawn above
+        -- handles it separately — print only if both paths fail
+        task.delay(5, function()
+            if not _autoArm.ready then
+                print("[ENRIQUE] If auto-arm failed, hit parry ONCE to capture via hook fallback.")
+            end
+        end)
     end
 end)
 
@@ -546,51 +639,61 @@ local lastCtxTime = 0
 local lastCtxOk = false
 local _spamPacket = nil
 local function SendParry()
-    -- Fast-path: re-check full context at most 5x/sec while spamming
     local ctime = os.clock()
     if ctime - (lastCtxTime or 0) > 0.2 then
         lastCtxTime = ctime
-        lastCtxOk = RemoteReady() and _tokReady and parryContextAllowed() and not AbilityBlocked()
+        lastCtxOk = _autoArm.ready or (RemoteReady() and _tokReady)
+        if lastCtxOk then lastCtxOk = parryContextAllowed() and not AbilityBlocked() end
     end
     if not lastCtxOk then return false end
-    local remote = _captured.remote
-    local cap = _reverted[remote]
-    if not cap then return false end
-    local raw = _captured.raw
-    if not raw then return false end
 
-    -- FRESH token every packet: Blade Ball token rotates every ~10ms,
-    -- stale tokens are rejected by the server. Token math is cheap.
-    local okTok, token = pcall(_tokenize, cap[2])
-    if not (okTok and token) then return false end
-
-    -- Reuse cached CFrame/events (only refreshed 10x/sec), no re-scan lag
+    -- Reuse cached CFrame/events (refreshed 10x/sec)
     local cf, events, mouse = GetParryData()
     cf = ApplyCurveToCFrame(cf)
 
-    -- Reuse one packet table (zero garbage)
+    -- FAST PATH: auto-arm — builds payload from game module upvalues.
+    -- Works instantly on load, survives Blade Ball updates (re-reads
+    -- upvalues each time the payload is built).
+    if _autoArm.ready then
+        local payload = _buildAutoArmPayload(cf, events, mouse)
+        if payload then
+            local fired = pcall(function()
+                _autoArm.remote:FireServer(unpack(payload))
+            end)
+            if fired then
+                local st = os.clock()
+                if st - (rpWindowStart or 0) > 0.5 then rpWindowStart = st; recentParries = 1
+                else recentParries = (recentParries or 0) + 1 end
+                if cfg.animfix and st - (lastAnimTime or 0) > 0.05 then
+                    lastAnimTime = st; task.spawn(PlayParryAnimation)
+                end
+                return true
+            end
+        end
+    end
+
+    -- FALLBACK: old hook-captured path (requires manual parry once)
+    if not RemoteReady() then return false end
+    local remote = _captured.remote
+    local cap = _reverted[remote]
+    if not cap or not _captured.raw then return false end
+
+    local okTok, token = pcall(_tokenize, cap[2])
+    if not (okTok and token) then return false end
+
     local packet = _spamPacket
     if not packet then
         packet = { cap[1], cap[2], token, cap[4] or 0.5, cf, events, mouse, false }
         _spamPacket = packet
     else
-        packet[1] = cap[1]
-        packet[2] = cap[2]
-        packet[3] = token
-        packet[4] = cap[4] or 0.5
-        packet[5] = cf
-        packet[6] = events
-        packet[7] = mouse
-        packet[8] = false
+        packet[1] = cap[1]; packet[2] = cap[2]; packet[3] = token
+        packet[4] = cap[4] or 0.5; packet[5] = cf
+        packet[6] = events; packet[7] = mouse; packet[8] = false
     end
 
-    -- Prefer the captured raw function (skips the capture wrapper and
-    -- per-call closures). Pass the remote as self exactly like remote:FireServer
-    -- does; if any executor/engine rejects direct invocation, fall back to the
-    -- normal metatable path so it always keeps working.
     local fired = false
-    if raw then
-        local ok = pcall(raw, _captured.remote, unpack(packet))
+    if _captured.raw then
+        local ok = pcall(_captured.raw, remote, unpack(packet))
         if ok then fired = true end
     end
     if not fired then
@@ -719,7 +822,7 @@ end
 task.spawn(function()
 local hb = RunService.Heartbeat
 while true do
-if spamActive and RemoteReady() and _tokReady then
+if spamActive and (_autoArm.ready or (RemoteReady() and _tokReady)) then
 -- Burst per frame, scaled from cps. No ping polling, no timers.
 local n = math.clamp(math.floor(math.max(cfg.cps or 1200, 60) / 60), 1, 24)
 for _ = 1, n do SendParry() end
@@ -729,7 +832,7 @@ end
 end)
 
 RunService.Heartbeat:Connect(function()
-if not RemoteReady() then return end
+if not (_autoArm.ready or RemoteReady()) then return end
 local balls=workspace:FindFirstChild("Balls")
 if balls then
  for _,v in ipairs(balls:GetChildren()) do
