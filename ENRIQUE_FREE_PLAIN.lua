@@ -34,6 +34,7 @@ local cfg = {
 parry = true,
 spam = false,
 trigger = false,
+tbRange = 24,
 cps = 1000,
 accuracy = 50,
 randomPingAccuracy = false,
@@ -57,9 +58,6 @@ cfg.spamThreshold = math.max(0, cfg.spamThreshold or 0)
 cfg.distanceMultiplier = math.max(0.8, cfg.distanceMultiplier or 1.0)
 
 local RuntimeAccuracy = math.clamp(tonumber(cfg.accuracy) or 50,1,100)
-task.spawn(function() while task.wait(1) do SaveENRIQUEConfig() end end)
-getgenv().SaveENRIQUEConfig=SaveENRIQUEConfig
-getgenv().LoadENRIQUEConfig=LoadENRIQUEConfig
 local spamBindKey = cfg.spamBindKey or "P"
 local isWaitingForBind = false
 local parried_balls = {}
@@ -296,27 +294,20 @@ local function CalculateParryDistance(ball,velocity,root)
  return result
 end
 
-local Lerp_Radians = 0
-local Last_Warping = tick()
 local function Is_Curved(ball)
 local Zoomies = ball:FindFirstChild("zoomies")
 if not Zoomies then return false end
+local root = player.Character and player.Character.PrimaryPart
+if not root then return false end
 local Velocity = Zoomies.VectorVelocity
-local Character = player.Character
-if not Character or not Character.PrimaryPart then return false end
-local distanceToBall = (Character.PrimaryPart.Position - ball.Position).Magnitude
-if distanceToBall <= 25 then return false end
-local Speed = Velocity.Magnitude
-local Direction = (Character.PrimaryPart.Position - ball.Position).Unit
-local Dot = Direction:Dot(Velocity.Unit)
-local Ping = LastPing / 1000
-local Distance = (Character.PrimaryPart.Position - ball.Position).Magnitude
-local Reach_Time = Distance / Speed - Ping
-local Radians = math.rad(math.asin(math.clamp(Dot, -1, 1)))
-Lerp_Radians = Lerp_Radians + (Radians - Lerp_Radians) * 0.8
-if Lerp_Radians < 0.018 then Last_Warping = tick() end
-if (tick() - Last_Warping) < (Reach_Time / 1.5) then return true end
-return Dot < (0.5 - Ping)
+local toPlayer = root.Position - ball.Position
+local dist = toPlayer.Magnitude
+if dist <= 30 then return false end
+local speed = Velocity.Magnitude
+if speed < 0.01 then return false end
+local dot = toPlayer.Unit:Dot(Velocity.Unit)
+-- Conservative: only skip balls far away that are clearly moving away/sideways.
+return dot <= 0.25
 end
 
 local function GetParryAnimation()
@@ -428,6 +419,35 @@ end
 local _reverted = {}
 local _originalMt = {}
 local _captured = nil
+local _rawFns = {}
+local _PARRY_CACHE = "Azure/enrique_parry_cache.json"
+
+local function _saveCapture()
+    pcall(function()
+        if not writefile then return end
+        if makefolder and not isfolder("Azure") then makefolder("Azure") end
+        local remote = _captured and _captured.remote
+        local cap = remote and _reverted[remote]
+        if not remote or not cap then return end
+        local data = {
+            path = remote:GetFullName(),
+            invoke = _captured.isInvoke == true,
+            a1 = tostring(cap[1]),
+            a2 = tostring(cap[2]),
+            a4 = tonumber(cap[4]) or 0.5,
+        }
+        writefile(_PARRY_CACHE, game:GetService("HttpService"):JSONEncode(data))
+    end)
+end
+
+local function _findByPath(full)
+    local root = game
+    for part in (full or ""):gmatch("[^%.]+") do
+        root = root and root:FindFirstChild(part)
+        if not root then return nil end
+    end
+    return root
+end
 
 local function _is_valid(args)
     return #args == 8
@@ -447,13 +467,17 @@ local function _hook(remote)
         local isFire  = (key == 'FireServer'  and self:IsA('RemoteEvent'))
         local isInvok = (key == 'InvokeServer' and self:IsA('RemoteFunction'))
         if isFire or isInvok then
+            if not _rawFns[self] then
+                _rawFns[self] = old(self, key)
+            end
             return function(_, ...)
                 local a = {...}
                 if _is_valid(a) then
-                if not _reverted[self] then _reverted[self] = a end
+                _reverted[self] = a
                 if not _captured then
-                    _captured = { remote = self, isInvoke = isInvok, raw = old(self, key) }
+                    _captured = { remote = self, isInvoke = isInvok, raw = _rawFns[self] }
                     print("[ENRIQUE] CAPTURED parry remote -> ready:", self:GetFullName())
+                    _saveCapture()
                 end
                 if not _tokReady then
                     local okT, tkn = pcall(_tokenize, a[2])
@@ -477,6 +501,40 @@ end
 ReplicatedStorage.ChildAdded:Connect(function(child)
     if child:IsA('RemoteEvent') or child:IsA('RemoteFunction') then
         pcall(_hook, child)
+    end
+end)
+
+-- Restore a previously saved parry capture so the script is armed IMMEDIATELY
+-- on load (no need to parry once manually after the very first setup).
+local function _restoreCapture()
+    if _captured or not _token then return false end
+    pcall(function()
+        local raw = readfile and isfile and isfile(_PARRY_CACHE) and readfile(_PARRY_CACHE)
+        if type(raw) ~= "string" or raw == "" then return end
+        local data = game:GetService("HttpService"):JSONDecode(raw)
+        if type(data) ~= "table" or type(data.path) ~= "string" then return end
+        local remote = _findByPath(data.path)
+        if not remote or not (remote:IsA("RemoteEvent") or remote:IsA("RemoteFunction")) then return end
+        pcall(function()
+            if remote:IsA("RemoteEvent") then local _ = remote.FireServer else local _ = remote.InvokeServer end
+        end)
+        local rawFn = _rawFns[remote]
+        if not rawFn then return end
+        local cap = { tostring(data.a1), tostring(data.a2), "", tonumber(data.a4) or 0.5 }
+        local okT, tkn = pcall(_tokenize, cap[2])
+        if not okT or not tkn then return end
+        _reverted[remote] = cap
+        _captured = { remote = remote, isInvoke = data.invoke == true, raw = rawFn }
+        _tokReady = true
+        print("[ENRIQUE] Remote restored from cache -> ready:", remote:GetFullName())
+    end)
+    return _captured ~= nil
+end
+
+task.spawn(function()
+    task.wait(0.5)
+    if not _restoreCapture() then
+        print("[ENRIQUE] Not armed yet - hit parry ONCE in game to capture, then it stays armed.")
     end
 end)
 
@@ -526,9 +584,22 @@ local function SendParry()
         packet[8] = false
     end
 
-    -- Call the captured raw remote function directly: skips the capture
-    -- metatable wrapper ({...} + unpack double-pass) and per-call closures.
-    local fired = pcall(raw, nil, unpack(packet))
+    -- Prefer the captured raw function (skips the capture wrapper and
+    -- per-call closures). Pass the remote as self exactly like remote:FireServer
+    -- does; if any executor/engine rejects direct invocation, fall back to the
+    -- normal metatable path so it always keeps working.
+    local fired = false
+    if raw then
+        local ok = pcall(raw, _captured.remote, unpack(packet))
+        if ok then fired = true end
+    end
+    if not fired then
+        if _captured.isInvoke then
+            fired = pcall(function() remote:InvokeServer(unpack(packet)) end)
+        else
+            fired = pcall(function() remote:FireServer(unpack(packet)) end)
+        end
+    end
 
     if fired then
         local st = os.clock()
@@ -554,26 +625,38 @@ local bID = ball:GetDebugId()
 if ball:GetAttribute("target") ~= player.Name or parried_balls[bID] then return end
 if Is_Curved(ball) then return end
 local charPart = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
-if not charPart then return end
-local velocity = ball.zoomies.VectorVelocity
+local z = ball:FindFirstChild("zoomies")
+if not charPart or not z then return end
+local velocity = z.VectorVelocity
 local ballPos = ball.Position
 local playerPos = charPart.Position
 local dist = (playerPos - ballPos).Magnitude
 local threshold = CalculateParryDistance(ball, velocity, charPart)
 if dist <= threshold or dist <= 20 then
+-- Only mark as parried when the packet actually went through, so a failed
+-- send is retried on the next frame instead of locking this ball out.
+if SendParry() then
 parried_balls[bID] = true
-SendParry()
 ball:GetAttributeChangedSignal("target"):Once(function() parried_balls[bID] = nil end)
+end
 end
 end
 
 local function ProcessTriggerBot(ball)
 if not cfg.trigger or spamActive then return end
 local bID = ball:GetDebugId()
-if ball:GetAttribute("target") == player.Name and not triggered_balls[bID] then
+if ball:GetAttribute("target") ~= player.Name or triggered_balls[bID] then return end
+local root = player.Character and player.Character.PrimaryPart
+local z = ball:FindFirstChild("zoomies")
+if not root or not z then return end
+local dist = (root.Position - ball.Position).Magnitude
+local range = math.max(cfg.tbRange or 24, 8)
+if dist <= range and z.VectorVelocity.Magnitude > 0.01 then
+-- Only mark when the packet actually went through (retry next frame otherwise).
+if SendParry() then
 triggered_balls[bID] = true
-SendParry()
 ball:GetAttributeChangedSignal("target"):Once(function() triggered_balls[bID] = nil end)
+end
 end
 end
 
@@ -645,21 +728,22 @@ end)
 
 RunService.Heartbeat:Connect(function()
 if not RemoteReady() then return end
-local ball=nil
 local balls=workspace:FindFirstChild("Balls")
-if balls then for _,v in pairs(balls:GetChildren()) do if v:GetAttribute("realBall") then ball=v break end end end
-if ball then
- if cfg.trigger then ProcessTriggerBot(ball)
- elseif cfg.parry and not spamActive then ProcessAutoParry(ball) end
- ProcessAutoSpam(ball)
+if balls then
+ for _,v in ipairs(balls:GetChildren()) do
+  if v:GetAttribute("realBall") then
+   if cfg.trigger then ProcessTriggerBot(v)
+   elseif cfg.parry and not spamActive then ProcessAutoParry(v) end
+   if v:GetAttribute("target") == player.Name then ProcessAutoSpam(v) end
+  end
+ end
 end
 local training=workspace:FindFirstChild("TrainingBalls")
 if training and parryContextAllowed() then
  for _,v in ipairs(training:GetChildren()) do
   if v:GetAttribute("realBall") then
    if cfg.parry then ProcessAutoParry(v) end
-   ProcessAutoSpam(v)
-   break
+   if v:GetAttribute("target") == player.Name then ProcessAutoSpam(v) end
   end
  end
 end
@@ -694,6 +778,8 @@ do
 
         -- Auto Spam
         if saved.auto_spam ~= nil then cfg.autoSpam = saved.auto_spam == true end
+        if saved.trigger_bot ~= nil then cfg.trigger = saved.trigger_bot == true end
+        if saved.tb_range ~= nil then cfg.tbRange = math.max(tonumber(saved.tb_range) or 24, 8) end
         if saved.target_change_stop ~= nil then cfg.targetChangeStop = saved.target_change_stop == true end
         if saved.animation_fix ~= nil then cfg.animfix = saved.animation_fix == true end
         if saved.parry_threshold ~= nil then cfg.spamThreshold = tonumber(saved.parry_threshold) or cfg.spamThreshold end
@@ -829,6 +915,21 @@ ParryRight:create_slider("distance_multiplier", {
     default = math.round(math.max(cfg.distanceMultiplier or 1.0, 0.8) * 100),
     rounding = true,
     callback = function(value) cfg.distanceMultiplier = math.max(value / 100, 0.8) end,
+})
+
+ParryRight:create_toggle("trigger_bot", {
+    title = "TB - Trigger Bot",
+    default = cfg.trigger == true,
+    callback = function(value) cfg.trigger = value end,
+})
+
+ParryRight:create_slider("tb_range", {
+    title = "TB Range",
+    minimum = 8,
+    maximum = 45,
+    default = math.round(cfg.tbRange or 24),
+    rounding = true,
+    callback = function(value) cfg.tbRange = math.max(value, 8) end,
 })
 
 
