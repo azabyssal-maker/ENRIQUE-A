@@ -360,11 +360,21 @@ end
 
 local aliveFolder = workspace:FindFirstChild("Alive")
 
--- Original kittylol GetParryData: mouse is the screen center (the game
--- validates cursor position; center is what the original hub sends).
+-- Cached parry data: the world-to-screen scan is only done ~10x/sec.
+-- Spam bursts reuse the same CFrame/events so it stays fast and smooth.
+local _gpdCacheCF = nil
+local _gpdCacheEvents = {}
+local _gpdCacheAt = 0
+local _gpdCenter = { 0, 0 }
+
 local function GetParryData()
+local now = os.clock()
+if _gpdCacheCF and (now - _gpdCacheAt) < 0.1 then
+return _gpdCacheCF, _gpdCacheEvents, _gpdCenter
+end
 local viewportSize = Camera.ViewportSize
 local centerPos = { viewportSize.X / 2, viewportSize.Y / 2 }
+_gpdCenter = centerPos
 local events = {}
 for _, v in pairs(aliveFolder:GetChildren()) do
 if v ~= player.Character and v:FindFirstChild("HumanoidRootPart") then
@@ -372,7 +382,10 @@ local screenPos, isOnScreen = Camera:WorldToScreenPoint(v.HumanoidRootPart.Posit
 if isOnScreen then events[tostring(v)] = screenPos end
 end
 end
-return Camera.CFrame, events, centerPos
+_gpdCacheEvents = events
+_gpdCacheCF = Camera.CFrame
+_gpdCacheAt = now
+return _gpdCacheCF, _gpdCacheEvents, _gpdCenter
 end
 
 local recentParries=0
@@ -408,6 +421,8 @@ end
 local _reverted = {}
 local _originalMt = {}
 local _captured = nil
+local _tokCache = nil
+local _tokCacheAt = 0
 
 local function _is_valid(args)
     return #args == 8
@@ -466,8 +481,14 @@ local function SendParry()
     local cap = _reverted[remote] or (_captured.args)
     if not cap then return false end
 
-    local okTok, token = pcall(_tokenize, cap[2])
-    if not (okTok and token) then return false end
+    local token = _tokCache
+    if not token or (os.clock() - _tokCacheAt) >= 0.1 then
+        local okTok, tk = pcall(_tokenize, cap[2])
+        if not (okTok and tk) then return false end
+        token = tk
+        _tokCache = tk
+        _tokCacheAt = os.clock()
+    end
 
     local cf, events, mouse = GetParryData()
     cf = ApplyCurveToCFrame(cf)
@@ -590,8 +611,8 @@ task.spawn(function()
 local hb = RunService.Heartbeat
 while true do
 if spamActive and RemoteReady() then
--- Burst per frame, scaled from cps. No ping polling, no timers.
-local n = math.clamp(math.floor(math.max(cfg.cps or 1500, 60) / 48), 1, 30)
+-- Frame-burst scaled from cps, capped to keep the game smooth.
+local n = math.clamp(math.floor(math.max(cfg.cps or 1000, 60) / 120), 1, 12)
 for _ = 1, n do SendParry() end
 end
 hb:Wait()
@@ -9199,7 +9220,7 @@ local function CreateSpamUI()
                     local dt = now - lastFrame
                     lastFrame = now
                     if dt < 0 or dt > 0.25 then dt = 1 / 60 end
-                    local n = math.clamp(math.floor(dt * (200 + manualSpamRate * 15)) + 1, 3, 30)
+                    local n = math.clamp(math.floor(dt * (100 + manualSpamRate * 4)) + 1, 2, 12)
                     for _ = 1, n do
                         sendFn()
                     end
