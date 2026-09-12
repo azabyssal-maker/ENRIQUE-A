@@ -43,6 +43,7 @@ spam = false,
 trigger = false,
 tbRange = 24,
 cps = 1000,
+spamRate = 100,
 accuracy = 50,
 randomPingAccuracy = false,
 autoSpam = false,
@@ -62,6 +63,11 @@ spamBindKey = "P"
 }
 
 cfg.spamThreshold = math.max(0, cfg.spamThreshold or 0)
+
+-- Shared burst size for Auto Spam and Manual Spam (Spam Strength slider).
+local function SpamBurstCount(dt)
+ return math.clamp(math.floor(dt * (400 + (cfg.spamRate or 100) * 15)) + 1, 3, 28)
+end
 cfg.distanceMultiplier = math.max(0.8, cfg.distanceMultiplier or 1.0)
 
 local RuntimeAccuracy = math.clamp(tonumber(cfg.accuracy) or 50,1,100)
@@ -624,7 +630,7 @@ if dist <= threshold or dist <= 20 then
     local st = APState[ball]
     if not st then st = { t = 0 } APState[ball] = st end
     local now = os.clock()
-    if now - st.t >= 0.3 then
+    if now - st.t >= 0.15 then
         st.t = now
         if not SendParry() then SendParry() end
     end
@@ -653,7 +659,7 @@ if dist <= range then
     local st = TBState[ball]
     if not st then st = { t = 0 } TBState[ball] = st end
     local now = os.clock()
-    if now - st.t >= 0.3 then
+    if now - st.t >= 0.2 then
         st.t = now
         if not SendParry() then SendParry() end
     end
@@ -719,8 +725,8 @@ local hb = RunService.Heartbeat
 while true do
 if spamActive and RemoteReady() then
 if parryContextAllowed() and not AbilityBlocked() then
--- Frame-burst scaled from cps, capped to keep the game smooth.
-local n = math.clamp(math.floor(math.max(cfg.cps or 1000, 60) / 60), 1, 24)
+-- Same speed as Manual Spam, driven by the Spam Strength slider.
+local n = SpamBurstCount(1 / 60)
 for _ = 1, n do SendParryFast() end
 end
 end
@@ -788,6 +794,7 @@ do
         if saved.animation_fix ~= nil then cfg.animfix = saved.animation_fix == true end
         if saved.parry_threshold ~= nil then cfg.spamThreshold = tonumber(saved.parry_threshold) or cfg.spamThreshold end
         if saved.distance_multiplier ~= nil then cfg.distanceMultiplier = math.max(tonumber(saved.distance_multiplier) or 100, 1) end
+        if saved.spam_rate ~= nil then cfg.spamRate = math.clamp(tonumber(saved.spam_rate) or 100, 1, 500) end
 
         -- Detection states
         if saved.detection_infinity ~= nil then Det.infinityEnabled = saved.detection_infinity == true end
@@ -9340,7 +9347,7 @@ local function CreateSpamUI()
                     local dt = now - lastFrame
                     lastFrame = now
                     if dt < 0 or dt > 0.25 then dt = 1 / 60 end
-                    local n = math.clamp(math.floor(dt * (400 + manualSpamRate * 15)) + 1, 3, 28)
+                    local n = SpamBurstCount(dt)
                     for _ = 1, n do
                         sendFn()
                     end
@@ -9408,6 +9415,7 @@ ParryRight:create_slider("spam_rate", {
     default = 100,
     rounding = true,
     callback = function(value)
+        cfg.spamRate = value
         manualSpamRate = value
     end,
 })
