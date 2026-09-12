@@ -363,20 +363,29 @@ local _gpdCacheTime = 0
 local _gpdEvents = {}
 local _gpdCenter = { 0, 0 }
 local _aliveFolder = workspace:FindFirstChild("Alive")
+
+-- The parry packet's mouse arg must match the REAL cursor position on
+-- PC (Blade Ball validates it), screen center is only for touch/mobile.
+local function ReadMousePosition()
+    local ok, m = pcall(function() return UserInputService:GetMouseLocation() end)
+    if ok and m then return { m.X, m.Y } end
+    local viewportSize = Camera.ViewportSize
+    return { viewportSize.X / 2, viewportSize.Y / 2 }
+end
+
 local function GetParryData(force)
+-- Mouse refetched live on every call; only CFrame/events are cached.
+_gpdCenter = ReadMousePosition()
 if not force and _gpdCacheTime ~= 0 and (os.clock() - _gpdCacheTime) < 0.1 then
 return _gpdCache, _gpdEvents, _gpdCenter
 end
 if not _aliveFolder then _aliveFolder = workspace:FindFirstChild("Alive") end
-local viewportSize = Camera.ViewportSize
-_gpdCenter[1] = viewportSize.X / 2
-_gpdCenter[2] = viewportSize.Y / 2
 table.clear(_gpdEvents)
 if _aliveFolder then
 for _, v in pairs(_aliveFolder:GetChildren()) do
 if v ~= player.Character and v:FindFirstChild("HumanoidRootPart") then
 local screenPos, isOnScreen = Camera:WorldToScreenPoint(v.HumanoidRootPart.Position)
-if isOnScreen then _gpdEvents[tostring(v)] = screenPos end
+if isOnScreen then _gpdEvents[v.Name] = screenPos end
 end
 end
 end
