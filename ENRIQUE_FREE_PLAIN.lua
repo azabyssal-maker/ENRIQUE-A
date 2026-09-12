@@ -779,7 +779,7 @@ end
 
 local _spamPacket = nil
 local function SendParry()
-    local ready = _autoArm.ready or KittyReady() or (RemoteReady() and _tokReady)
+    local ready = (RemoteReady() and _tokReady) or _autoArm.ready or KittyReady()
     if not ready then return false end
     if not parryContextAllowed() then return false end
 
@@ -787,8 +787,57 @@ local function SendParry()
     local cf, events, mouse = GetParryData()
     cf = ApplyCurveToCFrame(cf)
 
-    -- PRIMARY: original kittylol remote — direct 8-arg FireServer
-    -- built from the game PRY upvalues. No Block click required.
+    -- PRIMARY: REAL kittylol remote — replay the captured 8-arg packet
+    -- {hash, key, token, 0.5, CFrame, events, mouse, false} with a fresh
+    -- token, fresh CFrame/events and real cursor. The packet is captured
+    -- by the hook below whenever the game itself sends a valid parry.
+    if RemoteReady() then
+        local remote = _captured.remote
+        local cap = _reverted[remote]
+        if cap then
+            local okTok, token = pcall(_tokenize, cap[2])
+            if okTok and token then
+                local packet = _spamPacket
+                if not packet then
+                    packet = { cap[1], cap[2], token, cap[4] or 0.5, cf, events, mouse, false }
+                    _spamPacket = packet
+                else
+                    packet[1] = cap[1]; packet[2] = cap[2]; packet[3] = token
+                    packet[4] = cap[4] or 0.5; packet[5] = cf
+                    packet[6] = events; packet[7] = mouse; packet[8] = false
+                end
+
+                local fired = false
+                if _captured.raw then
+                    local ok = pcall(_captured.raw, remote, unpack(packet))
+                    if ok then fired = true end
+                end
+                if not fired then
+                    if _captured.isInvoke then
+                        fired = pcall(function() remote:InvokeServer(unpack(packet)) end)
+                    else
+                        fired = pcall(function() remote:FireServer(unpack(packet)) end)
+                    end
+                end
+
+                if fired then
+                    local st = os.clock()
+                    if st - (rpWindowStart or 0) > 0.5 then
+                        rpWindowStart = st; recentParries = 1
+                    else
+                        recentParries = (recentParries or 0) + 1
+                    end
+                    if cfg.animfix and st - (lastAnimTime or 0) > 0.05 then
+                        lastAnimTime = st; task.spawn(PlayParryAnimation)
+                    end
+                    return true
+                end
+            end
+        end
+    end
+
+    -- FALLBACK: auto-arm — direct 8-arg payload built from PRY upvalues
+    -- (only used when no real packet has been captured yet).
     if _autoArm.ready then
         local payload = _buildAutoArmPayload(cf, events, mouse)
         if payload then
@@ -796,7 +845,6 @@ local function SendParry()
                 _autoArm.remote:FireServer(unpack(payload))
             end)
             if not fired then
-                -- allow immediate retry with a fresh token/CFrame
                 _autoArm._lastSig = nil
             end
             if fired then
@@ -809,14 +857,12 @@ local function SendParry()
                 return true
             end
         elseif _autoArm._lastSig then
-            -- dedup hit: same token/time window already fired — count as
-            -- handled (matches the original kittylol `_lastSig` behavior)
             return true
         end
     end
 
     -- FALLBACK: captured 7-arg packet replayed with fresh CFrame /
-    -- events / real cursor (only used when auto-arm is not armed).
+    -- events / real cursor.
     if KittyReady() then
         if KittyFire(cf, events, mouse) then
             local st = os.clock()
@@ -829,52 +875,7 @@ local function SendParry()
         end
     end
 
-    -- FALLBACK: old hook-captured path (requires manual parry once)
-    if not RemoteReady() then return false end
-    local remote = _captured.remote
-    local cap = _reverted[remote]
-    if not cap or not _captured.raw then return false end
-
-    local okTok, token = pcall(_tokenize, cap[2])
-    if not (okTok and token) then return false end
-
-    local packet = _spamPacket
-    if not packet then
-        packet = { cap[1], cap[2], token, cap[4] or 0.5, cf, events, mouse, false }
-        _spamPacket = packet
-    else
-        packet[1] = cap[1]; packet[2] = cap[2]; packet[3] = token
-        packet[4] = cap[4] or 0.5; packet[5] = cf
-        packet[6] = events; packet[7] = mouse; packet[8] = false
-    end
-
-    local fired = false
-    if _captured.raw then
-        local ok = pcall(_captured.raw, remote, unpack(packet))
-        if ok then fired = true end
-    end
-    if not fired then
-        if _captured.isInvoke then
-            fired = pcall(function() remote:InvokeServer(unpack(packet)) end)
-        else
-            fired = pcall(function() remote:FireServer(unpack(packet)) end)
-        end
-    end
-
-    if fired then
-        local st = os.clock()
-        if st - (rpWindowStart or 0) > 0.5 then
-            rpWindowStart = st
-            recentParries = 1
-        else
-            recentParries = (recentParries or 0) + 1
-        end
-        if cfg.animfix and st - (lastAnimTime or 0) > 0.05 then
-            lastAnimTime = st
-            task.spawn(PlayParryAnimation)
-        end
-    end
-    return fired
+    return false
 end
 
 getgenv().ENRIQUE_SendParry=SendParry
@@ -977,7 +978,7 @@ end
 task.spawn(function()
 local hb = RunService.Heartbeat
 while true do
-if spamActive and (_autoArm.ready or KittyReady() or (RemoteReady() and _tokReady)) then
+if spamActive and ((RemoteReady() and _tokReady) or _autoArm.ready or KittyReady()) then
 -- Burst per frame, scaled from cps. No ping polling, no timers.
 local n = math.clamp(math.floor(math.max(cfg.cps or 1500, 60) / 48), 1, 30)
 for _ = 1, n do SendParry() end
@@ -987,7 +988,7 @@ end
 end)
 
 RunService.Heartbeat:Connect(function()
-if not (_autoArm.ready or KittyReady() or RemoteReady()) then return end
+if not ((RemoteReady() and _tokReady) or _autoArm.ready or KittyReady()) then return end
 local balls=workspace:FindFirstChild("Balls")
 if balls then
  for _,v in ipairs(balls:GetChildren()) do
