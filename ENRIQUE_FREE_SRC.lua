@@ -681,11 +681,11 @@ end
 task.spawn(function()
     task.wait(0.5)
     if not _restoreCapture() and not _autoArm.ready then
-        -- auto-arm may still be initializing; the task.spawn above
-        -- handles it separately — print only if both paths fail
+        -- kitty/auto-arm may still be initializing; print only if
+        -- every automatic path fails
         task.delay(5, function()
-            if not _autoArm.ready then
-                print("[ENRIQUE] If auto-arm failed, hit parry ONCE to capture via hook fallback.")
+            if not KittyReady() and not _autoArm.ready then
+                print("[ENRIQUE] Packet capture failed — the Block prime did not produce a parry packet.")
             end
         end)
     end
@@ -695,9 +695,90 @@ local function RemoteReady()
     return _captured ~= nil and _token ~= nil
 end
 
+-- ============================================================
+-- KITTYLOL-STYLE REMOTE (the previous working remote)
+-- Blade Ball changed the parry packet to the 7-arg format:
+-- {hash, key, token, CFrame, events, mouse, boolean}.
+-- We fire the game's own Block button ONCE (getconnections), the
+-- real handler sends the parry packet, our hook captures the exact
+-- args, then we replay it with fresh CFrame / events / mouse.
+-- ============================================================
+local _ktRemote = nil
+local _ktRaw = nil
+local _ktArgs = nil
+local _ktPrimed = false
+
+do
+    local ok = pcall(function()
+        local mt = getrawmetatable(game)
+        if not mt then return end
+        local old = mt.__index
+        setreadonly(mt, false)
+        mt.__index = newcclosure(function(self, key)
+            if key == "FireServer" or key == "InvokeServer" then
+                return newcclosure(function(instance, ...)
+                    local args = { ... }
+                    if #args >= 4 then
+                        local isParry = instance.Name and instance.Name:find("Parry")
+                        if isParry or (not _ktArgs) or (not _ktPrimed) then
+                            _ktRemote = instance
+                            _ktRaw = old(instance, "FireServer") or old(self, key)
+                            _ktArgs = args
+                        end
+                    end
+                    return old(self, key)(instance, ...)
+                end)
+            end
+            return old(self, key)
+        end)
+        setreadonly(mt, true)
+    end)
+end
+
+local function KittyPrime()
+    if _ktPrimed or _ktArgs then return true end
+    pcall(function()
+        local pg = player:FindFirstChild("PlayerGui") or player:WaitForChild("PlayerGui", 5)
+        local hb = pg and (pg:FindFirstChild("Hotbar") or pg:WaitForChild("Hotbar", 5))
+        local block = hb and (hb:FindFirstChild("Block") or hb:WaitForChild("Block", 5))
+        if block then
+            for _, conn in pairs(getconnections(block.Activated)) do
+                conn:Fire()
+            end
+        end
+    end)
+    _ktPrimed = _ktArgs ~= nil
+    return _ktPrimed
+end
+
+local function KittyReady()
+    return _ktArgs ~= nil and _ktRemote ~= nil and _ktRaw ~= nil
+end
+
+local function KittyFire(cf, events, mouse)
+    local a = _ktArgs
+    if not a then return false end
+    local payload = { a[1], a[2], a[3], cf, events, mouse, a[7] }
+    local ok = pcall(function()
+        _ktRaw(_ktRemote, unpack(payload))
+    end)
+    if not ok then
+        ok = pcall(function()
+            _ktRemote:FireServer(unpack(payload))
+        end)
+    end
+    return ok
+end
+
+-- Auto-prime once shortly after load (press Block -> capture packet).
+task.spawn(function()
+    task.wait(1.5)
+    if not KittyReady() then KittyPrime() end
+end)
+
 local _spamPacket = nil
 local function SendParry()
-    local ready = _autoArm.ready or (RemoteReady() and _tokReady)
+    local ready = KittyReady() or _autoArm.ready or (RemoteReady() and _tokReady)
     if not ready then return false end
     if not parryContextAllowed() then return false end
 
@@ -705,9 +786,23 @@ local function SendParry()
     local cf, events, mouse = GetParryData()
     cf = ApplyCurveToCFrame(cf)
 
-    -- FAST PATH: auto-arm — builds payload from game module upvalues.
-    -- Works instantly on load, survives Blade Ball updates (re-reads
-    -- upvalues each time the payload is built).
+    -- KITTYLOL path: replay the captured 7-arg packet (previous
+    -- working remote) with fresh CFrame / events / real cursor.
+    if KittyReady() then
+        KittyPrime()
+        if KittyFire(cf, events, mouse) then
+            local st = os.clock()
+            if st - (rpWindowStart or 0) > 0.5 then rpWindowStart = st; recentParries = 1
+            else recentParries = (recentParries or 0) + 1 end
+            if cfg.animfix and st - (lastAnimTime or 0) > 0.05 then
+                lastAnimTime = st; task.spawn(PlayParryAnimation)
+            end
+            return true
+        end
+    end
+
+    -- FALLBACK: auto-arm — builds the old 8-arg payload from game
+    -- module upvalues (only used when the 7-arg capture is missing).
     if _autoArm.ready then
         local payload = _buildAutoArmPayload(cf, events, mouse)
         if payload then
@@ -874,7 +969,7 @@ end
 task.spawn(function()
 local hb = RunService.Heartbeat
 while true do
-if spamActive and (_autoArm.ready or (RemoteReady() and _tokReady)) then
+if spamActive and (KittyReady() or _autoArm.ready or (RemoteReady() and _tokReady)) then
 -- Burst per frame, scaled from cps. No ping polling, no timers.
 local n = math.clamp(math.floor(math.max(cfg.cps or 1500, 60) / 48), 1, 30)
 for _ = 1, n do SendParry() end
@@ -884,7 +979,7 @@ end
 end)
 
 RunService.Heartbeat:Connect(function()
-if not (_autoArm.ready or RemoteReady()) then return end
+if not (KittyReady() or _autoArm.ready or RemoteReady()) then return end
 local balls=workspace:FindFirstChild("Balls")
 if balls then
  for _,v in ipairs(balls:GetChildren()) do
