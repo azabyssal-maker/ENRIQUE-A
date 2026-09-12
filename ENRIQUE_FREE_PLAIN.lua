@@ -696,16 +696,17 @@ local function RemoteReady()
 end
 
 -- ============================================================
--- KITTYLOL-STYLE REMOTE (the previous working remote)
--- Blade Ball changed the parry packet to the 7-arg format:
--- {hash, key, token, CFrame, events, mouse, boolean}.
--- We fire the game's own Block button ONCE (getconnections), the
--- real handler sends the parry packet, our hook captures the exact
--- args, then we replay it with fresh CFrame / events / mouse.
+-- KITTYLOL REMOTE (verbatim port of the original kittylol remote)
+-- Hook the game metatable: any 4+ arg FireServer/InvokeServer gets
+-- captured (remote + original FireServer + 7 args). Then CLICK the
+-- game's own Block button a few times (点几下) so the real handler
+-- sends the parry packet -> captured. Auto-parry replays the 7-arg
+-- packet with fresh CFrame / events / real cursor.
 -- ============================================================
 local _ktRemote = nil
 local _ktRaw = nil
 local _ktArgs = nil
+local _ktc = { nil, nil, nil, nil, nil, nil, nil }
 local _ktPrimed = false
 
 do
@@ -719,12 +720,10 @@ do
                 return newcclosure(function(instance, ...)
                     local args = { ... }
                     if #args >= 4 then
-                        local isParry = instance.Name and instance.Name:find("Parry")
-                        if isParry or (not _ktArgs) or (not _ktPrimed) then
-                            _ktRemote = instance
-                            _ktRaw = old(instance, "FireServer") or old(self, key)
-                            _ktArgs = args
-                        end
+                        _ktRemote = instance
+                        _ktRaw = old(instance, "FireServer") or old(self, key)
+                        for i = 1, 7 do _ktc[i] = args[i] end
+                        _ktArgs = _ktc
                     end
                     return old(self, key)(instance, ...)
                 end)
@@ -742,8 +741,13 @@ local function KittyPrime()
         local hb = pg and (pg:FindFirstChild("Hotbar") or pg:WaitForChild("Hotbar", 5))
         local block = hb and (hb:FindFirstChild("Block") or hb:WaitForChild("Block", 5))
         if block then
-            for _, conn in pairs(getconnections(block.Activated)) do
-                conn:Fire()
+            -- 点几下: fire the real Block button's Activated signals a
+            -- few times so the game's own handler sends the packet.
+            for click = 1, 3 do
+                for _, conn in pairs(getconnections(block.Activated)) do
+                    conn:Fire()
+                end
+                task.wait(0.05)
             end
         end
     end)
@@ -758,6 +762,8 @@ end
 local function KittyFire(cf, events, mouse)
     local a = _ktArgs
     if not a then return false end
+    -- original kittylol doFire layout:
+    -- { args[1], args[2], args[3], cf, events, mouse, args[7] }
     local payload = { a[1], a[2], a[3], cf, events, mouse, a[7] }
     local ok = pcall(function()
         _ktRaw(_ktRemote, unpack(payload))
@@ -770,7 +776,7 @@ local function KittyFire(cf, events, mouse)
     return ok
 end
 
--- Auto-prime once shortly after load (press Block -> capture packet).
+-- Auto-prime shortly after load (点几下 Block -> capture packet).
 task.spawn(function()
     task.wait(1.5)
     if not KittyReady() then KittyPrime() end
