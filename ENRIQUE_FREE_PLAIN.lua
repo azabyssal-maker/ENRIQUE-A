@@ -358,181 +358,26 @@ end
 return baseCFrame * rotation
 end
 
-local _gpdCache = nil
-local _gpdCacheTime = 0
-local _gpdEvents = {}
-local _gpdCenter = { 0, 0 }
-local _aliveFolder = workspace:FindFirstChild("Alive")
+local aliveFolder = workspace:FindFirstChild("Alive")
 
--- The parry packet's mouse arg must match the REAL cursor position on
--- PC (Blade Ball validates it), screen center is only for touch/mobile.
-local function ReadMousePosition()
-    local ok, m = pcall(function() return UserInputService:GetMouseLocation() end)
-    if ok and m then return { m.X, m.Y } end
-    local viewportSize = Camera.ViewportSize
-    return { viewportSize.X / 2, viewportSize.Y / 2 }
-end
-
-local function GetParryData(force)
--- Mouse refetched live on every call; only CFrame/events are cached.
-_gpdCenter = ReadMousePosition()
-if not force and _gpdCacheTime ~= 0 and (os.clock() - _gpdCacheTime) < 0.1 then
-return _gpdCache, _gpdEvents, _gpdCenter
-end
-if not _aliveFolder then _aliveFolder = workspace:FindFirstChild("Alive") end
-table.clear(_gpdEvents)
-if _aliveFolder then
-for _, v in pairs(_aliveFolder:GetChildren()) do
+-- Original kittylol GetParryData: mouse is the screen center (the game
+-- validates cursor position; center is what the original hub sends).
+local function GetParryData()
+local viewportSize = Camera.ViewportSize
+local centerPos = { viewportSize.X / 2, viewportSize.Y / 2 }
+local events = {}
+for _, v in pairs(aliveFolder:GetChildren()) do
 if v ~= player.Character and v:FindFirstChild("HumanoidRootPart") then
 local screenPos, isOnScreen = Camera:WorldToScreenPoint(v.HumanoidRootPart.Position)
-if isOnScreen then _gpdEvents[v.Name] = screenPos end
+if isOnScreen then events[tostring(v)] = screenPos end
 end
 end
-end
-_gpdCache = Camera.CFrame
-_gpdCacheTime = os.clock()
-return _gpdCache, _gpdEvents, _gpdCenter
+return Camera.CFrame, events, centerPos
 end
 
 local recentParries=0
-local rpWindowStart=0
-local lastAnimTime=0
 
--- ============================================================
--- AUTO-ARM: Extract parry info directly from the game's PRY
--- module upvalues. No manual parry needed — armed instantly.
--- Falls back to old hook-based capture if the module path changes.
--- ============================================================
--- Anti-detection hooks (required BEFORE require/getupvalues —
--- Blade Ball's anti-cheat watches these libraries)
--- ============================================================
-do
-    pcall(function()
-        if hookfunction and getrenv then
-            local old_dinfo
-            old_dinfo = hookfunction(getrenv().debug.info, function(f, t)
-                if type(f) == "function" then return "[C]"
-                elseif f == 4 and t == "s" then
-                    return "ReplicatedStorage.Controllers.SwordsController "
-                end
-                return old_dinfo(f, t)
-            end)
-        end
-    end)
-    pcall(function()
-        if hookfunction and getrenv then
-            local old_gfenv
-            old_gfenv = hookfunction(getrenv().getfenv, function(l)
-                if l ~= nil and type(l) == "number" then
-                    if l >= 1 and l <= 10 then return old_gfenv(10) end
-                end
-                return old_gfenv(l)
-            end)
-        end
-    end)
-end
-
--- ============================================================
-local _autoArm = {ready = false, remote = nil, keyTable = nil,
-    transformFn = nil, netModule = nil, remoteId = nil, parryHash = nil,
-    _lastSig = nil}
-
-task.spawn(function()
-    pcall(function()
-        repeat task.wait(0.3) until game:IsLoaded()
-        local RS = game:GetService("ReplicatedStorage")
-        local Controllers = RS:FindFirstChild("Controllers")
-            or RS:WaitForChild("Controllers", 30)
-        if not Controllers then return end
-
-        local SC = nil
-        for _, child in ipairs(Controllers:GetChildren()) do
-            if child.Name:sub(1, 16) == "SwordsController" then
-                SC = child; break
-            end
-        end
-        if not SC then
-            print("[ENRIQUE] SwordsController not found — parry once to capture via hook.")
-            return
-        end
-
-        local PRY = SC:FindFirstChild("PRY")
-            or SC:WaitForChild("PRY", 15)
-        if not PRY then
-            print("[ENRIQUE] PRY module not found — parry once to capture via hook.")
-            return
-        end
-
-        local ParryFn = require(PRY)
-        local getupvals = debug.getupvalues or getupvalues
-        if not getupvals then return end
-
-        local ups = getupvals(ParryFn)
-        if not ups or #ups < 8 then
-            print("[ENRIQUE] PRY upvalue count", ups and #ups or "nil",
-                  "- falling back to hook capture.")
-            return
-        end
-
-        _autoArm.keyTable    = ups[3]
-        _autoArm.transformFn = ups[4]
-        _autoArm.netModule   = ups[6]
-        _autoArm.remoteId    = ups[7]
-        _autoArm.parryHash   = ups[8]
-
-        local rok, remote = pcall(
-            _autoArm.netModule.RemoteEvent,
-            _autoArm.netModule, _autoArm.remoteId)
-        if not rok or not remote then
-            print("[ENRIQUE] Parry remote resolve failed — hook fallback active.")
-            return
-        end
-
-        _autoArm.remote = remote
-        _autoArm.ready = true
-        print("[ENRIQUE] Auto-arm OK:", remote:GetFullName())
-    end)
-end)
-
-local function _buildAutoArmPayload(cf, events, mouse)
-    if not _autoArm.ready then return nil end
-    local kt = _autoArm.keyTable
-    if not kt then return nil end
-    local keyIndex = kt[3]
-    local currentKey = kt[1] and kt[1][keyIndex]
-    if not currentKey then return nil end
-
-    local okT, transformed = pcall(_autoArm.transformFn, currentKey, "TIME")
-    if not okT or not transformed then
-        okT, transformed = pcall(_autoArm.transformFn, currentKey)
-        if not okT or not transformed then return nil end
-    end
-
-    local timeStr = tostring(math.floor(workspace:GetServerTimeNow() * 100))
-    local sig = tostring(currentKey) .. "|" .. timeStr
-    if _autoArm._lastSig == sig then return nil end
-    _autoArm._lastSig = sig
-    local klen = #transformed
-    local tc = {}
-    for i = 1, #timeStr do
-        local kb = string.byte(transformed, (i - 1) % klen + 1)
-        local tb = (string.byte(timeStr, i) + i) % 256
-        tc[i] = string.char(bit32.bxor(tb, kb))
-    end
-
-    return {
-        _autoArm.parryHash,
-        currentKey,
-        table.concat(tc),
-        0.5,
-        cf,
-        events,
-        mouse,
-        false,
-    }
-end
-
--- Old getgc-based _token fallback (for hook path, kept as backup)
+-- Original kittylol token: scan the game heap for the PRY token function.
 local _token
 for _, Function in getgc(true) do
     if type(Function) ~= 'function' then continue end
@@ -547,54 +392,22 @@ for _, Function in getgc(true) do
     if _token then break end
 end
 
-local _tokBuf = table.create(16)
-local _tokReady = false
 local function _tokenize(_remote_uid)
     local time = tostring(math.floor(workspace:GetServerTimeNow() * 100))
     local key = _token(_remote_uid, 'TIME')
-    local n = #time
-    local klen = #key
-    for index = 1, n do
-        _tokBuf[index] = string.char(bit32.bxor(
+    local characters = table.create(#time)
+    for index = 1, #time do
+        characters[index] = string.char(bit32.bxor(
             (string.byte(time, index) + index) % 256,
-            string.byte(key, (index - 1) % klen + 1)
+            string.byte(key, (index - 1) % #key + 1)
         ))
     end
-    return table.concat(_tokBuf, "", 1, n)
+    return table.concat(characters)
 end
 
 local _reverted = {}
 local _originalMt = {}
 local _captured = nil
-local _rawFns = {}
-local _PARRY_CACHE = "Azure/enrique_parry_cache.json"
-
-local function _saveCapture()
-    pcall(function()
-        if not writefile then return end
-        if makefolder and not isfolder("Azure") then makefolder("Azure") end
-        local remote = _captured and _captured.remote
-        local cap = remote and _reverted[remote]
-        if not remote or not cap then return end
-        local data = {
-            path = remote:GetFullName(),
-            invoke = _captured.isInvoke == true,
-            a1 = tostring(cap[1]),
-            a2 = tostring(cap[2]),
-            a4 = tonumber(cap[4]) or 0.5,
-        }
-        writefile(_PARRY_CACHE, game:GetService("HttpService"):JSONEncode(data))
-    end)
-end
-
-local function _findByPath(full)
-    local root = game
-    for part in (full or ""):gmatch("[^%.]+") do
-        root = root and root:FindFirstChild(part)
-        if not root then return nil end
-    end
-    return root
-end
 
 local function _is_valid(args)
     return #args == 8
@@ -614,22 +427,14 @@ local function _hook(remote)
         local isFire  = (key == 'FireServer'  and self:IsA('RemoteEvent'))
         local isInvok = (key == 'InvokeServer' and self:IsA('RemoteFunction'))
         if isFire or isInvok then
-            if not _rawFns[self] then
-                _rawFns[self] = old(self, key)
-            end
             return function(_, ...)
                 local a = {...}
                 if _is_valid(a) then
-                _reverted[self] = a
-                if not _captured then
-                    _captured = { remote = self, isInvoke = isInvok, raw = _rawFns[self] }
-                    print("[ENRIQUE] CAPTURED parry remote -> ready:", self:GetFullName())
-                    _saveCapture()
-                end
-                if not _tokReady then
-                    local okT, tkn = pcall(_tokenize, a[2])
-                    if okT and tkn then _tokReady = true end
-                end
+                    if not _reverted[self] then _reverted[self] = a end
+                    if not _captured then
+                        _captured = { remote = self, isInvoke = isInvok }
+                        print("[ENRIQUE] CAPTURED parry remote -> ready:", self:GetFullName())
+                    end
                 end
                 if isInvok then return old(self, key)(_, unpack(a)) end
                 return old(self, key)(_, unpack(a))
@@ -651,231 +456,37 @@ ReplicatedStorage.ChildAdded:Connect(function(child)
     end
 end)
 
--- Restore a previously saved parry capture so the script is armed IMMEDIATELY
--- on load (no need to parry once manually after the very first setup).
-local function _restoreCapture()
-    if _captured or not _token then return false end
-    pcall(function()
-        local raw = readfile and isfile and isfile(_PARRY_CACHE) and readfile(_PARRY_CACHE)
-        if type(raw) ~= "string" or raw == "" then return end
-        local data = game:GetService("HttpService"):JSONDecode(raw)
-        if type(data) ~= "table" or type(data.path) ~= "string" then return end
-        local remote = _findByPath(data.path)
-        if not remote or not (remote:IsA("RemoteEvent") or remote:IsA("RemoteFunction")) then return end
-        pcall(function()
-            if remote:IsA("RemoteEvent") then local _ = remote.FireServer else local _ = remote.InvokeServer end
-        end)
-        local rawFn = _rawFns[remote]
-        if not rawFn then return end
-        local cap = { tostring(data.a1), tostring(data.a2), "", tonumber(data.a4) or 0.5 }
-        local okT, tkn = pcall(_tokenize, cap[2])
-        if not okT or not tkn then return end
-        _reverted[remote] = cap
-        _captured = { remote = remote, isInvoke = data.invoke == true, raw = rawFn }
-        _tokReady = true
-        print("[ENRIQUE] Remote restored from cache -> ready:", remote:GetFullName())
-    end)
-    return _captured ~= nil
-end
-
-task.spawn(function()
-    task.wait(0.5)
-    if not _restoreCapture() and not _autoArm.ready then
-        -- kitty/auto-arm may still be initializing; print only if
-        -- every automatic path fails
-        task.delay(5, function()
-            if not KittyReady() and not _autoArm.ready then
-                print("[ENRIQUE] Packet capture failed — the Block prime did not produce a parry packet.")
-            end
-        end)
-    end
-end)
-
 local function RemoteReady()
     return _captured ~= nil and _token ~= nil
 end
 
--- ============================================================
--- KITTYLOL CAPTURE (fallback only)
--- The PRIMARY remote is the direct 8-arg FireServer built from the
--- game's PRY module upvalues (auto-arm below) — that is the original
--- kittylol remote. This metatable hook just passively captures any
--- 4+ arg parry packet the game itself sends (e.g. when the player
--- presses Block manually) so it can be replayed if auto-arm fails.
--- No Block button is clicked automatically by the script.
--- ============================================================
-local _ktRemote = nil
-local _ktRaw = nil
-local _ktArgs = nil
-local _ktc = { nil, nil, nil, nil, nil, nil, nil }
-local _ktPrimed = false
-
-do
-    local ok = pcall(function()
-        local mt = getrawmetatable(game)
-        if not mt then return end
-        local old = mt.__index
-        setreadonly(mt, false)
-        mt.__index = newcclosure(function(self, key)
-            if key == "FireServer" or key == "InvokeServer" then
-                return newcclosure(function(instance, ...)
-                    local args = { ... }
-                    if #args >= 4 then
-                        _ktRemote = instance
-                        _ktRaw = old(instance, "FireServer") or old(self, key)
-                        for i = 1, 7 do _ktc[i] = args[i] end
-                        _ktArgs = _ktc
-                    end
-                    return old(self, key)(instance, ...)
-                end)
-            end
-            return old(self, key)
-        end)
-        setreadonly(mt, true)
-    end)
-end
-
-local function KittyPrime()
-    if _ktPrimed or _ktArgs then return true end
-    pcall(function()
-        local pg = player:FindFirstChild("PlayerGui") or player:WaitForChild("PlayerGui", 5)
-        local hb = pg and (pg:FindFirstChild("Hotbar") or pg:WaitForChild("Hotbar", 5))
-        local block = hb and (hb:FindFirstChild("Block") or hb:WaitForChild("Block", 5))
-        if block then
-            -- 点几下: fire the real Block button's Activated signals a
-            -- few times so the game's own handler sends the packet.
-            for click = 1, 3 do
-                for _, conn in pairs(getconnections(block.Activated)) do
-                    conn:Fire()
-                end
-                task.wait(0.05)
-            end
-        end
-    end)
-    _ktPrimed = _ktArgs ~= nil
-    return _ktPrimed
-end
-
-local function KittyReady()
-    return _ktArgs ~= nil and _ktRemote ~= nil and _ktRaw ~= nil
-end
-
-local function KittyFire(cf, events, mouse)
-    local a = _ktArgs
-    if not a then return false end
-    -- original kittylol doFire layout:
-    -- { args[1], args[2], args[3], cf, events, mouse, args[7] }
-    local payload = { a[1], a[2], a[3], cf, events, mouse, a[7] }
-    local ok = pcall(function()
-        _ktRaw(_ktRemote, unpack(payload))
-    end)
-    if not ok then
-        ok = pcall(function()
-            _ktRemote:FireServer(unpack(payload))
-        end)
-    end
-    return ok
-end
-
-local _spamPacket = nil
 local function SendParry()
-    local ready = (RemoteReady() and _tokReady) or _autoArm.ready or KittyReady()
-    if not ready then return false end
-    if not parryContextAllowed() then return false end
+    if not RemoteReady() or not parryContextAllowed() or AbilityBlocked() then return false end
+    local remote = _captured.remote
+    local cap = _reverted[remote] or (_captured.args)
+    if not cap then return false end
 
-    -- Reuse cached CFrame/events (refreshed 10x/sec)
+    local okTok, token = pcall(_tokenize, cap[2])
+    if not (okTok and token) then return false end
+
     local cf, events, mouse = GetParryData()
     cf = ApplyCurveToCFrame(cf)
 
-    -- PRIMARY: REAL kittylol remote — replay the captured 8-arg packet
-    -- {hash, key, token, 0.5, CFrame, events, mouse, false} with a fresh
-    -- token, fresh CFrame/events and real cursor. The packet is captured
-    -- by the hook below whenever the game itself sends a valid parry.
-    if RemoteReady() then
-        local remote = _captured.remote
-        local cap = _reverted[remote]
-        if cap then
-            local okTok, token = pcall(_tokenize, cap[2])
-            if okTok and token then
-                local packet = _spamPacket
-                if not packet then
-                    packet = { cap[1], cap[2], token, cap[4] or 0.5, cf, events, mouse, false }
-                    _spamPacket = packet
-                else
-                    packet[1] = cap[1]; packet[2] = cap[2]; packet[3] = token
-                    packet[4] = cap[4] or 0.5; packet[5] = cf
-                    packet[6] = events; packet[7] = mouse; packet[8] = false
-                end
+    local packet = { cap[1], cap[2], token, cap[4] or 0.5, cf, events, mouse, false }
 
-                local fired = false
-                if _captured.raw then
-                    local ok = pcall(_captured.raw, remote, unpack(packet))
-                    if ok then fired = true end
-                end
-                if not fired then
-                    if _captured.isInvoke then
-                        fired = pcall(function() remote:InvokeServer(unpack(packet)) end)
-                    else
-                        fired = pcall(function() remote:FireServer(unpack(packet)) end)
-                    end
-                end
-
-                if fired then
-                    local st = os.clock()
-                    if st - (rpWindowStart or 0) > 0.5 then
-                        rpWindowStart = st; recentParries = 1
-                    else
-                        recentParries = (recentParries or 0) + 1
-                    end
-                    if cfg.animfix and st - (lastAnimTime or 0) > 0.05 then
-                        lastAnimTime = st; task.spawn(PlayParryAnimation)
-                    end
-                    return true
-                end
-            end
-        end
+    local fired
+    if _captured.isInvoke then
+        fired = pcall(function() remote:InvokeServer(unpack(packet)) end)
+    else
+        fired = pcall(function() remote:FireServer(unpack(packet)) end)
     end
 
-    -- FALLBACK: auto-arm — direct 8-arg payload built from PRY upvalues
-    -- (only used when no real packet has been captured yet).
-    if _autoArm.ready then
-        local payload = _buildAutoArmPayload(cf, events, mouse)
-        if payload then
-            local fired = pcall(function()
-                _autoArm.remote:FireServer(unpack(payload))
-            end)
-            if not fired then
-                _autoArm._lastSig = nil
-            end
-            if fired then
-                local st = os.clock()
-                if st - (rpWindowStart or 0) > 0.5 then rpWindowStart = st; recentParries = 1
-                else recentParries = (recentParries or 0) + 1 end
-                if cfg.animfix and st - (lastAnimTime or 0) > 0.05 then
-                    lastAnimTime = st; task.spawn(PlayParryAnimation)
-                end
-                return true
-            end
-        elseif _autoArm._lastSig then
-            return true
-        end
+    if fired then
+        recentParries = (recentParries or 0) + 1
+        task.delay(.5, function() recentParries = math.max((recentParries or 1) - 1, 0) end)
     end
-
-    -- FALLBACK: captured 7-arg packet replayed with fresh CFrame /
-    -- events / real cursor.
-    if KittyReady() then
-        if KittyFire(cf, events, mouse) then
-            local st = os.clock()
-            if st - (rpWindowStart or 0) > 0.5 then rpWindowStart = st; recentParries = 1
-            else recentParries = (recentParries or 0) + 1 end
-            if cfg.animfix and st - (lastAnimTime or 0) > 0.05 then
-                lastAnimTime = st; task.spawn(PlayParryAnimation)
-            end
-            return true
-        end
-    end
-
-    return false
+    if fired and cfg.animfix then task.spawn(PlayParryAnimation) end
+    return fired
 end
 
 getgenv().ENRIQUE_SendParry=SendParry
@@ -978,7 +589,7 @@ end
 task.spawn(function()
 local hb = RunService.Heartbeat
 while true do
-if spamActive and ((RemoteReady() and _tokReady) or _autoArm.ready or KittyReady()) then
+if spamActive and RemoteReady() then
 -- Burst per frame, scaled from cps. No ping polling, no timers.
 local n = math.clamp(math.floor(math.max(cfg.cps or 1500, 60) / 48), 1, 30)
 for _ = 1, n do SendParry() end
@@ -988,7 +599,7 @@ end
 end)
 
 RunService.Heartbeat:Connect(function()
-if not ((RemoteReady() and _tokReady) or _autoArm.ready or KittyReady()) then return end
+if not RemoteReady() then return end
 local balls=workspace:FindFirstChild("Balls")
 if balls then
  for _,v in ipairs(balls:GetChildren()) do
