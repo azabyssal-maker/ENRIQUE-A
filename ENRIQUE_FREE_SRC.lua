@@ -1,5 +1,8 @@
 repeat task.wait() until game:IsLoaded()
 
+print("[ENRIQUE] DIRECT REMOTE build | auto-arm + hook capture")
+
+
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
