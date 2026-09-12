@@ -291,10 +291,26 @@ RunService.Heartbeat:Connect(function(dt) local old=AI.frame AI.frame=old+((dt o
 local function ClosestOpponent() local root=player.Character and player.Character.PrimaryPart local alive=workspace:FindFirstChild("Alive") if not root or not alive then return end local best,res=math.huge,nil for _,c in ipairs(alive:GetChildren()) do if c~=player.Character and c.PrimaryPart then local d=(c.PrimaryPart.Position-root.Position).Magnitude if d<best then best,res=d,c end end end return res end
 
 local function CalculateParryDistance(ball,velocity,root)
- local speed=velocity.Magnitude local ping=LastPing local capped=math.min(math.max(speed-9.5,0),650) local acc=math.clamp(RuntimeAccuracy,1,100) local div=(2.4+capped*.002)*(3.75-(acc-1)*(3/99)) local modern=math.clamp(ping/100,5,17)+math.max(speed/div,9.5) local legacy=speed/math.max(2.4,(101-acc)/8)+ping/10 local result=math.max(modern,legacy)
- if result>46 then result=46 end
- if cfg.aiDetection then result=result+math.clamp(speed*AI.extra,0,30) if speed>=750 then result=math.max(result,9.5+speed*.025) end end
- if cfg.aiPatterns then local now=os.clock() local h=AI.motion[ball] if h then local dt=math.clamp(now-h.time,1/240,.15) local acc=(velocity-h.velocity).Magnitude/dt local turn=velocity.Magnitude>0 and h.velocity.Magnitude>0 and math.acos(math.clamp(velocity.Unit:Dot(h.velocity.Unit),-1,1)) or 0 result=result+math.clamp(acc*.0015+speed*turn*.07,0,20) end AI.motion[ball]={velocity=velocity,time=now} local o=ClosestOpponent() if o and o.PrimaryPart then local to=root.Position-o.PrimaryPart.Position if to.Magnitude>0 then result=result+math.clamp(math.max(o.PrimaryPart.AssemblyLinearVelocity:Dot(to.Unit),0)*.1,0,12) end end end
+ local speed=velocity.Magnitude local ping=LastPing or 100
+ -- Fixed reaction-time window: every ball is parried the SAME time before
+ -- impact, so Parry Accuracy 1 and 100 both react instantly and never feel
+ -- slow or inconsistent. Speed only scales the distance (fast ball = farther).
+ local reaction = 0.10 + math.clamp(ping/350, 0, 0.12)
+ reaction = reaction + (math.clamp(RuntimeAccuracy,1,100)-50)/50*0.03
+ if reaction < 0.08 then reaction = 0.08 end
+ local result = speed*reaction + 6
+ if result > 46 then result = 46 end
+ if cfg.aiDetection then result = result + math.clamp(speed*AI.extra,0,8) end
+ if cfg.aiPatterns then
+  local now=os.clock() local h=AI.motion[ball]
+  if h then
+   local dt=math.clamp(now-h.time,1/240,.15)
+   local acc=(velocity-h.velocity).Magnitude/dt
+   local turn=velocity.Magnitude>0 and h.velocity.Magnitude>0 and math.acos(math.clamp(velocity.Unit:Dot(h.velocity.Unit),-1,1)) or 0
+   result=result+math.clamp(acc*.0008+speed*turn*.03,0,6)
+  end
+  AI.motion[ball]={velocity=velocity,time=now}
+ end
  return result
 end
 
