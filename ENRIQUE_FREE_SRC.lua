@@ -35,7 +35,6 @@ parry = true,
 spam = false,
 trigger = false,
 tbRange = 24,
-tbStrength = 6,
 cps = 1000,
 accuracy = 50,
 randomPingAccuracy = false,
@@ -646,19 +645,20 @@ end
 local manualTBActive = false
 
 local function ProcessTriggerBot(ball)
-if not (cfg.trigger or manualTBActive) or spamActive then return end
+if not (cfg.trigger or manualTBActive) then return end
 if ball:GetAttribute("target") ~= player.Name then return end
+local bID = ball:GetDebugId()
+if triggered_balls[bID] then return end
 local root = player.Character and player.Character.PrimaryPart
 local z = ball:FindFirstChild("zoomies")
 if not root or not z then return end
 local dist = (root.Position - ball.Position).Magnitude
 local range = math.max(cfg.tbRange or 24, 8)
-if dist <= range and z.VectorVelocity.Magnitude > 0.01 then
--- Stronger TB: burst multiple packets per frame while ball is in range.
--- No lockout — fires every frame until the ball leaves range.
-for _ = 1, math.max(cfg.tbStrength or 6, 1) do
-    SendParry()
-end
+if dist <= range then
+-- Single clean parry per ball trip. Mark BEFORE firing to prevent double-parry.
+triggered_balls[bID] = true
+ball:GetAttributeChangedSignal("target"):Once(function() triggered_balls[bID] = nil end)
+SendParry()
 end
 end
 
@@ -734,8 +734,8 @@ local balls=workspace:FindFirstChild("Balls")
 if balls then
  for _,v in ipairs(balls:GetChildren()) do
   if v:GetAttribute("realBall") then
-   if (cfg.trigger or manualTBActive) then ProcessTriggerBot(v)
-   elseif cfg.parry and not spamActive then ProcessAutoParry(v) end
+   if (cfg.trigger or manualTBActive) then ProcessTriggerBot(v) end
+   if cfg.parry and not spamActive then ProcessAutoParry(v) end
    if v:GetAttribute("target") == player.Name then ProcessAutoSpam(v) end
   end
  end
@@ -782,7 +782,6 @@ do
         if saved.auto_spam ~= nil then cfg.autoSpam = saved.auto_spam == true end
         if saved.trigger_bot ~= nil then cfg.trigger = saved.trigger_bot == true end
         if saved.tb_range ~= nil then cfg.tbRange = math.max(tonumber(saved.tb_range) or 24, 8) end
-        if saved.tb_strength ~= nil then cfg.tbStrength = math.max(tonumber(saved.tb_strength) or 6, 1) end
         if saved.manual_tb ~= nil then cfg.manualTB = saved.manual_tb == true end
         if saved.target_change_stop ~= nil then cfg.targetChangeStop = saved.target_change_stop == true end
         if saved.animation_fix ~= nil then cfg.animfix = saved.animation_fix == true end
@@ -936,15 +935,6 @@ TBGroup:create_slider("tb_range", {
     default = math.round(cfg.tbRange or 24),
     rounding = true,
     callback = function(value) cfg.tbRange = math.max(value, 8) end,
-})
-
-TBGroup:create_slider("tb_strength", {
-    title = "TB Strength",
-    minimum = 1,
-    maximum = 20,
-    default = math.max(cfg.tbStrength or 6, 1),
-    rounding = true,
-    callback = function(value) cfg.tbStrength = math.max(value, 1) end,
 })
 
 -- ============================================================
