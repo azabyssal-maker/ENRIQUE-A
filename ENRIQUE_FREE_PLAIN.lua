@@ -35,6 +35,7 @@ parry = true,
 spam = false,
 trigger = false,
 tbRange = 24,
+tbStrength = 6,
 cps = 1000,
 accuracy = 50,
 randomPingAccuracy = false,
@@ -642,20 +643,21 @@ end
 end
 end
 
+local manualTBActive = false
+
 local function ProcessTriggerBot(ball)
-if not cfg.trigger or spamActive then return end
-local bID = ball:GetDebugId()
-if ball:GetAttribute("target") ~= player.Name or triggered_balls[bID] then return end
+if not (cfg.trigger or manualTBActive) or spamActive then return end
+if ball:GetAttribute("target") ~= player.Name then return end
 local root = player.Character and player.Character.PrimaryPart
 local z = ball:FindFirstChild("zoomies")
 if not root or not z then return end
 local dist = (root.Position - ball.Position).Magnitude
 local range = math.max(cfg.tbRange or 24, 8)
 if dist <= range and z.VectorVelocity.Magnitude > 0.01 then
--- Only mark when the packet actually went through (retry next frame otherwise).
-if SendParry() then
-triggered_balls[bID] = true
-ball:GetAttributeChangedSignal("target"):Once(function() triggered_balls[bID] = nil end)
+-- Stronger TB: burst multiple packets per frame while ball is in range.
+-- No lockout — fires every frame until the ball leaves range.
+for _ = 1, math.max(cfg.tbStrength or 6, 1) do
+    SendParry()
 end
 end
 end
@@ -732,7 +734,7 @@ local balls=workspace:FindFirstChild("Balls")
 if balls then
  for _,v in ipairs(balls:GetChildren()) do
   if v:GetAttribute("realBall") then
-   if cfg.trigger then ProcessTriggerBot(v)
+   if (cfg.trigger or manualTBActive) then ProcessTriggerBot(v)
    elseif cfg.parry and not spamActive then ProcessAutoParry(v) end
    if v:GetAttribute("target") == player.Name then ProcessAutoSpam(v) end
   end
@@ -780,6 +782,8 @@ do
         if saved.auto_spam ~= nil then cfg.autoSpam = saved.auto_spam == true end
         if saved.trigger_bot ~= nil then cfg.trigger = saved.trigger_bot == true end
         if saved.tb_range ~= nil then cfg.tbRange = math.max(tonumber(saved.tb_range) or 24, 8) end
+        if saved.tb_strength ~= nil then cfg.tbStrength = math.max(tonumber(saved.tb_strength) or 6, 1) end
+        if saved.manual_tb ~= nil then cfg.manualTB = saved.manual_tb == true end
         if saved.target_change_stop ~= nil then cfg.targetChangeStop = saved.target_change_stop == true end
         if saved.animation_fix ~= nil then cfg.animfix = saved.animation_fix == true end
         if saved.parry_threshold ~= nil then cfg.spamThreshold = tonumber(saved.parry_threshold) or cfg.spamThreshold end
@@ -933,6 +937,119 @@ TBGroup:create_slider("tb_range", {
     rounding = true,
     callback = function(value) cfg.tbRange = math.max(value, 8) end,
 })
+
+TBGroup:create_slider("tb_strength", {
+    title = "TB Strength",
+    minimum = 1,
+    maximum = 20,
+    default = math.max(cfg.tbStrength or 6, 1),
+    rounding = true,
+    callback = function(value) cfg.tbStrength = math.max(value, 1) end,
+})
+
+-- ============================================================
+-- MANUAL TB FLOATING BUTTON
+-- ============================================================
+do
+    local manualTBLoop = nil
+
+    local function CreateTBFloatButton()
+        local gui = Instance.new("ScreenGui")
+        gui.Name = "ManualTBUI"
+        gui.ResetOnSpawn = false
+        gui.IgnoreGuiInset = true
+        gui.Parent = CoreGui
+
+        local Main = Instance.new("Frame")
+        Main.Size = UDim2.fromOffset(200, 66)
+        Main.Position = UDim2.new(0.5, -100, 0.65, 0)
+        Main.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+        Main.BorderSizePixel = 0
+        Main.Active = true
+        Main.Parent = gui
+        Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 14)
+
+        local Stroke = Instance.new("UIStroke", Main)
+        Stroke.Thickness = 2
+        Stroke.Color = Color3.fromRGB(255, 255, 255)
+        Stroke.Transparency = 0.5
+        Instance.new("UIGradient", Main).Rotation = 90
+        Main.UIGradient.Color = ColorSequence.new({
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 255, 255)),
+            ColorSequenceKeypoint.new(0.3, Color3.fromRGB(170, 170, 170)),
+            ColorSequenceKeypoint.new(0.7, Color3.fromRGB(60, 60, 60)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(5, 5, 5)),
+        })
+
+        local Button = Instance.new("TextButton", Main)
+        Button.Size = UDim2.new(1, 0, 1, 0)
+        Button.BackgroundTransparency = 1
+        Button.Text = "TB"
+        Button.TextColor3 = Color3.fromRGB(255, 255, 255)
+        Button.TextSize = 20
+        Button.Font = Enum.Font.GothamBold
+        Button.AutoButtonColor = false
+
+        local RING = 16
+        local dragging, dragStart, startPos = false, nil, nil
+        local function isInRing(input)
+            local p = input.Position
+            local ax, ay = Main.AbsolutePosition.X, Main.AbsolutePosition.Y
+            local w, h = Main.AbsoluteSize.X, Main.AbsoluteSize.Y
+            local lx, ly = p.X - ax, p.Y - ay
+            return lx < RING or ly < RING or lx > w - RING or ly > h - RING
+        end
+        Button.InputBegan:Connect(function(input)
+            if input.UserInputType ~= Enum.UserInputType.MouseButton1 and input.UserInputType ~= Enum.UserInputType.Touch then return end
+            if isInRing(input) then dragging = true; dragStart = input.Position; startPos = Main.Position end
+        end)
+        UserInputService.InputChanged:Connect(function(input)
+            if not dragging then return end
+            if input.UserInputType ~= Enum.UserInputType.MouseMovement and input.UserInputType ~= Enum.UserInputType.Touch then return end
+            local d = input.Position - dragStart
+            Main.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + d.X, startPos.Y.Scale, startPos.Y.Offset + d.Y)
+        end)
+        UserInputService.InputEnded:Connect(function(input)
+            if input.UserInputType ~= Enum.UserInputType.MouseButton1 and input.UserInputType ~= Enum.UserInputType.Touch then return end
+            dragging = false
+        end)
+
+        Button.MouseButton1Click:Connect(function()
+            manualTBActive = not manualTBActive
+            if manualTBActive then
+                Button.Text = "OFF"
+                Button.TextColor3 = Color3.fromRGB(255, 90, 90)
+                Stroke.Color = Color3.fromRGB(255, 90, 90)
+            else
+                Button.Text = "TB"
+                Button.TextColor3 = Color3.fromRGB(255, 255, 255)
+                Stroke.Color = Color3.fromRGB(255, 255, 255)
+            end
+        end)
+        return gui
+    end
+
+    local tbFloatUI = CreateTBFloatButton()
+    tbFloatUI.Enabled = false
+
+    TBGroup:create_toggle("manual_tb", {
+        title = "Manual TB",
+        default = cfg.manualTB == true,
+        callback = function(value)
+            cfg.manualTB = value
+            if value then
+                if type(getgenv().ENRIQUE_SendParry) ~= "function" then
+                    print("[Manual TB] Parry once to capture first!")
+                    return
+                end
+                tbFloatUI.Enabled = true
+            else
+                tbFloatUI.Enabled = false
+                manualTBActive = false
+            end
+        end,
+    })
+end
 
 
 local __unlockAllInit = false
