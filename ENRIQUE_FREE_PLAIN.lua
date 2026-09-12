@@ -719,7 +719,7 @@ local hb = RunService.Heartbeat
 while true do
 if spamActive and RemoteReady() and _tokReady then
 -- Burst per frame, scaled from cps. No ping polling, no timers.
-local n = math.clamp(math.floor(math.max(cfg.cps or 1000, 60) / 120), 1, 20)
+local n = math.clamp(math.floor(math.max(cfg.cps or 1200, 60) / 60), 1, 24)
 for _ = 1, n do SendParry() end
 end
 hb:Wait()
@@ -917,13 +917,15 @@ ParryRight:create_slider("distance_multiplier", {
     callback = function(value) cfg.distanceMultiplier = math.max(value / 100, 0.8) end,
 })
 
-ParryRight:create_toggle("trigger_bot", {
+local TBGroup = Parry:create_group("Trigger Bot", "left")
+
+TBGroup:create_toggle("trigger_bot", {
     title = "TB - Trigger Bot",
     default = cfg.trigger == true,
     callback = function(value) cfg.trigger = value end,
 })
 
-ParryRight:create_slider("tb_range", {
+TBGroup:create_slider("tb_range", {
     title = "TB Range",
     minimum = 8,
     maximum = 45,
@@ -9220,7 +9222,7 @@ local function CreateSpamUI()
                     local dt = now - lastFrame
                     lastFrame = now
                     if dt < 0 or dt > 0.25 then dt = 1 / 60 end
-                    local n = math.clamp(math.floor(dt * (100 + manualSpamRate * 5)) + 1, 2, 12)
+                    local n = math.clamp(math.floor(dt * (150 + manualSpamRate * 12)) + 1, 2, 24)
                     for _ = 1, n do
                         sendFn()
                     end
