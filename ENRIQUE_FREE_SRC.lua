@@ -421,8 +421,6 @@ end
 local _reverted = {}
 local _originalMt = {}
 local _captured = nil
-local _tokCache = nil
-local _tokCacheAt = 0
 
 local function _is_valid(args)
     return #args == 8
@@ -481,14 +479,10 @@ local function SendParry()
     local cap = _reverted[remote] or (_captured.args)
     if not cap then return false end
 
-    local token = _tokCache
-    if not token or (os.clock() - _tokCacheAt) >= 0.1 then
-        local okTok, tk = pcall(_tokenize, cap[2])
-        if not (okTok and tk) then return false end
-        token = tk
-        _tokCache = tk
-        _tokCacheAt = os.clock()
-    end
+    -- Fresh token per packet (kittylol original): the server rejects
+    -- reused tokens, so never cache this across packets.
+    local okTok, token = pcall(_tokenize, cap[2])
+    if not (okTok and token) then return false end
 
     local cf, events, mouse = GetParryData()
     cf = ApplyCurveToCFrame(cf)
@@ -611,8 +605,8 @@ task.spawn(function()
 local hb = RunService.Heartbeat
 while true do
 if spamActive and RemoteReady() then
--- Frame-burst scaled from cps, capped to keep the game smooth.
-local n = math.clamp(math.floor(math.max(cfg.cps or 1000, 60) / 120), 1, 12)
+-- Frame-burst scaled from cps. Fast but bounded per frame.
+local n = math.clamp(math.floor(math.max(cfg.cps or 1000, 60) / 60), 1, 30)
 for _ = 1, n do SendParry() end
 end
 hb:Wait()
@@ -9220,7 +9214,7 @@ local function CreateSpamUI()
                     local dt = now - lastFrame
                     lastFrame = now
                     if dt < 0 or dt > 0.25 then dt = 1 / 60 end
-                    local n = math.clamp(math.floor(dt * (100 + manualSpamRate * 4)) + 1, 2, 12)
+                    local n = math.clamp(math.floor(dt * (400 + manualSpamRate * 15)) + 1, 3, 40)
                     for _ = 1, n do
                         sendFn()
                     end
@@ -9284,7 +9278,7 @@ ParryRight:create_toggle("manual_spam", {
 ParryRight:create_slider("spam_rate", {
     title = "Spam Strength",
     minimum = 1,
-    maximum = 100,
+    maximum = 500,
     default = 100,
     rounding = true,
     callback = function(value)
