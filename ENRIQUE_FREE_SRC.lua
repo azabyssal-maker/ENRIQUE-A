@@ -696,12 +696,13 @@ local function RemoteReady()
 end
 
 -- ============================================================
--- KITTYLOL REMOTE (verbatim port of the original kittylol remote)
--- Hook the game metatable: any 4+ arg FireServer/InvokeServer gets
--- captured (remote + original FireServer + 7 args). Then CLICK the
--- game's own Block button a few times (点几下) so the real handler
--- sends the parry packet -> captured. Auto-parry replays the 7-arg
--- packet with fresh CFrame / events / real cursor.
+-- KITTYLOL CAPTURE (fallback only)
+-- The PRIMARY remote is the direct 8-arg FireServer built from the
+-- game's PRY module upvalues (auto-arm below) — that is the original
+-- kittylol remote. This metatable hook just passively captures any
+-- 4+ arg parry packet the game itself sends (e.g. when the player
+-- presses Block manually) so it can be replayed if auto-arm fails.
+-- No Block button is clicked automatically by the script.
 -- ============================================================
 local _ktRemote = nil
 local _ktRaw = nil
@@ -776,15 +777,9 @@ local function KittyFire(cf, events, mouse)
     return ok
 end
 
--- Auto-prime shortly after load (点几下 Block -> capture packet).
-task.spawn(function()
-    task.wait(1.5)
-    if not KittyReady() then KittyPrime() end
-end)
-
 local _spamPacket = nil
 local function SendParry()
-    local ready = KittyReady() or _autoArm.ready or (RemoteReady() and _tokReady)
+    local ready = _autoArm.ready or KittyReady() or (RemoteReady() and _tokReady)
     if not ready then return false end
     if not parryContextAllowed() then return false end
 
@@ -792,29 +787,18 @@ local function SendParry()
     local cf, events, mouse = GetParryData()
     cf = ApplyCurveToCFrame(cf)
 
-    -- KITTYLOL path: replay the captured 7-arg packet (previous
-    -- working remote) with fresh CFrame / events / real cursor.
-    if KittyReady() then
-        KittyPrime()
-        if KittyFire(cf, events, mouse) then
-            local st = os.clock()
-            if st - (rpWindowStart or 0) > 0.5 then rpWindowStart = st; recentParries = 1
-            else recentParries = (recentParries or 0) + 1 end
-            if cfg.animfix and st - (lastAnimTime or 0) > 0.05 then
-                lastAnimTime = st; task.spawn(PlayParryAnimation)
-            end
-            return true
-        end
-    end
-
-    -- FALLBACK: auto-arm — builds the old 8-arg payload from game
-    -- module upvalues (only used when the 7-arg capture is missing).
+    -- PRIMARY: original kittylol remote — direct 8-arg FireServer
+    -- built from the game PRY upvalues. No Block click required.
     if _autoArm.ready then
         local payload = _buildAutoArmPayload(cf, events, mouse)
         if payload then
             local fired = pcall(function()
                 _autoArm.remote:FireServer(unpack(payload))
             end)
+            if not fired then
+                -- allow immediate retry with a fresh token/CFrame
+                _autoArm._lastSig = nil
+            end
             if fired then
                 local st = os.clock()
                 if st - (rpWindowStart or 0) > 0.5 then rpWindowStart = st; recentParries = 1
@@ -824,6 +808,24 @@ local function SendParry()
                 end
                 return true
             end
+        elseif _autoArm._lastSig then
+            -- dedup hit: same token/time window already fired — count as
+            -- handled (matches the original kittylol `_lastSig` behavior)
+            return true
+        end
+    end
+
+    -- FALLBACK: captured 7-arg packet replayed with fresh CFrame /
+    -- events / real cursor (only used when auto-arm is not armed).
+    if KittyReady() then
+        if KittyFire(cf, events, mouse) then
+            local st = os.clock()
+            if st - (rpWindowStart or 0) > 0.5 then rpWindowStart = st; recentParries = 1
+            else recentParries = (recentParries or 0) + 1 end
+            if cfg.animfix and st - (lastAnimTime or 0) > 0.05 then
+                lastAnimTime = st; task.spawn(PlayParryAnimation)
+            end
+            return true
         end
     end
 
@@ -975,7 +977,7 @@ end
 task.spawn(function()
 local hb = RunService.Heartbeat
 while true do
-if spamActive and (KittyReady() or _autoArm.ready or (RemoteReady() and _tokReady)) then
+if spamActive and (_autoArm.ready or KittyReady() or (RemoteReady() and _tokReady)) then
 -- Burst per frame, scaled from cps. No ping polling, no timers.
 local n = math.clamp(math.floor(math.max(cfg.cps or 1500, 60) / 48), 1, 30)
 for _ = 1, n do SendParry() end
@@ -985,7 +987,7 @@ end
 end)
 
 RunService.Heartbeat:Connect(function()
-if not (KittyReady() or _autoArm.ready or RemoteReady()) then return end
+if not (_autoArm.ready or KittyReady() or RemoteReady()) then return end
 local balls=workspace:FindFirstChild("Balls")
 if balls then
  for _,v in ipairs(balls:GetChildren()) do
