@@ -391,8 +391,39 @@ local lastAnimTime=0
 -- module upvalues. No manual parry needed — armed instantly.
 -- Falls back to old hook-based capture if the module path changes.
 -- ============================================================
+-- Anti-detection hooks (required BEFORE require/getupvalues —
+-- Blade Ball's anti-cheat watches these libraries)
+-- ============================================================
+do
+    pcall(function()
+        if hookfunction and getrenv then
+            local old_dinfo
+            old_dinfo = hookfunction(getrenv().debug.info, function(f, t)
+                if type(f) == "function" then return "[C]"
+                elseif f == 4 and t == "s" then
+                    return "ReplicatedStorage.Controllers.SwordsController "
+                end
+                return old_dinfo(f, t)
+            end)
+        end
+    end)
+    pcall(function()
+        if hookfunction and getrenv then
+            local old_gfenv
+            old_gfenv = hookfunction(getrenv().getfenv, function(l)
+                if l ~= nil and type(l) == "number" then
+                    if l >= 1 and l <= 10 then return old_gfenv(10) end
+                end
+                return old_gfenv(l)
+            end)
+        end
+    end)
+end
+
+-- ============================================================
 local _autoArm = {ready = false, remote = nil, keyTable = nil,
-    transformFn = nil, netModule = nil, remoteId = nil, parryHash = nil}
+    transformFn = nil, netModule = nil, remoteId = nil, parryHash = nil,
+    _lastSig = nil}
 
 task.spawn(function()
     pcall(function()
@@ -404,16 +435,19 @@ task.spawn(function()
 
         local SC = nil
         for _, child in ipairs(Controllers:GetChildren()) do
-            if child.Name:sub(1, 14) == "SwordsController" then
+            if child.Name:sub(1, 16) == "SwordsController" then
                 SC = child; break
             end
         end
-        if not SC then return end
+        if not SC then
+            print("[ENRIQUE] SwordsController not found — parry once to capture via hook.")
+            return
+        end
 
         local PRY = SC:FindFirstChild("PRY")
             or SC:WaitForChild("PRY", 15)
         if not PRY then
-            warn("[ENRIQUE] PRY module not found under SwordsController!")
+            print("[ENRIQUE] PRY module not found — parry once to capture via hook.")
             return
         end
 
@@ -423,8 +457,8 @@ task.spawn(function()
 
         local ups = getupvals(ParryFn)
         if not ups or #ups < 8 then
-            warn("[ENRIQUE] PRY upvalue count", ups and #ups or "nil",
-                 "- expected >=8. Your executor may be unsupported.")
+            print("[ENRIQUE] PRY upvalue count", ups and #ups or "nil",
+                  "- falling back to hook capture.")
             return
         end
 
@@ -438,7 +472,7 @@ task.spawn(function()
             _autoArm.netModule.RemoteEvent,
             _autoArm.netModule, _autoArm.remoteId)
         if not rok or not remote then
-            warn("[ENRIQUE] Parry remote resolve failed:", tostring(remote))
+            print("[ENRIQUE] Parry remote resolve failed — hook fallback active.")
             return
         end
 
@@ -463,6 +497,9 @@ local function _buildAutoArmPayload(cf, events, mouse)
     end
 
     local timeStr = tostring(math.floor(workspace:GetServerTimeNow() * 100))
+    local sig = tostring(currentKey) .. "|" .. timeStr
+    if _autoArm._lastSig == sig then return nil end
+    _autoArm._lastSig = sig
     local klen = #transformed
     local tc = {}
     for i = 1, #timeStr do
@@ -729,16 +766,22 @@ getgenv().ENRIQUE_SendParry=SendParry
 
 local function ProcessAutoParry(ball)
 if not cfg.parry or spamActive then return end
-if ball:GetAttribute("target") ~= player.Name then return end
 local bID = ball:GetDebugId()
-if parried_balls[bID] then return end
-if not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then return end
--- INSTANT REACTION: fire the instant the ball targets us, regardless of
--- distance. The server decides parry validity; firing early ensures our
--- packet arrives at the server in time — even from across the map.
-if SendParry() then
-    parried_balls[bID] = true
-    ball:GetAttributeChangedSignal("target"):Once(function() parried_balls[bID] = nil end)
+if ball:GetAttribute("target") ~= player.Name or parried_balls[bID] then return end
+local charPart = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+local z = ball:FindFirstChild("zoomies")
+if not charPart or not z then return end
+local velocity = z.VectorVelocity
+if velocity.Magnitude < 0.01 then return end
+local dist = (charPart.Position - ball.Position).Magnitude
+-- Parry when the ball reaches the parry window (original distance logic).
+-- REACTION is instant: no cached context, fires the same frame it enters range.
+local threshold = CalculateParryDistance(ball, velocity, charPart)
+if dist <= threshold or dist <= 20 then
+    if SendParry() then
+        parried_balls[bID] = true
+        ball:GetAttributeChangedSignal("target"):Once(function() parried_balls[bID] = nil end)
+    end
 end
 end
 
