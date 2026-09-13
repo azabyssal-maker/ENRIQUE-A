@@ -612,7 +612,7 @@ local _parryFrame = 0
 local function TrackBall(ball, store)
     local st = store[ball]
     if st and st.listening then return st end
-    st = { fired = false, done = false, listening = true, lastFrame = 0, refireCount = 0 }
+    st = { fired = false, done = false, listening = true, lastFrame = 0, refireCount = 0, newBall = true }
     store[ball] = st
     ball:GetAttributeChangedSignal("target"):Connect(function()
         local t = store[ball]
@@ -632,12 +632,12 @@ end
 -- still alive, aimed at us and closing in) fire again. Max 3 swings per
 -- ball, every extra swing needs a REAL miss, so it never blind-spams.
 local function TryRefire(st, ball, charPart, velocity)
- if st.done or not st.fired or st.refireCount >= 2 then return end
+ if st.done or not st.fired or st.refireCount >= 1 then return end
  if st.lastFrame == _parryFrame then return end
  local now = os.clock()
- local delay = 0.09
- if st.refireCount >= 1 then delay = 0.06 end
- if now - st.firedAt < delay then return end
+ -- 0.15s: long enough for a successful parry's reflection to update
+ -- client-side, so we never add a redundant 2nd swing on a real parry.
+ if now - st.firedAt < 0.15 then return end
  local ok = false
  if velocity.Magnitude < 0.01 then
   ok = (charPart.Position - ball.Position).Magnitude <= 20
@@ -664,6 +664,17 @@ if not charPart or not z then return end
 local st = TrackBall(ball, ParryState)
 if st.done or st.lastFrame == _parryFrame then return end
 local velocity = z.VectorVelocity
+-- Spawn reaction: a freshly-seen ball that already locks us gets an instant
+-- parry, zero wait, works even while it is still frozen or far away.
+if st.newBall and not st.fired then
+    st.newBall = false
+    st.fired = true
+    st.firedAt = os.clock()
+    st.distAtFire = 20
+    st.lastFrame = _parryFrame
+    if not SendParry() then SendParry() end
+    return
+end
 -- Freeze resistance: a frozen/stopped ball sitting on us still gets parried,
 -- no need for it to be moving toward us first.
 if velocity.Magnitude < 0.01 then
@@ -711,6 +722,16 @@ if not root or not z then return end
 local st = TrackBall(ball, ParryState)
 if st.done or st.lastFrame == _parryFrame then return end
 local velocity = z.VectorVelocity
+-- Spawn reaction shared with Auto Parry: instant parry on a fresh lock.
+if st.newBall and not st.fired then
+    st.newBall = false
+    st.fired = true
+    st.firedAt = os.clock()
+    st.distAtFire = 20
+    st.lastFrame = _parryFrame
+    if not SendParry() then SendParry() end
+    return
+end
 -- TB also handles frozen/stopped balls sitting on us.
 if velocity.Magnitude < 0.01 then
     if not st.fired and (root.Position - ball.Position).Magnitude <= 20 then
