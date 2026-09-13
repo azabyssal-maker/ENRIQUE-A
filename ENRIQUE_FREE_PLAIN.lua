@@ -623,14 +623,20 @@ local charPart = player.Character and player.Character:FindFirstChild("HumanoidR
 local z = ball:FindFirstChild("zoomies")
 if not charPart or not z then return end
 local velocity = z.VectorVelocity
-if velocity.Magnitude < 0.01 then return end
--- Fixed-distance trigger: fire as soon as the ball closes to ~16 studs of the
--- predicted impact point. Speed and Accuracy never change reaction time,
--- this is always the fastest clean parry.
-local lead = math.clamp((LastPing or 100) / 1000 + 1 / 60 + 0.02, 0.02, 0.08)
-local predicted = ball.Position + velocity * lead
-local dist = (charPart.Position - predicted).Magnitude
-if dist <= 16 then
+-- Freeze resistance: a frozen/stopped ball sitting on us still gets parried,
+-- no need for it to be moving toward us first.
+local fire = false
+if velocity.Magnitude < 0.01 then
+    fire = (charPart.Position - ball.Position).Magnitude <= 20
+else
+    -- Fixed-distance trigger: fire as soon as the ball closes to ~16 studs of
+    -- the predicted impact point. Speed and Accuracy never change reaction
+    -- time, this is always the fastest clean parry.
+    local lead = math.clamp((LastPing or 100) / 1000 + 1 / 60 + 0.02, 0.02, 0.08)
+    local predicted = ball.Position + velocity * lead
+    fire = (charPart.Position - predicted).Magnitude <= 16
+end
+if fire then
     local st = TrackBall(ball, ParryState)
     if st.done or st.fired or st.lastFrame == _parryFrame then return end
     st.fired = true
