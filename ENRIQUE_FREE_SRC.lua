@@ -65,27 +65,14 @@ spamBindKey = "P"
 cfg.spamThreshold = math.max(0, cfg.spamThreshold or 0)
 
 -- Shared burst size for Auto Spam and Manual Spam (Spam Strength slider).
--- AIMD congestion control: ping healthy = full-speed burst (fast);
--- ping climbs = back off hard and hold, let the connection recover;
--- ping recovers = ramp back up. Fast when possible, never stays lagged.
-local _spamPace = 1.0
-local _spamPaceUntil = 0
+-- Pure rate: SPAM 500 ~= 1000 packets/sec, frame-rate independent.
+-- No ping polling here; the rate is fixed by the slider. Client cost per
+-- packet is tiny (token is reused inside the same 10ms window), so full
+-- rate runs smooth.
 local function SpamBurstCount(dt)
- local ping = LastPing or 100
- local now = os.clock()
- if now >= _spamPaceUntil then
-  if ping > 230 then
-   _spamPace = math.max(0.25, _spamPace * 0.6)
-   _spamPaceUntil = now + 1.2
-  elseif ping > 150 then
-   _spamPace = math.max(0.35, _spamPace * 0.8)
-   _spamPaceUntil = now + 0.8
-  elseif ping < 80 and _spamPace < 1 then
-   _spamPace = math.min(1, _spamPace + 0.1)
-  end
- end
- local n = math.floor(dt * (80 + (cfg.spamRate or 100) * 3.2) * _spamPace) + 1
- return math.clamp(n, 2, 16)
+ local rate = (cfg.spamRate or 100) * 2
+ local n = math.floor(dt * rate) + 1
+ return math.clamp(n, 2, 18)
 end
 cfg.distanceMultiplier = math.max(0.8, cfg.distanceMultiplier or 1.0)
 
@@ -448,9 +435,13 @@ for _, Function in getgc(true) do
 end
 
 local _tokKeyCache = {}
+local _tokCache = {}
 
 local function _tokenize(_remote_uid)
-    local time = tostring(math.floor(workspace:GetServerTimeNow() * 100))
+    local ts = math.floor(workspace:GetServerTimeNow() * 100)
+    local cached = _tokCache[_remote_uid]
+    if cached and cached.ts == ts then return cached.token end
+    local time = tostring(ts)
     local key = _tokKeyCache[_remote_uid]
     if not key then
         local okKey, k = pcall(_token, _remote_uid, 'TIME')
@@ -465,7 +456,9 @@ local function _tokenize(_remote_uid)
             string.byte(key, (index - 1) % #key + 1)
         ))
     end
-    return table.concat(characters)
+    local token = table.concat(characters)
+    _tokCache[_remote_uid] = { ts = ts, token = token }
+    return token
 end
 
 local _reverted = {}
