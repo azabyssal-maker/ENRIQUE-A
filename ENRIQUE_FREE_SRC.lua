@@ -681,12 +681,13 @@ local function TryRefire(st, ball, charPart, velocity)
   end
  end
 
- if st.refireCount >= 1 then return end
- if dist > 22 then return end
+ if st.refireCount >= 2 then return end
+ if dist > 24 then return end
 
  local now = os.clock()
  local pingLead = math.clamp((LastPing or 100) / 1000, 0.05, 0.2)
- if now - (st.firedAt or now) < 0.05 + pingLead * 0.5 then return end
+ local delay = 0.05 + pingLead * 0.5 + st.refireCount * 0.04
+ if now - (st.firedAt or now) < delay then return end
 
  st.refireCount = st.refireCount + 1
  st.firedAt = now
@@ -694,20 +695,38 @@ local function TryRefire(st, ball, charPart, velocity)
  FireParry()
 end
 
--- Swing timing shared by Auto Parry and TB: reaction follows the ball's
--- real time-to-impact, so slow balls are not swung at too early (miss) and
--- fast balls are swung before they land (no late/失效 parries).
-local function ParryWindow(ball, root, velocity, speed)
- local dir = root.Position - ball.Position
- local dist = dir.Magnitude
- local closing = speed > 0.01 and -dir.Unit:Dot(velocity) or 0
- if closing <= 0 then return false, dist end
- local tti = dist / closing
- local pingLead = math.clamp((LastPing or 100) / 1000, 0.03, 0.15)
- local aiLead = cfg.aiDetection and AI.extra or 0
- local closeShot = dist <= 16 and tti <= 0.28
- local timedShot = dist <= 34 and tti <= 0.13 + pingLead + aiLead
- return (closeShot or timedShot), dist
+-- Parry reach rebuilt from the original kittylol timing: the swing
+-- distance scales with ball speed + ping + accuracy, so fast balls get
+-- enough lead (never late/失效) and slow balls are not swung at point
+-- blank. Capped at 40 so we never swing into the air at far spawns.
+-- aiPatterns adds extra reach for accelerating/curving balls.
+local function ParryReach(ball, velocity)
+    local speed = velocity.Magnitude
+    if speed <= 0.01 then return 10 end
+    local ping = LastPing or 100
+    local capped = math.min(math.max(speed - 9.5, 0), 650)
+    local div = (2.4 + capped * 0.002) * (0.75 + (math.clamp(RuntimeAccuracy, 1, 100) - 1) * (3 / 99))
+    local modern = math.clamp(ping / 100, 5, 17) + math.max(speed / div, 9.5)
+    local legacy = speed / math.max(2.4, RuntimeAccuracy / 8) + ping / 10
+    local result = math.max(modern, legacy)
+    if cfg.aiDetection then
+        result = result + math.clamp(speed * AI.extra, 0, 30)
+    end
+    if cfg.aiPatterns then
+        local now = os.clock()
+        local h = AI.motion[ball]
+        if h then
+            local dt = math.clamp(now - h.time, 1 / 240, 0.15)
+            local acc = (velocity - h.velocity).Magnitude / dt
+            local turn = 0
+            if speed > 0 and h.velocity.Magnitude > 0 then
+                turn = math.acos(math.clamp(velocity.Unit:Dot(h.velocity.Unit), -1, 1))
+            end
+            result = result + math.clamp(acc * 0.0015 + speed * turn * 0.07, 0, 20)
+        end
+        AI.motion[ball] = { velocity = velocity, time = now }
+    end
+    return math.min(result, 40)
 end
 
 local function ProcessAutoParry(ball)
@@ -722,17 +741,22 @@ if st.done or st.lastFrame == _parryFrame then return end
 local velocity = z.VectorVelocity
 local speed = velocity.Magnitude
 if not st.fired then
-    local want, dist = ParryWindow(ball, charPart, velocity, speed)
-    if want then
-        st.fired = true
-        st.firedAt = os.clock()
-        st.distAtFire = dist
-        st.lastFrame = _parryFrame
-        FireParry()
+    local dist = (charPart.Position - ball.Position).Magnitude
+    if speed < 0.01 then
+        -- Frozen ball on top of us: one swing, no repeat.
+        if dist <= 10 then
+            st.fired = true
+            st.firedAt = os.clock()
+            st.distAtFire = dist
+            st.lastFrame = _parryFrame
+            FireParry()
+        end
         return
     end
-    -- Frozen ball right on top of us: one clean swing, no repeat.
-    if speed < 0.01 and dist <= 8 then
+    -- Swing with real lead: reach grows with ball speed/ping, floor 15 so
+    -- even slow balls get swung in time (original kittylol timing).
+    local reach = math.max(ParryReach(ball, velocity), 15)
+    if dist <= reach then
         st.fired = true
         st.firedAt = os.clock()
         st.distAtFire = dist
@@ -758,18 +782,23 @@ if st.done or st.lastFrame == _parryFrame then return end
 local velocity = z.VectorVelocity
 local speed = velocity.Magnitude
 if not st.fired then
-    local want, dist = ParryWindow(ball, root, velocity, speed)
-    -- TB obeys its Range slider (caps how far out it swings).
-    if want and dist <= math.max(cfg.tbRange or 24, 8) then
-        st.fired = true
-        st.firedAt = os.clock()
-        st.distAtFire = dist
-        st.lastFrame = _parryFrame
-        FireParry()
+    local dist = (root.Position - ball.Position).Magnitude
+    if speed < 0.01 then
+        -- Frozen ball on top of us: one swing, no repeat.
+        if dist <= 10 then
+            st.fired = true
+            st.firedAt = os.clock()
+            st.distAtFire = dist
+            st.lastFrame = _parryFrame
+            FireParry()
+        end
         return
     end
-    -- Frozen ball right on top of us: one clean swing, no repeat.
-    if speed < 0.01 and dist <= 8 then
+    -- TB max reach = TB Range slider (raise it to swing from further out);
+    -- never below the real parry lead, so fast balls are not swung late.
+    local base = math.max(ParryReach(ball, velocity), 15)
+    local reach = math.min(math.max(cfg.tbRange or 24, base), 100)
+    if dist <= reach then
         st.fired = true
         st.firedAt = os.clock()
         st.distAtFire = dist
