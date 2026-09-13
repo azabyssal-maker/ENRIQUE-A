@@ -1002,7 +1002,7 @@ end
 
 
 -- =================== Character FX ===================
-local CharFX = { auraPart = nil, orig = {} }
+local CharFX = { auraPart = nil, auraCore = nil, orig = {} }
 CharFX.orig = setmetatable({}, { __mode = "k" })
 
 local function ApplyNoHead(char)
@@ -1032,7 +1032,7 @@ local function ApplyNoHead(char)
         pcall(function()
             mesh.MeshType = Enum.MeshType.FileMesh
             mesh.MeshId = "rbxassetid://3270017"
-            mesh.TextureId = 0
+            mesh.TextureId = ""
         end)
     end
 end
@@ -1060,36 +1060,57 @@ local function ApplyAura(char)
     if CharFX.auraPart then
         pcall(function() CharFX.auraPart:Destroy() end)
         CharFX.auraPart = nil
+        CharFX.auraCore = nil
     end
     if getgenv().auraEnabled ~= true or not char then return end
     local root = char:FindFirstChild("HumanoidRootPart")
     if not root then return end
     local okAura = pcall(function()
-        local aura = Instance.new("Part")
-        aura.Name = "ENRIQUE_Aura"
-        aura.Size = Vector3.new(16, 0.5, 16)
-        aura.Shape = Enum.PartType.Block
-        aura.Material = Enum.Material.Neon
-        aura.Color = getgenv().auraColor or Color3.fromRGB(0, 255, 255)
-        aura.Transparency = 0.55
-        aura.CanCollide = false
-        aura.CanTouch = false
-        aura.CanQuery = false
-        aura.CastShadow = false
-        aura.Anchored = false
-        local mesh = Instance.new("SpecialMesh")
-        mesh.MeshType = Enum.MeshType.Sphere
-        mesh.Scale = Vector3.new(1, 0.06, 1)
-        mesh.Parent = aura
-        aura.Parent = char
-        local weld = Instance.new("WeldConstraint")
-        weld.Part0 = root
-        weld.Part1 = aura
-        weld.Parent = root
-        CharFX.auraPart = aura
+        local color = getgenv().auraColor or Color3.fromRGB(0, 255, 255)
+        local outer = Instance.new("Part")
+        outer.Name = "ENRIQUE_Aura"
+        outer.Size = Vector3.new(22, 0.8, 22)
+        outer.Shape = Enum.PartType.Cylinder
+        outer.Material = Enum.Material.Neon
+        outer.Color = color
+        outer.Transparency = 0.35
+        outer.CanCollide = false
+        outer.CanTouch = false
+        outer.CanQuery = false
+        outer.CastShadow = false
+        outer.Anchored = false
+        outer.CFrame = root.CFrame * CFrame.new(0, -3.4, 0)
+        outer.Parent = char
+        local inner = Instance.new("Part")
+        inner.Name = "ENRIQUE_AuraCore"
+        inner.Size = Vector3.new(15, 0.25, 15)
+        inner.Shape = Enum.PartType.Cylinder
+        inner.Material = Enum.Material.Neon
+        inner.Color = color
+        inner.Transparency = 0.15
+        inner.CanCollide = false
+        inner.CanTouch = false
+        inner.CanQuery = false
+        inner.CastShadow = false
+        inner.Anchored = false
+        inner.CFrame = root.CFrame * CFrame.new(0, -3.25, 0)
+        inner.Parent = char
+        local weld1 = Instance.new("WeldConstraint")
+        weld1.Part0 = root
+        weld1.Part1 = outer
+        weld1.Parent = root
+        local weld2 = Instance.new("WeldConstraint")
+        weld2.Part0 = root
+        weld2.Part1 = inner
+        weld2.Parent = root
+        CharFX.auraPart = outer
+        CharFX.auraCore = inner
         return true
     end)
-    if not okAura then CharFX.auraPart = nil end
+    if not okAura then
+        CharFX.auraPart = nil
+        CharFX.auraCore = nil
+    end
 end
 
 local function ApplyCharacterFX(c)
@@ -9722,7 +9743,7 @@ local FXTab = FXCat:create_tab("Body", "rbxassetid://eye")
 local FXGroup1 = FXTab:create_group("Body FX", "left")
 
 FXGroup1:create_toggle("headless", {
-    title = "Headless 无头",
+    title = "Headless",
     default = getgenv().headlessEnabled == true,
     callback = function(v)
         getgenv().headlessEnabled = v
@@ -9731,7 +9752,7 @@ FXGroup1:create_toggle("headless", {
 })
 
 FXGroup1:create_toggle("no_legs", {
-    title = "No Legs 无脚",
+    title = "No Legs",
     default = getgenv().noLegsEnabled == true,
     callback = function(v)
         getgenv().noLegsEnabled = v
@@ -9740,7 +9761,7 @@ FXGroup1:create_toggle("no_legs", {
 })
 
 FXGroup1:create_toggle("aura", {
-    title = "Aura 光环",
+    title = "Aura",
     default = getgenv().auraEnabled == true,
     callback = function(v)
         getgenv().auraEnabled = v
@@ -9749,12 +9770,15 @@ FXGroup1:create_toggle("aura", {
 })
 
 FXGroup1:create_colorpicker("aura_color", {
-    title = "Aura Color 光环颜色",
+    title = "Aura Color",
     default = getgenv().auraColor or Color3.fromRGB(0, 255, 255),
     callback = function(c)
         getgenv().auraColor = c
         if CharFX.auraPart then
-            pcall(function() CharFX.auraPart.Color = c end)
+            pcall(function()
+                CharFX.auraPart.Color = c
+                if CharFX.auraCore then CharFX.auraCore.Color = c end
+            end)
         end
     end,
 })
