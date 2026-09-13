@@ -960,33 +960,43 @@ end
 
 
 -- =================== Character FX ===================
-local CharFX = { auraPart = nil, auraCore = nil, orig = {} }
+local CharFX = { auraParts = nil, orig = {} }
 CharFX.orig = setmetatable({}, { __mode = "k" })
 
 local function ApplyNoHead(char)
     if not char then return end
     local head = char:FindFirstChild("Head")
     if not head then return end
-    local mesh = head:FindFirstChildOfClass("SpecialMesh") or head:FindFirstChildOfClass("Mesh")
     local enabled = getgenv().headlessEnabled == true
     if not enabled then
         local o = CharFX.orig[head]
         if o then
-            if mesh then
+            head.Transparency = o.transp
+            local mesh = head:FindFirstChildOfClass("SpecialMesh") or head:FindFirstChildOfClass("Mesh")
+            if mesh and o.id then
                 pcall(function()
-                    if o.id then mesh.MeshId = o.id end
-                    if o.tex then mesh.TextureId = o.tex end
-                    if o.typ then mesh.MeshType = o.typ end
+                    mesh.MeshId = o.id
+                    mesh.TextureId = o.tex
+                    mesh.MeshType = o.typ
                 end)
             end
             CharFX.orig[head] = nil
         end
         return
     end
+    if not CharFX.orig[head] then
+        local mesh = head:FindFirstChildOfClass("SpecialMesh") or head:FindFirstChildOfClass("Mesh")
+        CharFX.orig[head] = {
+            transp = head.Transparency,
+            id = mesh and mesh.MeshId,
+            tex = mesh and mesh.TextureId,
+            typ = mesh and mesh.MeshType,
+        }
+    end
+    -- Fully invisible head: no round blob, no leftover geometry.
+    head.Transparency = 1
+    local mesh = head:FindFirstChildOfClass("SpecialMesh") or head:FindFirstChildOfClass("Mesh")
     if mesh then
-        if not CharFX.orig[head] then
-            CharFX.orig[head] = { id = mesh.MeshId, tex = mesh.TextureId, typ = mesh.MeshType }
-        end
         pcall(function()
             mesh.MeshType = Enum.MeshType.FileMesh
             mesh.MeshId = "rbxassetid://3270017"
@@ -998,8 +1008,9 @@ end
 local function ApplyNoLegs(char)
     if not char then return end
     local enabled = getgenv().noLegsEnabled == true
+    -- Legs AND feet both go invisible (the leftover foot was the "spike").
     for _, part in ipairs(char:GetDescendants()) do
-        if part:IsA("BasePart") and (part.Name:find("Leg", 1, true) or part.Name == "LowerTorso") then
+        if part:IsA("BasePart") and (part.Name:find("Leg", 1, true) or part.Name:find("Foot", 1, true)) then
             if enabled then
                 if not CharFX.orig[part] then CharFX.orig[part] = part.Transparency end
                 part.Transparency = 1
@@ -1012,63 +1023,85 @@ local function ApplyNoLegs(char)
             end
         end
     end
+    -- Shoe/boot accessories riding on the hidden limbs get hidden too.
+    for _, acc in ipairs(char:GetDescendants()) do
+        if acc:IsA("Accessory") then
+            local name = acc.Name:lower()
+            if name:find("leg", 1, true) or name:find("foot", 1, true)
+                or name:find("shoe", 1, true) or name:find("boot", 1, true) then
+                local h = acc:FindFirstChild("Handle")
+                if h and h:IsA("BasePart") then
+                    if enabled then
+                        if not CharFX.orig[h] then CharFX.orig[h] = h.Transparency end
+                        h.Transparency = 1
+                    else
+                        local o = CharFX.orig[h]
+                        if o then
+                            h.Transparency = o
+                            CharFX.orig[h] = nil
+                        end
+                    end
+                end
+            end
+        end
+    end
 end
 
 local function ApplyAura(char)
-    if CharFX.auraPart then
-        pcall(function() CharFX.auraPart:Destroy() end)
-        CharFX.auraPart = nil
-        CharFX.auraCore = nil
+    if CharFX.auraParts then
+        for _, v in ipairs(CharFX.auraParts) do
+            pcall(function() v:Destroy() end)
+        end
     end
+    CharFX.auraParts = nil
     if getgenv().auraEnabled ~= true or not char then return end
     local root = char:FindFirstChild("HumanoidRootPart")
     if not root then return end
     local okAura = pcall(function()
-        local color = getgenv().auraColor or Color3.fromRGB(0, 255, 255)
-        local outer = Instance.new("Part")
-        outer.Name = "ENRIQUE_Aura"
-        outer.Size = Vector3.new(22, 0.8, 22)
-        outer.Shape = Enum.PartType.Cylinder
-        outer.Material = Enum.Material.Neon
-        outer.Color = color
-        outer.Transparency = 0.35
-        outer.CanCollide = false
-        outer.CanTouch = false
-        outer.CanQuery = false
-        outer.CastShadow = false
-        outer.Anchored = false
-        outer.CFrame = root.CFrame * CFrame.new(0, -3.4, 0)
-        outer.Parent = char
-        local inner = Instance.new("Part")
-        inner.Name = "ENRIQUE_AuraCore"
-        inner.Size = Vector3.new(15, 0.25, 15)
-        inner.Shape = Enum.PartType.Cylinder
-        inner.Material = Enum.Material.Neon
-        inner.Color = color
-        inner.Transparency = 0.15
-        inner.CanCollide = false
-        inner.CanTouch = false
-        inner.CanQuery = false
-        inner.CastShadow = false
-        inner.Anchored = false
-        inner.CFrame = root.CFrame * CFrame.new(0, -3.25, 0)
-        inner.Parent = char
-        local weld1 = Instance.new("WeldConstraint")
-        weld1.Part0 = root
-        weld1.Part1 = outer
-        weld1.Parent = root
-        local weld2 = Instance.new("WeldConstraint")
-        weld2.Part0 = root
-        weld2.Part1 = inner
-        weld2.Parent = root
-        CharFX.auraPart = outer
-        CharFX.auraCore = inner
+        CharFX.auraParts = {}
+        local color = getgenv().auraColor or Color3.fromRGB(255, 170, 0)
+        local att = Instance.new("Attachment")
+        att.Parent = root
+        table.insert(CharFX.auraParts, att)
+
+        -- Soft glow halo: many light dots floating around the body.
+        local soft = Instance.new("ParticleEmitter")
+        soft.Color = ColorSequence.new(Color3.new(1, 1, 1), color)
+        soft.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 3), NumberSequenceKeypoint.new(1, 0) })
+        soft.Lifetime = NumberRange.new(2.5, 4.5)
+        soft.Rate = 40
+        soft.Speed = NumberRange.new(1.5, 3.5)
+        soft.SpreadAngle = Vector2.new(360, 360)
+        soft.Rotation = NumberRange.new(0, 360)
+        soft.RotSpeed = NumberRange.new(-60, 60)
+        soft.Shape = Enum.ParticleEmitterShape.Sphere
+        soft.ShapeInOut = Enum.ParticleEmitterShapeInOut.InOut
+        soft.LightEmission = 1
+        soft.LightInfluence = 0
+        soft.Acceleration = Vector3.new(0, 2.5, 0)
+        soft.Parent = att
+        table.insert(CharFX.auraParts, soft)
+
+        -- Brighter sparks swirling around on top of the glow.
+        local spark = Instance.new("ParticleEmitter")
+        spark.Color = ColorSequence.new(color, Color3.new(1, 1, 1))
+        spark.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1.4), NumberSequenceKeypoint.new(1, 0) })
+        spark.Lifetime = NumberRange.new(1.2, 2.2)
+        spark.Rate = 80
+        spark.Speed = NumberRange.new(2.5, 5)
+        spark.SpreadAngle = Vector2.new(360, 360)
+        spark.Rotation = NumberRange.new(0, 360)
+        spark.RotSpeed = NumberRange.new(-120, 120)
+        spark.Shape = Enum.ParticleEmitterShape.Sphere
+        spark.ShapeInOut = Enum.ParticleEmitterShapeInOut.InOut
+        spark.LightEmission = 1
+        spark.LightInfluence = 0
+        spark.Acceleration = Vector3.new(0, 3, 0)
+        spark.Parent = att
+        table.insert(CharFX.auraParts, spark)
         return true
     end)
-    if not okAura then
-        CharFX.auraPart = nil
-        CharFX.auraCore = nil
-    end
+    if not okAura then CharFX.auraParts = nil end
 end
 
 local function ApplyCharacterFX(c)
@@ -9732,10 +9765,17 @@ FXGroup1:create_colorpicker("aura_color", {
     default = getgenv().auraColor or Color3.fromRGB(0, 255, 255),
     callback = function(c)
         getgenv().auraColor = c
-        if CharFX.auraPart then
+        if CharFX.auraParts then
             pcall(function()
-                CharFX.auraPart.Color = c
-                if CharFX.auraCore then CharFX.auraCore.Color = c end
+                for _, v in ipairs(CharFX.auraParts) do
+                    if v:IsA("ParticleEmitter") then
+                        if v.Lifetime.Max >= 2.5 then
+                            v.Color = ColorSequence.new(Color3.new(1, 1, 1), c)
+                        else
+                            v.Color = ColorSequence.new(c, Color3.new(1, 1, 1))
+                        end
+                    end
+                end
             end)
         end
     end,
