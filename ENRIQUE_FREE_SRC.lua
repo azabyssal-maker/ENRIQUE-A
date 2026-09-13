@@ -629,22 +629,25 @@ local function TrackBall(ball, store)
 end
 
 -- Shared real-miss follow-up: after a parry that did not connect (ball is
--- still alive, aimed at us and closing in) fire again. Max 3 swings per
--- ball, every extra swing needs a REAL miss, so it never blind-spams.
+-- still alive, aimed at us and closing in) fire again.
+-- Point-blank (ball <= 25 studs) = firehose: fast repeated swings so a
+-- hugging opponent cannot kill us. Normal range = conservative: one 2nd
+-- swing at 0.15s only, never a visible double-parry.
 local function TryRefire(st, ball, charPart, velocity)
- if st.done or not st.fired or st.refireCount >= 1 then return end
- if st.lastFrame == _parryFrame then return end
+ if st.done or not st.fired or st.lastFrame == _parryFrame then return end
  local now = os.clock()
- -- 0.15s: long enough for a successful parry's reflection to update
- -- client-side, so we never add a redundant 2nd swing on a real parry.
- if now - st.firedAt < 0.15 then return end
+ local curDist = (charPart.Position - ball.Position).Magnitude
+ local pointBlank = curDist <= 25
+ if st.refireCount >= (pointBlank and 3 or 1) then return end
+ local delay = 0.15
+ if pointBlank then delay = 0.055 end
+ if now - st.firedAt < delay then return end
  local ok = false
  if velocity.Magnitude < 0.01 then
-  ok = (charPart.Position - ball.Position).Magnitude <= 20
+  ok = curDist <= 20
  else
-  local curDist = (charPart.Position - ball.Position).Magnitude
   ok = velocity:Dot(charPart.Position - ball.Position) > 0
-   and curDist <= math.min(st.distAtFire or 24, 16)
+   and curDist <= math.min(st.distAtFire or 24, 20)
  end
  if ok then
   st.refireCount = st.refireCount + 1
@@ -675,21 +678,19 @@ if st.newBall and not st.fired then
     if not SendParry() then SendParry() end
     return
 end
--- Freeze resistance: a frozen/stopped ball sitting on us still gets parried,
--- no need for it to be moving toward us first.
-if velocity.Magnitude < 0.01 then
-    if not st.fired and (charPart.Position - ball.Position).Magnitude <= 20 then
+if not st.fired then
+    local nowDist = (charPart.Position - ball.Position).Magnitude
+    -- Point-blank / frozen: the ball is already on top of us (enemy hugging
+    -- us, freeze, spawn-near). Fire THIS frame, zero threshold wait.
+    if nowDist <= 25 or (velocity.Magnitude < 0.01 and nowDist <= 20) then
         st.fired = true
         st.firedAt = os.clock()
-        st.distAtFire = 20
+        st.distAtFire = nowDist
         st.lastFrame = _parryFrame
         if not SendParry() then SendParry() end
-    else
-        TryRefire(st, ball, charPart, velocity)
+        return
     end
-    return
-end
-if not st.fired then
+    if velocity.Magnitude < 0.01 then return end
     -- Speed-scaled fast trigger: fire ~0.12s (+ping) before impact so the
     -- packet reaches the server in time. Fast balls trigger earlier, slow
     -- balls wait until close.
@@ -707,7 +708,7 @@ if not st.fired then
     end
     return
 end
--- Real-miss follow-up: 2nd/3rd clean swing only if the ball is still coming.
+-- Real-miss follow-up: firehose at point-blank, one swing elsewhere.
 TryRefire(st, ball, charPart, velocity)
 end
 
@@ -732,35 +733,35 @@ if st.newBall and not st.fired then
     if not SendParry() then SendParry() end
     return
 end
--- TB also handles frozen/stopped balls sitting on us.
-if velocity.Magnitude < 0.01 then
-    if not st.fired and (root.Position - ball.Position).Magnitude <= 20 then
+if not st.fired then
+    local nowDist = (root.Position - ball.Position).Magnitude
+    -- Point-blank / frozen: zero-wait fire, same as Auto Parry.
+    if nowDist <= 25 or (velocity.Magnitude < 0.01 and nowDist <= 20) then
         st.fired = true
         st.firedAt = os.clock()
-        st.distAtFire = 20
+        st.distAtFire = nowDist
         st.lastFrame = _parryFrame
         if not SendParry() then SendParry() end
-    else
-        TryRefire(st, ball, root, velocity)
+        return
+    end
+    if velocity.Magnitude < 0.01 then return end
+    local lead = math.clamp((LastPing or 100) / 1000 + 1 / 120 + 0.02, 0.02, 0.08)
+    local predicted = ball.Position + velocity * lead
+    local dist = (root.Position - predicted).Magnitude
+    local speed = velocity.Magnitude
+    -- Speed-scaled reach: the TB Range slider stays the floor for slow balls,
+    -- fast balls get intercepted much earlier (up to 48 studs).
+    local reach = math.max(cfg.tbRange or 24, math.min(speed * 0.12 + 6, 48))
+    if dist <= reach then
+        st.fired = true
+        st.firedAt = os.clock()
+        st.distAtFire = dist
+        st.lastFrame = _parryFrame
+        if not SendParry() then SendParry() end
     end
     return
 end
-local lead = math.clamp((LastPing or 100) / 1000 + 1 / 120 + 0.02, 0.02, 0.08)
-local predicted = ball.Position + velocity * lead
-local dist = (root.Position - predicted).Magnitude
-local speed = velocity.Magnitude
--- Speed-scaled reach: the TB Range slider stays the floor for slow balls,
--- fast balls get intercepted much earlier (up to 48 studs).
-local reach = math.max(cfg.tbRange or 24, math.min(speed * 0.12 + 6, 48))
-if dist <= reach and not st.fired then
-    st.fired = true
-    st.firedAt = os.clock()
-    st.distAtFire = dist
-    st.lastFrame = _parryFrame
-    if not SendParry() then SendParry() end
-    return
-end
--- Real-miss follow-up shared with Auto Parry: never double swing.
+-- Real-miss follow-up shared with Auto Parry: firehose at point-blank.
 TryRefire(st, ball, root, velocity)
 end
 
