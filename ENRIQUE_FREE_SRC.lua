@@ -312,36 +312,33 @@ end
 
 local function CalculateParryDistance(ball,velocity,root)
  local speed=velocity.Magnitude local ping=LastPing or 100
- -- Accuracy 1..100 ALL stay strong: reaction window never goes below
- -- the full-speed baseline, 100 just pushes slightly further.
+ -- Close-range window: parry when the ball is NEAR the player, never from
+ -- across the map. Speed only scales inside this tight reaction window.
  local acc=math.clamp(RuntimeAccuracy,1,100)
- local reaction = 0.10 + (acc-1)/99*0.04 + math.clamp(ping/350,0,0.12)
- if reaction < 0.10 then reaction = 0.10 end
+ local reaction = 0.05 + (acc-1)/99*0.015 + math.clamp(ping/600,0,0.05)
+ if reaction < 0.05 then reaction = 0.05 end
  local result = speed*reaction + 6
- -- AI detection: ping/framerate-aware extra reach.
- if cfg.aiDetection then
-  result = result + math.clamp(speed*AI.extra,0,30)
-  if speed>=750 then result=math.max(result,9.5+speed*.025) end
- end
- -- AI patterns: motion history (accel/turn) + nearest opponent push.
+ -- AI detection: small ping/framerate-aware reach.
+ if cfg.aiDetection then result = result + math.clamp(speed*AI.extra,0,8) end
+ -- AI patterns: motion history + opponent push, kept small.
  if cfg.aiPatterns then
   local now=os.clock() local h=AI.motion[ball]
   if h then
    local dt=math.clamp(now-h.time,1/240,.15)
    local accv=(velocity-h.velocity).Magnitude/dt
    local turn=velocity.Magnitude>0 and h.velocity.Magnitude>0 and math.acos(math.clamp(velocity.Unit:Dot(h.velocity.Unit),-1,1)) or 0
-   result=result+math.clamp(accv*.0015+speed*turn*.07,0,20)
+   result=result+math.clamp(accv*.001+speed*turn*.04,0,10)
   end
   AI.motion[ball]={velocity=velocity,time=now}
   local o=AIOpponent()
   if o and o.PrimaryPart then
    local to=root.Position-o.PrimaryPart.Position
    if to.Magnitude>0 then
-    result=result+math.clamp(math.max(o.PrimaryPart.AssemblyLinearVelocity:Dot(to.Unit),0)*.1,0,12)
+    result=result+math.clamp(math.max(o.PrimaryPart.AssemblyLinearVelocity:Dot(to.Unit),0)*.06,0,8)
    end
   end
  end
- if result > 60 then result = 60 end
+ if result > 24 then result = 24 end
  return result
 end
 
@@ -613,10 +610,12 @@ local TBState = setmetatable({}, {__mode="k"})
 
 -- AI tracking: one clean parry per threat; re-fire only after a REAL miss
 -- (ball still aimed at us 0.12s later), max 3 tries. Never blind-spams.
+local _parryFrame = 0
+
 local function TrackBall(ball, store)
     local st = store[ball]
     if st and st.listening then return st end
-    st = { firedAt = 0, fired = false, tries = 0, done = false, listening = true }
+    st = { firedAt = 0, fired = false, tries = 0, done = false, listening = true, lastFrame = 0 }
     store[ball] = st
     ball:GetAttributeChangedSignal("target"):Connect(function()
         local t = store[ball]
@@ -637,7 +636,7 @@ local function AIFire(st, now)
         st.fired = true
         st.firedAt = now
         SendParry()
-    elseif now - st.firedAt >= 0.12 and st.tries < 3 then
+    elseif now - st.firedAt >= 0.08 and st.tries < 3 then
         st.firedAt = now
         st.tries = st.tries + 1
         SendParry()
@@ -652,22 +651,25 @@ local z = ball:FindFirstChild("zoomies")
 if not charPart or not z then return end
 local velocity = z.VectorVelocity
 if velocity.Magnitude < 0.01 then return end
--- Reaction lead with a small ping-spike buffer so a hiccup never misses.
-local lead = math.clamp((LastPing or 100) / 1000 + 1 / 60 + 0.03, 0.03, 0.22)
+-- Reaction lead: small ping buffer, never extends the reach far away.
+local lead = math.clamp((LastPing or 100) / 1000 + 1 / 60 + 0.02, 0.02, 0.08)
 local predicted = ball.Position + velocity * lead
 local dist = (charPart.Position - predicted).Magnitude
 local threshold = CalculateParryDistance(ball, velocity, charPart)
-if dist <= threshold or dist <= 20 then
+if dist <= threshold or dist <= 10 then
     if cfg.aiParry then
         local st = TrackBall(ball, APState)
-        if st.done then return end
+        if st.done or st.lastFrame == _parryFrame then return end
         AIFire(st, os.clock())
+        st.lastFrame = _parryFrame
     else
         local st = APState[ball]
-        if not st then st = { firedAt = 0 } APState[ball] = st end
+        if not st then st = { firedAt = 0, lastFrame = 0 } APState[ball] = st end
+        if st.lastFrame == _parryFrame then return end
         local now = os.clock()
         if now - st.firedAt >= 0.3 then
             st.firedAt = now
+            st.lastFrame = _parryFrame
             SendParry()
         end
     end
@@ -683,15 +685,16 @@ local root = player.Character and player.Character.PrimaryPart
 local z = ball:FindFirstChild("zoomies")
 if not root or not z then return end
 local velocity = z.VectorVelocity
--- Reaction lead: same buffered prediction so TB reacts earlier, not later.
-local lead = math.clamp((LastPing or 100) / 1000 + 1 / 120 + 0.03, 0.03, 0.22)
+-- Reaction lead: same small buffered prediction so TB reacts on time.
+local lead = math.clamp((LastPing or 100) / 1000 + 1 / 120 + 0.02, 0.02, 0.08)
 local predicted = ball.Position + velocity * lead
 local dist = (root.Position - predicted).Magnitude
 local range = math.max(cfg.tbRange or 24, 8)
 if dist <= range then
     local st = TrackBall(ball, TBState)
-    if st.done then return end
+    if st.done or st.lastFrame == _parryFrame then return end
     AIFire(st, os.clock())
+    st.lastFrame = _parryFrame
 end
 end
 
@@ -764,6 +767,7 @@ end
 end)
 
 RunService.Heartbeat:Connect(function()
+_parryFrame = _parryFrame + 1
 if not RemoteReady() then return end
 local balls=workspace:FindFirstChild("Balls")
 if balls then
