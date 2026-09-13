@@ -323,33 +323,34 @@ end
 
 local function CalculateParryDistance(ball,velocity,root)
  local speed=velocity.Magnitude local ping=LastPing or 100
- -- Close-range window: parry when the ball is NEAR the player, never from
- -- across the map. Speed only scales inside this tight reaction window.
+ -- Clean reaction window: time-based so slow balls get a small window and
+ -- fast balls a bigger one, all at roughly the same reaction speed. Never
+ -- fires from across the map.
  local acc=math.clamp(RuntimeAccuracy,1,100)
- local reaction = 0.05 + (acc-1)/99*0.015 + math.clamp(ping/600,0,0.05)
- if reaction < 0.05 then reaction = 0.05 end
+ local reaction = 0.055 + (acc-1)/99*0.02 + math.clamp(ping/600,0,0.06)
+ if reaction < 0.055 then reaction = 0.055 end
  local result = speed*reaction + 6
- -- AI detection: small ping/framerate-aware reach.
+ -- AI detection: small smooth ping/framerate-aware reach.
  if cfg.aiDetection then result = result + math.clamp(speed*AI.extra,0,8) end
- -- AI patterns: motion history + opponent push, kept small.
+ -- AI patterns: small motion/opponent assist, smooth by nature.
  if cfg.aiPatterns then
   local now=os.clock() local h=AI.motion[ball]
   if h then
    local dt=math.clamp(now-h.time,1/240,.15)
    local accv=(velocity-h.velocity).Magnitude/dt
    local turn=velocity.Magnitude>0 and h.velocity.Magnitude>0 and math.acos(math.clamp(velocity.Unit:Dot(h.velocity.Unit),-1,1)) or 0
-   result=result+math.clamp(accv*.001+speed*turn*.04,0,10)
+   result=result+math.clamp(accv*.0008+speed*turn*.03,0,6)
   end
   AI.motion[ball]={velocity=velocity,time=now}
   local o=AIOpponent()
   if o and o.PrimaryPart then
    local to=root.Position-o.PrimaryPart.Position
    if to.Magnitude>0 then
-    result=result+math.clamp(math.max(o.PrimaryPart.AssemblyLinearVelocity:Dot(to.Unit),0)*.06,0,8)
+    result=result+math.clamp(math.max(o.PrimaryPart.AssemblyLinearVelocity:Dot(to.Unit),0)*.05,0,4)
    end
   end
  end
- if result > 24 then result = 24 end
+ if result > 22 then result = 22 end
  return result
 end
 
@@ -652,7 +653,7 @@ local function AIFire(st, now, refireDelay, close)
     if not st.fired then
         st.fired = true
         st.firedAt = now
-        SendParry()
+        if not SendParry() then SendParry() end
     elseif now - st.firedAt >= refireDelay and st.tries < 1 and close then
         st.firedAt = now
         st.tries = st.tries + 1
@@ -677,7 +678,7 @@ if dist <= threshold or dist <= 10 then
     if cfg.aiParry then
         local st = TrackBall(ball, APState)
         if st.done or st.lastFrame == _parryFrame then return end
-        AIFire(st, os.clock(), RefireDelay(velocity.Magnitude), (dist <= threshold * 0.6 or dist <= 8))
+        AIFire(st, os.clock(), RefireDelay(velocity.Magnitude), (dist <= threshold * 0.7 or dist <= 9))
         st.lastFrame = _parryFrame
     else
         local st = APState[ball]
@@ -709,9 +710,10 @@ local dist = (root.Position - predicted).Magnitude
 local range = math.max(cfg.tbRange or 24, 8)
 if dist <= range then
     local st = TrackBall(ball, TBState)
-    if st.done or st.lastFrame == _parryFrame then return end
-    AIFire(st, os.clock(), RefireDelay(velocity.Magnitude), (dist <= range * 0.6 or dist <= 8))
+    if st.done or st.fired or st.lastFrame == _parryFrame then return end
+    st.fired = true
     st.lastFrame = _parryFrame
+    if not SendParry() then SendParry() end
 end
 end
 
