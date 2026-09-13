@@ -612,7 +612,7 @@ local _parryFrame = 0
 local function TrackBall(ball, store)
     local st = store[ball]
     if st and st.listening then return st end
-    st = { fired = false, done = false, listening = true, lastFrame = 0 }
+    st = { fired = false, done = false, listening = true, lastFrame = 0, refireCount = 0 }
     store[ball] = st
     ball:GetAttributeChangedSignal("target"):Connect(function()
         local t = store[ball]
@@ -622,10 +622,36 @@ local function TrackBall(ball, store)
         else
             t.done = false
             t.fired = false
-            t.refired = false
+            t.refireCount = 0
         end
     end)
     return st
+end
+
+-- Shared real-miss follow-up: after a parry that did not connect (ball is
+-- still alive, aimed at us and closing in) fire again. Max 3 swings per
+-- ball, every extra swing needs a REAL miss, so it never blind-spams.
+local function TryRefire(st, ball, charPart, velocity)
+ if st.done or not st.fired or st.refireCount >= 2 then return end
+ if st.lastFrame == _parryFrame then return end
+ local now = os.clock()
+ local delay = 0.09
+ if st.refireCount >= 1 then delay = 0.06 end
+ if now - st.firedAt < delay then return end
+ local ok = false
+ if velocity.Magnitude < 0.01 then
+  ok = (charPart.Position - ball.Position).Magnitude <= 20
+ else
+  local curDist = (charPart.Position - ball.Position).Magnitude
+  ok = velocity:Dot(charPart.Position - ball.Position) > 0
+   and curDist <= math.min(st.distAtFire or 24, 16)
+ end
+ if ok then
+  st.refireCount = st.refireCount + 1
+  st.firedAt = now
+  st.lastFrame = _parryFrame
+  if not SendParry() then SendParry() end
+ end
 end
 
 local function ProcessAutoParry(ball)
@@ -642,11 +668,13 @@ local velocity = z.VectorVelocity
 -- no need for it to be moving toward us first.
 if velocity.Magnitude < 0.01 then
     if not st.fired and (charPart.Position - ball.Position).Magnitude <= 20 then
+        st.fired = true
         st.firedAt = os.clock()
         st.distAtFire = 20
-        st.fired = true
         st.lastFrame = _parryFrame
         if not SendParry() then SendParry() end
+    else
+        TryRefire(st, ball, charPart, velocity)
     end
     return
 end
@@ -668,20 +696,8 @@ if not st.fired then
     end
     return
 end
--- Real-miss second attempt: the first parry missed (ball still alive, aimed
--- at us and got closer inside ~16 studs) -> one clean 2nd parry, never spam.
-if not st.refired then
-    local now = os.clock()
-    if now - st.firedAt >= 0.09 then
-        local curDist = (charPart.Position - ball.Position).Magnitude
-        local approaching = velocity:Dot(charPart.Position - ball.Position) > 0
-        if approaching and curDist <= math.min(st.distAtFire or 24, 16) then
-            st.refired = true
-            st.lastFrame = _parryFrame
-            if not SendParry() then SendParry() end
-        end
-    end
-end
+-- Real-miss follow-up: 2nd/3rd clean swing only if the ball is still coming.
+TryRefire(st, ball, charPart, velocity)
 end
 
 local manualTBActive = false
@@ -692,21 +708,39 @@ if ball:GetAttribute("target") ~= player.Name then return end
 local root = player.Character and player.Character.PrimaryPart
 local z = ball:FindFirstChild("zoomies")
 if not root or not z then return end
+local st = TrackBall(ball, ParryState)
+if st.done or st.lastFrame == _parryFrame then return end
 local velocity = z.VectorVelocity
-if velocity.Magnitude < 0.01 then return end
+-- TB also handles frozen/stopped balls sitting on us.
+if velocity.Magnitude < 0.01 then
+    if not st.fired and (root.Position - ball.Position).Magnitude <= 20 then
+        st.fired = true
+        st.firedAt = os.clock()
+        st.distAtFire = 20
+        st.lastFrame = _parryFrame
+        if not SendParry() then SendParry() end
+    else
+        TryRefire(st, ball, root, velocity)
+    end
+    return
+end
 local lead = math.clamp((LastPing or 100) / 1000 + 1 / 120 + 0.02, 0.02, 0.08)
 local predicted = ball.Position + velocity * lead
 local dist = (root.Position - predicted).Magnitude
-local range = math.max(cfg.tbRange or 24, 8)
-if dist <= range then
-    local st = TrackBall(ball, ParryState)
-    if st.done or st.fired or st.lastFrame == _parryFrame then return end
+local speed = velocity.Magnitude
+-- Speed-scaled reach: the TB Range slider stays the floor for slow balls,
+-- fast balls get intercepted much earlier (up to 48 studs).
+local reach = math.max(cfg.tbRange or 24, math.min(speed * 0.12 + 6, 48))
+if dist <= reach and not st.fired then
     st.fired = true
     st.firedAt = os.clock()
     st.distAtFire = dist
     st.lastFrame = _parryFrame
     if not SendParry() then SendParry() end
+    return
 end
+-- Real-miss follow-up shared with Auto Parry: never double swing.
+TryRefire(st, ball, root, velocity)
 end
 
 local AS={target=nil,targetTime=0,lastCheck=0,lastFire=0,trackedBall=nil,targetConn=nil,engagedTarget=nil,abortCycle=false}
