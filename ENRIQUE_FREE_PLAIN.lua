@@ -632,7 +632,7 @@ local function TrackBall(ball, store)
             t.done = false
             -- Quick ping-pong retargets do NOT reset the swing; only a real
             -- re-shot (>=0.45s after our last parry) gets a fresh fire.
-            if not t.fired or os.clock() - (t.firedAt or 0) >= 0.45 then
+            if not t.fired or os.clock() - (t.firedAt or 0) >= 0.3 then
                 t.fired = false
                 t.refireCount = 0
             end
@@ -645,17 +645,19 @@ end
 -- the ball is STILL alive, still coming at us and inside 10 studs) -> one
 -- clean 2nd swing. A successful parry reflects fast, so it never shows a 2nd.
 local function TryRefire(st, ball, charPart, velocity)
- if st.done or not st.fired or st.refireCount >= 1 then return end
+ if st.done or not st.fired or st.refireCount >= 2 then return end
  if st.lastFrame == _parryFrame then return end
  local now = os.clock()
- if now - st.firedAt < 0.25 then return end
+ local delay = 0.15
+ if st.refireCount >= 1 then delay = 0.12 end
+ if now - st.firedAt < delay then return end
  local curDist = (charPart.Position - ball.Position).Magnitude
  local ok = false
  if velocity.Magnitude < 0.01 then
   ok = curDist <= 12
  else
   ok = velocity:Dot(charPart.Position - ball.Position) > 0
-   and curDist <= 10
+   and curDist <= 12
  end
  if ok then
   st.refireCount = st.refireCount + 1
@@ -677,7 +679,7 @@ if st.done or st.lastFrame == _parryFrame then return end
 local velocity = z.VectorVelocity
 local speed = velocity.Magnitude
 if not st.fired then
-    -- Frozen/stopped ball right on top of us: one immediate swing.
+    -- Frozen ball right on top of us: one immediate swing.
     if speed < 0.01 then
         local nowDist = (charPart.Position - ball.Position).Magnitude
         if nowDist <= 12 then
@@ -689,9 +691,19 @@ if not st.fired then
         end
         return
     end
-    -- Precise timing only: ~0.12s before impact, capped at 24 studs.
-    -- Slow balls wait until they are close, fast balls fire earlier.
-    -- No close-range instant spam, no far-away swings.
+    -- Very close + still coming: fire this frame (no waiting, no spam -
+    -- one swing; retarget lock stops machine-gunning).
+    local nowDist = (charPart.Position - ball.Position).Magnitude
+    if nowDist <= 14 and speed > 0.01
+        and velocity:Dot(charPart.Position - ball.Position) > 0 then
+        st.fired = true
+        st.firedAt = os.clock()
+        st.distAtFire = nowDist
+        st.lastFrame = _parryFrame
+        FireParry()
+        return
+    end
+    -- Timed reach: ~0.12s before impact, capped 24.
     local lead = 0.05
     local predicted = ball.Position + velocity * lead
     local dist = (charPart.Position - predicted).Magnitude
@@ -706,7 +718,7 @@ if not st.fired then
         st.lastSpeedAt = now
         effSpeed = speed + math.clamp(st.smoothAccel * 0.25, -speed * 0.4, speed * 0.9)
     end
-    local reach = math.min(math.max(effSpeed * 0.12, 6), 24)
+    local reach = math.min(math.max(effSpeed * 0.12, 8), 24)
     if dist <= reach then
         st.fired = true
         st.firedAt = os.clock()
@@ -716,7 +728,7 @@ if not st.fired then
     end
     return
 end
--- ONE follow-up on a real miss only.
+-- Real-miss follow-ups (close range only, max 2).
 TryRefire(st, ball, charPart, velocity)
 end
 
@@ -733,7 +745,7 @@ if st.done or st.lastFrame == _parryFrame then return end
 local velocity = z.VectorVelocity
 local speed = velocity.Magnitude
 if not st.fired then
-    -- Frozen/stopped ball right on top of us: one immediate swing.
+    -- Frozen ball right on top of us: one immediate swing.
     if speed < 0.01 then
         local nowDist = (root.Position - ball.Position).Magnitude
         if nowDist <= 12 then
@@ -745,8 +757,18 @@ if not st.fired then
         end
         return
     end
-    -- Range comes from the TB Range slider only - no speed extension,
-    -- no instant-close spam, no far-away parry beyond your own setting.
+    -- Very close + still coming: fire this frame.
+    local nowDist = (root.Position - ball.Position).Magnitude
+    if nowDist <= 14 and speed > 0.01
+        and velocity:Dot(root.Position - ball.Position) > 0 then
+        st.fired = true
+        st.firedAt = os.clock()
+        st.distAtFire = nowDist
+        st.lastFrame = _parryFrame
+        FireParry()
+        return
+    end
+    -- Range from the TB Range slider only.
     local lead = math.clamp((LastPing or 100) / 1000 + 1 / 120 + 0.02, 0.02, 0.08)
     local predicted = ball.Position + velocity * lead
     local dist = (root.Position - predicted).Magnitude
@@ -760,7 +782,7 @@ if not st.fired then
     end
     return
 end
--- ONE follow-up on a real miss only.
+-- Real-miss follow-ups (close range only, max 2).
 TryRefire(st, ball, root, velocity)
 end
 
@@ -1034,44 +1056,26 @@ end
 
 local function ApplyNoLegs(char)
     if not char then return end
-    local enabled = getgenv().noLegsEnabled == true
-    if not enabled then
-        local lt = char:FindFirstChild("LowerTorso")
-        if lt and CharFX.orig[lt] then
-            lt.Transparency = CharFX.orig[lt]
-            CharFX.orig[lt] = nil
-        end
-        return
+    if getgenv().noLegsEnabled ~= true then return end
+    local root = char:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+    local rootY = root.Position.Y
+    local function IsCore(p)
+        local n = p.Name
+        return n == "HumanoidRootPart" or n == "Torso" or n == "UpperTorso"
+            or n:find("Arm", 1, true) or n:find("Hand", 1, true)
     end
-    -- Canonical "no legs": DELETE the leg/foot parts outright so nothing
-    -- can remain (no transparency edge, no spike, no half-leg).
+    -- Delete EVERYTHING below the waist: legs, feet, shoes, pants, spikes.
+    -- Name fallback for Leg/Foot (works even during loading), Y-cut for
+    -- any custom rig part (both sides always, no leftovers).
     local toDelete = {}
     for _, part in ipairs(char:GetDescendants()) do
-        if part:IsA("BasePart") and not part:IsA("Accessory") then
+        if part:IsA("BasePart") and not IsCore(part) then
             local n = part.Name
-            if n:find("Leg", 1, true) or n:find("Foot", 1, true) then
+            local nameHit = n:find("Leg", 1, true) or n:find("Foot", 1, true)
+            local ok, y = pcall(function() return part.Position.Y end)
+            if nameHit or (ok and y < rootY - 0.4) then
                 toDelete[#toDelete + 1] = part
-            end
-        end
-    end
-    -- delete accessories that ride on those legs/feet (shoes, spikes...)
-    for _, acc in ipairs(char:GetDescendants()) do
-        if acc:IsA("Accessory") then
-            local h = acc:FindFirstChild("Handle")
-            if h and h:IsA("BasePart") then
-                local limb = nil
-                for _, j in ipairs(h:GetDescendants()) do
-                    if j:IsA("Motor6D") then
-                        limb = j.Parent
-                    elseif j:IsA("WeldConstraint") then
-                        limb = j.Part0
-                    elseif j:IsA("Weld") then
-                        limb = j.Part1 == h and j.Parent or nil
-                    end
-                end
-                if limb and (limb.Name:find("Leg", 1, true) or limb.Name:find("Foot", 1, true)) then
-                    toDelete[#toDelete + 1] = h
-                end
             end
         end
     end
@@ -1080,14 +1084,6 @@ local function ApplyNoLegs(char)
             pcall(function() part:Destroy() end)
         end
     end
-    -- pelvis invisible so the torso ends cleanly (no stump)
-    local lt = char:FindFirstChild("LowerTorso")
-    if lt then
-        if not CharFX.orig[lt] then CharFX.orig[lt] = lt.Transparency end
-        lt.Transparency = 1
-    end
-    -- undo pelvis when disabled next respawn... (parts deleted stay gone
-    -- until the character respawns; effect is fully clean)
 end
 
 local function ApplyAura(char)
@@ -1118,12 +1114,36 @@ local function ApplyAura(char)
         att.Parent = root
         table.insert(CharFX.auraParts, att)
 
+        -- Guaranteed glow: neon bubble around the whole body (always visible,
+        -- even on low-spec executors where particles are hidden).
+        local bubble = Instance.new("Part")
+        bubble.Name = "ENRIQUE_AuraBubble"
+        bubble.Shape = Enum.PartType.Ball
+        bubble.Size = Vector3.new(14, 14, 14)
+        bubble.Material = Enum.Material.Neon
+        bubble.Color = color
+        bubble.Transparency = 0.82
+        bubble.CanCollide = false
+        bubble.CanTouch = false
+        bubble.CanQuery = false
+        bubble.CastShadow = false
+        bubble.Anchored = false
+        bubble.CFrame = root.CFrame
+        bubble.Parent = char
+        local weldB = Instance.new("WeldConstraint")
+        weldB.Part0 = root
+        weldB.Part1 = bubble
+        weldB.Parent = root
+        table.insert(CharFX.auraParts, bubble)
+        table.insert(CharFX.auraParts, weldB)
+
         -- Soft glow halo: many light dots floating around the body.
         local soft = Instance.new("ParticleEmitter")
+        soft.Enabled = true
         soft.Color = ColorSequence.new(Color3.new(1, 1, 1), color)
-        soft.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 3), NumberSequenceKeypoint.new(1, 0) })
-        soft.Lifetime = NumberRange.new(2.5, 4.5)
-        soft.Rate = 40
+        soft.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 5), NumberSequenceKeypoint.new(1, 0) })
+        soft.Lifetime = NumberRange.new(3, 5)
+        soft.Rate = 60
         soft.Speed = NumberRange.new(1.5, 3.5)
         soft.SpreadAngle = Vector2.new(360, 360)
         soft.Rotation = NumberRange.new(0, 360)
@@ -1138,10 +1158,11 @@ local function ApplyAura(char)
 
         -- Brighter sparks swirling around on top of the glow.
         local spark = Instance.new("ParticleEmitter")
+        spark.Enabled = true
         spark.Color = ColorSequence.new(color, Color3.new(1, 1, 1))
-        spark.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1.4), NumberSequenceKeypoint.new(1, 0) })
+        spark.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 2.4), NumberSequenceKeypoint.new(1, 0) })
         spark.Lifetime = NumberRange.new(1.2, 2.2)
-        spark.Rate = 80
+        spark.Rate = 110
         spark.Speed = NumberRange.new(2.5, 5)
         spark.SpreadAngle = Vector2.new(360, 360)
         spark.Rotation = NumberRange.new(0, 360)
