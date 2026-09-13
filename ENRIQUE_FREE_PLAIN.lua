@@ -603,6 +603,14 @@ end
 getgenv().ENRIQUE_SendParry=SendParry
 getgenv().ENRIQUE_SendParryFast=SendParryFast
 
+-- Double-tap helper: two parries back-to-back so one lost/dropped packet
+-- never turns into a missed parry. Animation is throttled, so it looks
+-- like a single swing.
+local function FireParry()
+    SendParry()
+    return SendParry()
+end
+
 local ParryState = setmetatable({}, {__mode="k"})
 
 -- Shared per-ball state: TB and Auto Parry both use this, so one ball is
@@ -653,7 +661,7 @@ local function TryRefire(st, ball, charPart, velocity)
   st.refireCount = st.refireCount + 1
   st.firedAt = now
   st.lastFrame = _parryFrame
-  if not SendParry() then SendParry() end
+  FireParry()
  end
 end
 
@@ -675,7 +683,7 @@ if st.newBall and not st.fired then
     st.firedAt = os.clock()
     st.distAtFire = 20
     st.lastFrame = _parryFrame
-    if not SendParry() then SendParry() end
+    FireParry()
     return
 end
 if not st.fired then
@@ -687,24 +695,23 @@ if not st.fired then
         st.firedAt = os.clock()
         st.distAtFire = nowDist
         st.lastFrame = _parryFrame
-        if not SendParry() then SendParry() end
+        FireParry()
         return
     end
     if velocity.Magnitude < 0.01 then return end
-    -- Speed-scaled fast trigger: fire ~0.12s (+ping) before impact so the
-    -- packet reaches the server in time. Fast balls trigger earlier, slow
-    -- balls wait until close.
-    local lead = math.clamp((LastPing or 100) / 1000 + 1 / 60 + 0.02, 0.02, 0.08)
+    -- Speed-scaled fast trigger: FIXED lead and reaction time (no ping
+    -- jitter) so every parry reacts the same - always fast, never slow.
+    local lead = 0.05
     local predicted = ball.Position + velocity * lead
     local dist = (charPart.Position - predicted).Magnitude
     local speed = velocity.Magnitude
-    local reaction = 0.12 + math.clamp((LastPing or 100) / 350, 0, 0.10)
-    if dist <= math.min(speed * reaction + 6, 46) then
+    local reaction = 0.16
+    if dist <= math.min(speed * reaction + 6, 48) then
         st.fired = true
         st.firedAt = os.clock()
         st.distAtFire = dist
         st.lastFrame = _parryFrame
-        if not SendParry() then SendParry() end
+        FireParry()
     end
     return
 end
@@ -730,7 +737,7 @@ if st.newBall and not st.fired then
     st.firedAt = os.clock()
     st.distAtFire = 20
     st.lastFrame = _parryFrame
-    if not SendParry() then SendParry() end
+    FireParry()
     return
 end
 if not st.fired then
@@ -741,7 +748,7 @@ if not st.fired then
         st.firedAt = os.clock()
         st.distAtFire = nowDist
         st.lastFrame = _parryFrame
-        if not SendParry() then SendParry() end
+        FireParry()
         return
     end
     if velocity.Magnitude < 0.01 then return end
@@ -750,14 +757,14 @@ if not st.fired then
     local dist = (root.Position - predicted).Magnitude
     local speed = velocity.Magnitude
     -- Speed-scaled reach: the TB Range slider stays the floor for slow balls,
-    -- fast balls get intercepted much earlier (up to 48 studs).
-    local reach = math.max(cfg.tbRange or 24, math.min(speed * 0.12 + 6, 48))
+    -- fast balls get intercepted much earlier (consistent, no ping jitter).
+    local reach = math.max(cfg.tbRange or 24, math.min(speed * 0.14 + 6, 48))
     if dist <= reach then
         st.fired = true
         st.firedAt = os.clock()
         st.distAtFire = dist
         st.lastFrame = _parryFrame
-        if not SendParry() then SendParry() end
+        FireParry()
     end
     return
 end
