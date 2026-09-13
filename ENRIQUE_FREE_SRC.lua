@@ -65,8 +65,13 @@ spamBindKey = "P"
 cfg.spamThreshold = math.max(0, cfg.spamThreshold or 0)
 
 -- Shared burst size for Auto Spam and Manual Spam (Spam Strength slider).
+-- Ping-adaptive pace: when ping rises the burst backs off so the flood never
+-- sticks the server (lower ping = packets land faster = feels quicker).
 local function SpamBurstCount(dt)
- return math.clamp(math.floor(dt * (400 + (cfg.spamRate or 100) * 15)) + 1, 3, 20)
+ local ping = LastPing or 100
+ local pace = math.clamp(1.25 - ping / 500, 0.45, 1.25)
+ local n = math.floor(dt * (60 + (cfg.spamRate or 100) * 2.2) * pace) + 1
+ return math.clamp(n, 2, 12)
 end
 cfg.distanceMultiplier = math.max(0.8, cfg.distanceMultiplier or 1.0)
 
@@ -610,6 +615,7 @@ local function TrackBall(ball, store)
         else
             t.done = false
             t.fired = false
+            t.refired = false
         end
     end)
     return st
@@ -622,29 +628,52 @@ if cfg.aiPatterns and Is_Curved(ball) then return end
 local charPart = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
 local z = ball:FindFirstChild("zoomies")
 if not charPart or not z then return end
+local st = TrackBall(ball, ParryState)
+if st.done or st.lastFrame == _parryFrame then return end
 local velocity = z.VectorVelocity
 -- Freeze resistance: a frozen/stopped ball sitting on us still gets parried,
 -- no need for it to be moving toward us first.
-local fire = false
 if velocity.Magnitude < 0.01 then
-    fire = (charPart.Position - ball.Position).Magnitude <= 20
-else
+    if not st.fired and (charPart.Position - ball.Position).Magnitude <= 20 then
+        st.firedAt = os.clock()
+        st.distAtFire = 20
+        st.fired = true
+        st.lastFrame = _parryFrame
+        if not SendParry() then SendParry() end
+    end
+    return
+end
+if not st.fired then
     -- Speed-scaled fast trigger: fire ~0.12s (+ping) before impact so the
     -- packet reaches the server in time. Fast balls trigger earlier, slow
-    -- balls wait until close. One send per ball = still no 2 parry.
+    -- balls wait until close.
     local lead = math.clamp((LastPing or 100) / 1000 + 1 / 60 + 0.02, 0.02, 0.08)
     local predicted = ball.Position + velocity * lead
     local dist = (charPart.Position - predicted).Magnitude
     local speed = velocity.Magnitude
     local reaction = 0.12 + math.clamp((LastPing or 100) / 350, 0, 0.10)
-    fire = dist <= math.min(speed * reaction + 6, 46)
+    if dist <= math.min(speed * reaction + 6, 46) then
+        st.fired = true
+        st.firedAt = os.clock()
+        st.distAtFire = dist
+        st.lastFrame = _parryFrame
+        if not SendParry() then SendParry() end
+    end
+    return
 end
-if fire then
-    local st = TrackBall(ball, ParryState)
-    if st.done or st.fired or st.lastFrame == _parryFrame then return end
-    st.fired = true
-    st.lastFrame = _parryFrame
-    if not SendParry() then SendParry() end
+-- Real-miss second attempt: the first parry missed (ball still alive, aimed
+-- at us and got closer inside ~16 studs) -> one clean 2nd parry, never spam.
+if not st.refired then
+    local now = os.clock()
+    if now - st.firedAt >= 0.09 then
+        local curDist = (charPart.Position - ball.Position).Magnitude
+        local approaching = velocity:Dot(charPart.Position - ball.Position) > 0
+        if approaching and curDist <= math.min(st.distAtFire or 24, 16) then
+            st.refired = true
+            st.lastFrame = _parryFrame
+            if not SendParry() then SendParry() end
+        end
+    end
 end
 end
 
@@ -666,6 +695,8 @@ if dist <= range then
     local st = TrackBall(ball, ParryState)
     if st.done or st.fired or st.lastFrame == _parryFrame then return end
     st.fired = true
+    st.firedAt = os.clock()
+    st.distAtFire = dist
     st.lastFrame = _parryFrame
     if not SendParry() then SendParry() end
 end
