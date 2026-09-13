@@ -848,7 +848,7 @@ local ping=math.clamp(LastPing/10,1,16)
  local spamGate = math.max(cfg.spamThreshold or 0, 0)
  if (target==enemy.Name or target==player.Name) and bd<=acc and ed<=acc
     and recentParries>=spamGate then
-   SendParry()
+   FireParry()
  end
 end
 
@@ -989,11 +989,120 @@ do
         -- World / ESP / Hit Sound / Ball Trail (UI defaults auto-restored via library._flags)
         if saved.world_sky_changer ~= nil then getgenv().worldSkyEnabled = saved.world_sky_changer == true end
 
+        -- Character FX
+        if saved.headless ~= nil then getgenv().headlessEnabled = saved.headless == true end
+        if saved.no_legs ~= nil then getgenv().noLegsEnabled = saved.no_legs == true end
+        if saved.aura ~= nil then getgenv().auraEnabled = saved.aura == true end
+        if typeof(saved.aura_color) == "Color3" then getgenv().auraColor = saved.aura_color end
+
         print("[ENRIQUE] Profile restored from saved state")
     end
 end
 
 
+
+-- =================== Character FX ===================
+local CharFX = { auraPart = nil, orig = {} }
+CharFX.orig = setmetatable({}, { __mode = "k" })
+
+local function ApplyNoHead(char)
+    if not char then return end
+    local head = char:FindFirstChild("Head")
+    if not head then return end
+    local mesh = head:FindFirstChildOfClass("SpecialMesh") or head:FindFirstChildOfClass("Mesh")
+    local enabled = getgenv().headlessEnabled == true
+    if not enabled then
+        local o = CharFX.orig[head]
+        if o then
+            if mesh then
+                pcall(function()
+                    if o.id then mesh.MeshId = o.id end
+                    if o.tex then mesh.TextureId = o.tex end
+                    if o.typ then mesh.MeshType = o.typ end
+                end)
+            end
+            CharFX.orig[head] = nil
+        end
+        return
+    end
+    if mesh then
+        if not CharFX.orig[head] then
+            CharFX.orig[head] = { id = mesh.MeshId, tex = mesh.TextureId, typ = mesh.MeshType }
+        end
+        pcall(function()
+            mesh.MeshType = Enum.MeshType.FileMesh
+            mesh.MeshId = "rbxassetid://3270017"
+            mesh.TextureId = 0
+        end)
+    end
+end
+
+local function ApplyNoLegs(char)
+    if not char then return end
+    local enabled = getgenv().noLegsEnabled == true
+    for _, part in ipairs(char:GetDescendants()) do
+        if part:IsA("BasePart") and (part.Name:find("Leg", 1, true) or part.Name == "LowerTorso") then
+            if enabled then
+                if not CharFX.orig[part] then CharFX.orig[part] = part.Transparency end
+                part.Transparency = 1
+            else
+                local o = CharFX.orig[part]
+                if o then
+                    part.Transparency = o
+                    CharFX.orig[part] = nil
+                end
+            end
+        end
+    end
+end
+
+local function ApplyAura(char)
+    if CharFX.auraPart then
+        pcall(function() CharFX.auraPart:Destroy() end)
+        CharFX.auraPart = nil
+    end
+    if getgenv().auraEnabled ~= true or not char then return end
+    local root = char:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+    local okAura = pcall(function()
+        local aura = Instance.new("Part")
+        aura.Name = "ENRIQUE_Aura"
+        aura.Size = Vector3.new(16, 0.5, 16)
+        aura.Shape = Enum.PartType.Block
+        aura.Material = Enum.Material.Neon
+        aura.Color = getgenv().auraColor or Color3.fromRGB(0, 255, 255)
+        aura.Transparency = 0.55
+        aura.CanCollide = false
+        aura.CanTouch = false
+        aura.CanQuery = false
+        aura.CastShadow = false
+        aura.Anchored = false
+        local mesh = Instance.new("SpecialMesh")
+        mesh.MeshType = Enum.MeshType.Sphere
+        mesh.Scale = Vector3.new(1, 0.06, 1)
+        mesh.Parent = aura
+        aura.Parent = char
+        local weld = Instance.new("WeldConstraint")
+        weld.Part0 = root
+        weld.Part1 = aura
+        weld.Parent = root
+        CharFX.auraPart = aura
+        return true
+    end)
+    if not okAura then CharFX.auraPart = nil end
+end
+
+local function ApplyCharacterFX(c)
+    ApplyNoHead(c)
+    ApplyNoLegs(c)
+    ApplyAura(c)
+end
+
+player.CharacterAdded:Connect(function(c)
+    task.wait(0.2)
+    ApplyCharacterFX(c)
+end)
+ApplyCharacterFX(player.Character)
 
 local MainCat = UI:create_category("Main")
 local Parry = MainCat:create_tab("Parry", "rbxassetid://swords")
@@ -9607,6 +9716,49 @@ ParryRight:create_slider("spam_rate", {
 -- MUSIC TAB
 -- ============================================================
 local SettingsCat = UI:create_category("Settings")
+
+local FXCat = UI:create_category("Character FX")
+local FXTab = FXCat:create_tab("Body", "rbxassetid://eye")
+local FXGroup1 = FXTab:create_group("Body FX", "left")
+
+FXGroup1:create_toggle("headless", {
+    title = "Headless 无头",
+    default = getgenv().headlessEnabled == true,
+    callback = function(v)
+        getgenv().headlessEnabled = v
+        if player.Character then ApplyNoHead(player.Character) end
+    end,
+})
+
+FXGroup1:create_toggle("no_legs", {
+    title = "No Legs 无脚",
+    default = getgenv().noLegsEnabled == true,
+    callback = function(v)
+        getgenv().noLegsEnabled = v
+        if player.Character then ApplyNoLegs(player.Character) end
+    end,
+})
+
+FXGroup1:create_toggle("aura", {
+    title = "Aura 光环",
+    default = getgenv().auraEnabled == true,
+    callback = function(v)
+        getgenv().auraEnabled = v
+        if player.Character then ApplyAura(player.Character) end
+    end,
+})
+
+FXGroup1:create_colorpicker("aura_color", {
+    title = "Aura Color 光环颜色",
+    default = getgenv().auraColor or Color3.fromRGB(0, 255, 255),
+    callback = function(c)
+        getgenv().auraColor = c
+        if CharFX.auraPart then
+            pcall(function() CharFX.auraPart.Color = c end)
+        end
+    end,
+})
+
 local MusicTab = SettingsCat:create_tab("Music", "rbxassetid://note")
 local MusicGroup = MusicTab:create_group("Music Player", "left")
 
