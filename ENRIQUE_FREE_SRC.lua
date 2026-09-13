@@ -397,9 +397,9 @@ local _gpdCacheEvents = {}
 local _gpdCacheAt = 0
 local _gpdCenter = { 0, 0 }
 
-local function GetParryData()
+local function GetParryData(fresh)
 local now = os.clock()
-if _gpdCacheCF and (now - _gpdCacheAt) < 0.1 then
+if not fresh and _gpdCacheCF and (now - _gpdCacheAt) < 0.1 then
 return _gpdCacheCF, _gpdCacheEvents, _gpdCenter
 end
 local viewportSize = Camera.ViewportSize
@@ -539,8 +539,8 @@ end
 -- Reused packet table: burst spam must not allocate ~2k tables/sec.
 local _packet = { nil, nil, nil, 0.5, CFrame.new(), {}, {}, false }
 
-local function BuildPacket(cap, token)
-    local cf, events, mouse = GetParryData()
+local function BuildPacket(cap, token, fresh)
+    local cf, events, mouse = GetParryData(fresh)
     cf = ApplyCurveToCFrame(cf)
     local p = _packet
     p[1] = cap[1]
@@ -584,7 +584,8 @@ local function SendParry()
     local okTok, token = pcall(_tokenize, cap[2])
     if not (okTok and token) then return false end
 
-    return FireDirect(BuildPacket(cap, token))
+    -- Real swings use live camera/aim data (never stale cached packet).
+    return FireDirect(BuildPacket(cap, token, true))
 end
 
 -- Burst fast path: context is checked once per frame by the spam loops,
@@ -598,7 +599,7 @@ local function SendParryFast()
     local okTok, token = pcall(_tokenize, cap[2])
     if not (okTok and token) then return false end
 
-    return FireDirect(BuildPacket(cap, token))
+    return FireDirect(BuildPacket(cap, token, false))
 end
 
 getgenv().ENRIQUE_SendParry=SendParry
@@ -618,61 +619,56 @@ local ParryState = setmetatable({}, {__mode="k"})
 -- ever only parried ONCE (no 2 parry), whoever reacts first wins.
 local _parryFrame = 0
 
+-- Installed after the parry functions exist: fires the swing the MOMENT the
+-- game locks the ball onto us (no waiting for the next frame = fastest
+-- possible reaction).
+local SwingNowHook = nil
+
 local function TrackBall(ball, store)
     local st = store[ball]
     if st and st.listening then return st end
-    st = { fired = false, done = false, listening = true, lastFrame = 0, firedAt = 0 }
+    st = { fired = false, done = false, listening = true, lastFrame = 0, firedAt = 0, swingCount = 0 }
     store[ball] = st
     ball:GetAttributeChangedSignal("target"):Connect(function()
         local t = store[ball]
         if not t then return end
         if ball:GetAttribute("target") ~= player.Name then
-            -- Ball left us (parried away / re-targeted): arm for its next life.
+            -- Ball left us (parried away / re-targeted): arm its next life.
             t.done = true
         else
             t.done = false
-            -- Returned to us after leaving: allow one fresh swing, but never
-            -- mid-approach double swings.
             if not t.fired or os.clock() - (t.firedAt or 0) >= 0.3 then
                 t.fired = false
             end
+            -- Reaction NOW: swing immediately if this lock is already in range.
+            if SwingNowHook then SwingNowHook(ball) end
         end
     end)
     return st
 end
 
--- Parry reach rebuilt from the original kittylol timing: the swing
--- distance scales with ball speed + ping + accuracy, so fast balls get
--- enough lead (never late/失效) and slow balls are not swung at point
--- blank. Cap 120 = even a spawn-aimed ball gets a fast swing.
--- aiPatterns adds extra reach for accelerating/curving balls.
-local function ParryReach(ball, velocity)
+-- Interception window (tested approach): swing so the ball arrives inside
+-- the parry radius (~16) exactly when our packet reaches the server.
+-- Lead = ball speed * (ping/2 + one frame), so fast balls are swung early
+-- (fast reaction) and the swing itself lands on time - never too early,
+-- never too late. Frozen balls swing only when they are on top of us.
+local function ParryWindow(ball, root, velocity)
+    local dir = root.Position - ball.Position
+    local dist = dir.Magnitude
     local speed = velocity.Magnitude
-    if speed <= 0.01 then return 10 end
-    local ping = LastPing or 100
-    local capped = math.min(math.max(speed - 9.5, 0), 650)
-    local div = (2.4 + capped * 0.002) * (0.75 + (math.clamp(RuntimeAccuracy, 1, 100) - 1) * (3 / 99))
-    local modern = math.clamp(ping / 100, 5, 17) + math.max(speed / div, 9.5)
-    local legacy = speed / math.max(2.4, RuntimeAccuracy / 8) + ping / 10
-    local result = math.max(modern, legacy)
+    if speed < 0.01 then
+        return dist <= 16, dist
+    end
+    -- Must be heading our way (ignore passing balls).
+    if velocity:Dot(dir) < -5 then return false, dist end
+    local pingSec = (LastPing or 100) / 1000
+    local transit = math.clamp(pingSec * 0.5 + 1 / 60, 0.016, 0.12)
+    local lead = math.clamp(speed * transit, 0, 22)
+    local radius = 16 + lead
     if cfg.aiDetection then
-        result = result + math.clamp(speed * AI.extra, 0, 30)
+        radius = radius + math.clamp(speed * (AI.extra or 0), 0, 8)
     end
-    if cfg.aiPatterns then
-        local now = os.clock()
-        local h = AI.motion[ball]
-        if h then
-            local dt = math.clamp(now - h.time, 1 / 240, 0.15)
-            local acc = (velocity - h.velocity).Magnitude / dt
-            local turn = 0
-            if speed > 0 and h.velocity.Magnitude > 0 then
-                turn = math.acos(math.clamp(velocity.Unit:Dot(h.velocity.Unit), -1, 1))
-            end
-            result = result + math.clamp(acc * 0.0015 + speed * turn * 0.07, 0, 20)
-        end
-        AI.motion[ball] = { velocity = velocity, time = now }
-    end
-    return math.min(result, 120)
+    return dist <= radius, dist
 end
 
 local function ProcessAutoParry(ball)
@@ -686,24 +682,33 @@ local st = TrackBall(ball, ParryState)
 if st.done or st.lastFrame == _parryFrame then return end
 local velocity = z.VectorVelocity
 local speed = velocity.Magnitude
--- One swing per ball-life, fired the moment the ball is aimed at us and
--- inside the parry lead (speeds up with the ball, so reaction is always
--- fast and the swing connects: not too early, not too late). No follow-up
--- swings = no double parry, ever.
 if not st.fired then
-    local dist = (charPart.Position - ball.Position).Magnitude
-    if speed < 0.01 then
-        if dist > 15 then return end
-    else
-        local reach = math.max(ParryReach(ball, velocity), 15)
-        if dist > reach then return end
-    end
+    local want, dist = ParryWindow(ball, charPart, velocity)
+    if not want then return end
     st.fired = true
+    st.swingCount = 1
     st.firedAt = os.clock()
     st.distAtFire = dist
     st.lastFrame = _parryFrame
     FireParry()
+    return
 end
+-- Safety net, ONLY for a real miss (max 2 swings total): the swing is
+-- gone, the ball is still OURS, still approaching and now on top of us
+-- (<=18) - one final swing. A connected parry reflects/re-targets the
+-- ball, which cancels this.
+if st.swingCount >= 2 then return end
+if ball:GetAttribute("target") ~= player.Name then st.done = true return end
+if speed < 0.01 then return end
+if velocity:Dot(charPart.Position - ball.Position) < 0 then st.done = true return end
+local dist = (charPart.Position - ball.Position).Magnitude
+if dist > 18 then return end
+local pingSec = (LastPing or 100) / 1000
+if os.clock() - st.firedAt < 0.10 + pingSec then return end
+st.swingCount = 2
+st.firedAt = os.clock()
+st.lastFrame = _parryFrame
+FireParry()
 end
 
 local manualTBActive = false
@@ -718,25 +723,45 @@ local st = TrackBall(ball, ParryState)
 if st.done or st.lastFrame == _parryFrame then return end
 local velocity = z.VectorVelocity
 local speed = velocity.Magnitude
--- Trigger bot = fastest reaction: swing as soon as the ball is aimed at
--- us, one swing per ball-life. TB Range only raises the max swing distance
--- (default already covers the whole court), no double swings.
 if not st.fired then
-    local dist = (root.Position - ball.Position).Magnitude
-    if speed < 0.01 then
-        if dist > 15 then return end
-    else
-        local reach = math.max(ParryReach(ball, velocity), cfg.tbRange or 24)
-        if dist > math.min(reach, 120) then return end
+    local want, dist = ParryWindow(ball, root, velocity)
+    -- TB Range slider = extra aggressiveness: raises the swing distance
+    -- (24 = the normal fast window, 100 = swing as soon as it is aimed).
+    if want and (cfg.tbRange or 24) > 24 then
+        local margin = (cfg.tbRange or 24) - 24
+        want = dist <= (16 + margin) + math.clamp(speed * 0.0167 + (LastPing or 100) / 1000 * 0.5, 0, 22)
     end
+    if not want then return end
     st.fired = true
+    st.swingCount = 1
     st.firedAt = os.clock()
     st.distAtFire = dist
     st.lastFrame = _parryFrame
     FireParry()
+    return
 end
+-- Same real-miss safety net as Auto Parry (max 2 swings total).
+if st.swingCount >= 2 then return end
+if ball:GetAttribute("target") ~= player.Name then st.done = true return end
+if speed < 0.01 then return end
+if velocity:Dot(root.Position - ball.Position) < 0 then st.done = true return end
+local dist = (root.Position - ball.Position).Magnitude
+if dist > 18 then return end
+local pingSec = (LastPing or 100) / 1000
+if os.clock() - st.firedAt < 0.10 + pingSec then return end
+st.swingCount = 2
+st.firedAt = os.clock()
+st.lastFrame = _parryFrame
+FireParry()
 end
 
+-- Fastest reaction: the instant the game points the ball at us, swing
+-- without waiting for the next heartbeat frame.
+SwingNowHook = function(ball)
+    if not RemoteReady() then return end
+    if cfg.parry and not spamActive then pcall(ProcessAutoParry, ball) end
+    if cfg.trigger or manualTBActive then pcall(ProcessTriggerBot, ball) end
+end
 
 local AS={target=nil,targetTime=0,lastCheck=0,lastFire=0,trackedBall=nil,targetConn=nil,engagedTarget=nil,abortCycle=false}
 local function ResetAutoSpamTargetGuard()
