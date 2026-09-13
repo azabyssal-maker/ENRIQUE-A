@@ -615,12 +615,13 @@ end
 
 local ParryState = setmetatable({}, {__mode="k"})
 
--- Shared per-ball state: TB and Auto Parry both use this, so one ball is
--- never swung twice for the SAME approach (no double parry), whoever
--- reacts first wins. A NEW approach (ball re-locked on us / ball coming
--- back) resets the counter, so close-range clashes swing fast.
+-- Shared per-ball state: TB and Auto Parry share it, so only the first
+-- reactor swings. Staircase firing: swing as soon as the ball enters the
+-- big reach (fast reaction), then again at 26/18/12 as it closes, ONLY
+-- while it is still ours and still coming. A reflected ball (moving away)
+-- stops everything instantly, so a successful parry = one swing.
 local _parryFrame = 0
-local minParryGap = 0.06
+local minParryGap = 0.05
 
 -- Installed after the parry functions exist: fires the swing the MOMENT the
 -- game locks the ball onto us (no waiting for the next frame = fastest
@@ -630,16 +631,15 @@ local SwingNowHook = nil
 local function TrackBall(ball, store)
     local st = store[ball]
     if st and st.listening then return st end
-    st = { fired = false, done = false, listening = true, lastFrame = 0, swingCount = 0, lastSwing = 0, away = false, frozenFired = false }
+    st = { fired = false, done = false, listening = true, lastFrame = 0, lastSwing = 0, nextStep = nil, away = false, frozenFired = false }
     store[ball] = st
     ball:GetAttributeChangedSignal("target"):Connect(function()
         local t = store[ball]
         if not t then return end
-        local nowTarget = ball:GetAttribute("target")
-        if nowTarget == player.Name then
-            -- Re-locked on us = a fresh attack: swing again immediately.
+        if ball:GetAttribute("target") == player.Name then
+            -- Re-locked on us = a fresh attack: fresh staircase, swing now.
             t.done = false
-            t.swingCount = 0
+            t.nextStep = nil
             if SwingNowHook then SwingNowHook(ball) end
         else
             t.done = true
@@ -648,10 +648,9 @@ local function TrackBall(ball, store)
     return st
 end
 
--- Aggressive parry reach (original kittylol formula): the swing distance
--- grows hard with ball speed + ping, so a fast ball is swung the moment it
--- enters range = maximum reaction. Floor 16+lead guarantees even slow balls
--- are swung on time. aiDetection pushes it further for curving balls.
+-- Aggressive reach (original kittylol formula): fast balls are swung the
+-- moment they enter range = maximum reaction, capped at 60 so the swing
+-- still lands inside the server's parry radius (not wasted at 100+).
 local function ParryReach(velocity)
     local speed = velocity.Magnitude
     if speed < 0.01 then return 16 end
@@ -666,7 +665,31 @@ local function ParryReach(velocity)
     if cfg.aiDetection then
         result = result + math.clamp(speed * (AI.extra or 0), 0, 30)
     end
-    return math.min(result, 120)
+    return math.min(result, 60)
+end
+
+-- One swing whenever the ball crosses the next staircase step. Steps walk
+-- DOWN from the big reach (fast early swing) to 26/18/12 (guaranteed
+-- catch), so we never wait until the ball is already on us.
+local function StaircaseFire(st, dist, reach, pingSec)
+    local step = st.nextStep
+    if step == nil then step = reach end
+    if dist > step then return false end
+    local now = os.clock()
+    -- First swing: as fast as allowed. Later steps wait long enough for a
+    -- successful reflect to reach us, so we never double-swing a hit ball.
+    local gap = minParryGap
+    if st.lastSwing > 0 then gap = math.max(minParryGap, pingSec * 0.75) end
+    if now - (st.lastSwing or 0) < gap then return false end
+    st.lastSwing = now
+    st.lastFrame = _parryFrame
+    FireParry()
+    if step > 26 then step = 26
+    elseif step > 18 then step = 18
+    elseif step > 12 then step = 12
+    else step = 0 end
+    st.nextStep = step
+    return true
 end
 
 local function ProcessAutoParry(ball)
@@ -695,36 +718,21 @@ end
 st.frozenFired = false
 
 -- Still coming at us? (Ignore passes.)
-local approaching = velocity:Dot(dir) >= -5
-if not approaching then
+if velocity:Dot(dir) < -5 then
     st.away = true
     return
 end
 if st.away then
-    -- It left and is now heading back: fresh attack, swing again.
+    -- It left and is now heading back: fresh attack, fresh staircase.
     st.away = false
-    st.swingCount = 0
+    st.nextStep = nil
 end
 
 -- Threat gate: locked on us, or point blank no matter the lock.
 if not targetUs and dist > 10 then return end
 
--- Big-reach first swing (fast reaction) + point-blank follow-up ONLY if
--- the first one really missed (max 2 swings per approach).
-local canFire = false
-local now = os.clock()
-if st.swingCount == 0 then
-    canFire = dist <= ParryReach(velocity) and (now - st.lastSwing) >= minParryGap
-else
-    local pingSec = (LastPing or 100) / 1000
-    canFire = dist <= 14 and (now - st.lastSwing) >= pingSec + 0.05
-end
-if not canFire then return end
-
-st.swingCount = st.swingCount + 1
-st.lastSwing = now
-st.lastFrame = _parryFrame
-FireParry()
+if st.nextStep == nil then st.nextStep = ParryReach(velocity) end
+StaircaseFire(st, dist, st.nextStep, (LastPing or 100) / 1000)
 end
 
 local manualTBActive = false
@@ -753,38 +761,24 @@ if speed < 0.01 then
 end
 st.frozenFired = false
 
-local approaching = velocity:Dot(dir) >= -5
-if not approaching then
+if velocity:Dot(dir) < -5 then
     st.away = true
     return
 end
 if st.away then
     st.away = false
-    st.swingCount = 0
+    st.nextStep = nil
 end
 
 if not targetUs and dist > 10 then return end
 
-local canFire = false
-local now = os.clock()
-if st.swingCount == 0 then
-    local reach = ParryReach(velocity)
-    -- TB Range slider = extra aggressiveness (24 = normal, 100 = swing as
-    -- soon as the ball is aimed at us from across the court).
-    if (cfg.tbRange or 24) > 24 then
-        reach = math.min(reach + ((cfg.tbRange or 24) - 24), 120)
-    end
-    canFire = dist <= reach and (now - st.lastSwing) >= minParryGap
-else
-    local pingSec = (LastPing or 100) / 1000
-    canFire = dist <= 14 and (now - st.lastSwing) >= pingSec + 0.05
+local reach = ParryReach(velocity)
+-- TB Range slider = extra aggressiveness (24 = normal, 100 = swing from
+-- across the court).
+if (cfg.tbRange or 24) > 24 then
+    reach = math.min(reach + ((cfg.tbRange or 24) - 24), 120)
 end
-if not canFire then return end
-
-st.swingCount = st.swingCount + 1
-st.lastSwing = now
-st.lastFrame = _parryFrame
-FireParry()
+StaircaseFire(st, dist, st.nextStep or reach, (LastPing or 100) / 1000)
 end
 
 -- Fastest reaction: the instant the game points the ball at us, swing
