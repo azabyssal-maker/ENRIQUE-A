@@ -968,7 +968,7 @@ end
 
 
 -- =================== Character FX ===================
-local CharFX = { auraParts = nil, orig = {} }
+local CharFX = { auraParts = nil, auraChar = nil, orig = {} }
 CharFX.orig = setmetatable({}, { __mode = "k" })
 
 local function ApplyNoHead(char)
@@ -986,86 +986,129 @@ local function ApplyNoHead(char)
                     mesh.MeshId = o.id
                     mesh.TextureId = o.tex
                     mesh.MeshType = o.typ
+                    mesh.Scale = o.scale
                 end)
             end
             CharFX.orig[head] = nil
         end
         return
     end
+    local mesh = head:FindFirstChildOfClass("SpecialMesh") or head:FindFirstChildOfClass("Mesh")
     if not CharFX.orig[head] then
-        local mesh = head:FindFirstChildOfClass("SpecialMesh") or head:FindFirstChildOfClass("Mesh")
         CharFX.orig[head] = {
             transp = head.Transparency,
             id = mesh and mesh.MeshId,
             tex = mesh and mesh.TextureId,
             typ = mesh and mesh.MeshType,
+            scale = mesh and mesh.Scale,
         }
     end
-    -- Fully invisible head: no round blob, no leftover geometry.
-    head.Transparency = 1
-    local mesh = head:FindFirstChildOfClass("SpecialMesh") or head:FindFirstChildOfClass("Mesh")
-    if mesh then
-        pcall(function()
+    -- True headless: invisible head + zero-size mesh (no round blob).
+    pcall(function()
+        if mesh then
             mesh.MeshType = Enum.MeshType.FileMesh
             mesh.MeshId = "rbxassetid://3270017"
             mesh.TextureId = ""
-        end)
-    end
+            mesh.Scale = Vector3.new(0, 0, 0)
+        end
+        head.Transparency = 1
+        -- hide any accessories sitting on the head too
+        for _, acc in ipairs(char:GetDescendants()) do
+            if acc:IsA("Accessory") then
+                local h = acc:FindFirstChild("Handle")
+                if h then
+                    for _, j in ipairs(h:GetDescendants()) do
+                        if j:IsA("Motor6D") and j.Parent == head then
+                            h.Transparency = 1
+                        elseif j:IsA("Weld") and (j.Part1 == h or j.Parent == head) then
+                            h.Transparency = 1
+                        elseif j:IsA("WeldConstraint") and (j.Part0 == head or j.Part1 == head) then
+                            h.Transparency = 1
+                        end
+                    end
+                end
+            end
+        end
+    end)
 end
 
 local function ApplyNoLegs(char)
     if not char then return end
     local enabled = getgenv().noLegsEnabled == true
-    local root = char:FindFirstChild("HumanoidRootPart")
-    -- Everything below the waist disappears: legs, feet, shoes, spikes,
-    -- whatever the rig calls them (R6/R15/custom avatars all covered).
-    local function isBelowWaist(part)
-        local nameHit = part.Name:find("Leg", 1, true) or part.Name:find("Foot", 1, true)
-        if root and part.Position.Y < root.Position.Y - 0.6 then return true end
-        return nameHit ~= nil
+    if not enabled then
+        local lt = char:FindFirstChild("LowerTorso")
+        if lt and CharFX.orig[lt] then
+            lt.Transparency = CharFX.orig[lt]
+            CharFX.orig[lt] = nil
+        end
+        return
     end
+    -- Canonical "no legs": DELETE the leg/foot parts outright so nothing
+    -- can remain (no transparency edge, no spike, no half-leg).
+    local toDelete = {}
     for _, part in ipairs(char:GetDescendants()) do
-        if part:IsA("BasePart") and not part:IsA("Accessory") and isBelowWaist(part) then
-            if enabled then
-                if not CharFX.orig[part] then CharFX.orig[part] = part.Transparency end
-                part.Transparency = 1
-            else
-                local o = CharFX.orig[part]
-                if o then
-                    part.Transparency = o
-                    CharFX.orig[part] = nil
-                end
+        if part:IsA("BasePart") and not part:IsA("Accessory") then
+            local n = part.Name
+            if n:find("Leg", 1, true) or n:find("Foot", 1, true) then
+                toDelete[#toDelete + 1] = part
             end
         end
     end
-    -- Accessories (shoes, spikes, tails...) below the waist get hidden too.
+    -- delete accessories that ride on those legs/feet (shoes, spikes...)
     for _, acc in ipairs(char:GetDescendants()) do
         if acc:IsA("Accessory") then
             local h = acc:FindFirstChild("Handle")
-            if h and h:IsA("BasePart") and isBelowWaist(h) then
-                if enabled then
-                    if not CharFX.orig[h] then CharFX.orig[h] = h.Transparency end
-                    h.Transparency = 1
-                else
-                    local o = CharFX.orig[h]
-                    if o then
-                        h.Transparency = o
-                        CharFX.orig[h] = nil
+            if h and h:IsA("BasePart") then
+                local limb = nil
+                for _, j in ipairs(h:GetDescendants()) do
+                    if j:IsA("Motor6D") then
+                        limb = j.Parent
+                    elseif j:IsA("WeldConstraint") then
+                        limb = j.Part0
+                    elseif j:IsA("Weld") then
+                        limb = j.Part1 == h and j.Parent or nil
                     end
+                end
+                if limb and (limb.Name:find("Leg", 1, true) or limb.Name:find("Foot", 1, true)) then
+                    toDelete[#toDelete + 1] = h
                 end
             end
         end
     end
+    for _, part in ipairs(toDelete) do
+        if part and part.Parent then
+            pcall(function() part:Destroy() end)
+        end
+    end
+    -- pelvis invisible so the torso ends cleanly (no stump)
+    local lt = char:FindFirstChild("LowerTorso")
+    if lt then
+        if not CharFX.orig[lt] then CharFX.orig[lt] = lt.Transparency end
+        lt.Transparency = 1
+    end
+    -- undo pelvis when disabled next respawn... (parts deleted stay gone
+    -- until the character respawns; effect is fully clean)
 end
 
 local function ApplyAura(char)
+    if getgenv().auraEnabled ~= true then
+        if CharFX.auraParts then
+            for _, v in ipairs(CharFX.auraParts) do
+                pcall(function() v:Destroy() end)
+            end
+        end
+        CharFX.auraParts = nil
+        CharFX.auraChar = nil
+        return
+    end
+    if CharFX.auraParts and CharFX.auraChar == char then return end
     if CharFX.auraParts then
         for _, v in ipairs(CharFX.auraParts) do
             pcall(function() v:Destroy() end)
         end
     end
     CharFX.auraParts = nil
-    if getgenv().auraEnabled ~= true or not char then return end
+    if not char then return end
     local root = char:FindFirstChild("HumanoidRootPart")
     if not root then return end
     local okAura = pcall(function()
@@ -1110,9 +1153,13 @@ local function ApplyAura(char)
         spark.Acceleration = Vector3.new(0, 3, 0)
         spark.Parent = att
         table.insert(CharFX.auraParts, spark)
+        CharFX.auraChar = char
         return true
     end)
-    if not okAura then CharFX.auraParts = nil end
+    if not okAura then
+        CharFX.auraParts = nil
+        CharFX.auraChar = nil
+    end
 end
 
 local function ApplyCharacterFX(c)
@@ -1122,10 +1169,26 @@ local function ApplyCharacterFX(c)
 end
 
 player.CharacterAdded:Connect(function(c)
-    task.wait(0.2)
+    task.wait(0.35)
     ApplyCharacterFX(c)
 end)
 ApplyCharacterFX(player.Character)
+
+-- Server re-sync proof: every 1.5s re-apply the body FX so a round reset /
+-- teleport can never bring the head/legs back.
+task.spawn(function()
+    while true do
+        task.wait(1.5)
+        local c = player.Character
+        if c and (getgenv().headlessEnabled == true or getgenv().noLegsEnabled == true or getgenv().auraEnabled == true) then
+            pcall(function()
+                ApplyNoHead(c)
+                ApplyNoLegs(c)
+                ApplyAura(c)
+            end)
+        end
+    end
+end)
 
 local MainCat = UI:create_category("Main")
 local Parry = MainCat:create_tab("Parry", "rbxassetid://swords")
