@@ -629,12 +629,15 @@ local fire = false
 if velocity.Magnitude < 0.01 then
     fire = (charPart.Position - ball.Position).Magnitude <= 20
 else
-    -- Fixed-distance trigger: fire as soon as the ball closes to ~16 studs of
-    -- the predicted impact point. Speed and Accuracy never change reaction
-    -- time, this is always the fastest clean parry.
+    -- Speed-scaled fast trigger: fire ~0.12s (+ping) before impact so the
+    -- packet reaches the server in time. Fast balls trigger earlier, slow
+    -- balls wait until close. One send per ball = still no 2 parry.
     local lead = math.clamp((LastPing or 100) / 1000 + 1 / 60 + 0.02, 0.02, 0.08)
     local predicted = ball.Position + velocity * lead
-    fire = (charPart.Position - predicted).Magnitude <= 16
+    local dist = (charPart.Position - predicted).Magnitude
+    local speed = velocity.Magnitude
+    local reaction = 0.12 + math.clamp((LastPing or 100) / 350, 0, 0.10)
+    fire = dist <= math.min(speed * reaction + 6, 46)
 end
 if fire then
     local st = TrackBall(ball, ParryState)
