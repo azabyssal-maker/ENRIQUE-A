@@ -631,12 +631,18 @@ local function TrackBall(ball, store)
     return st
 end
 
-local function AIFire(st, now)
+-- Slow balls stay in the window longer, so refire slower for them;
+-- fast balls get a quick second chance. Never refire while still far.
+local function RefireDelay(speed)
+    return math.clamp(0.10 + (120 - speed) * 0.0015, 0.06, 0.4)
+end
+
+local function AIFire(st, now, refireDelay, close)
     if not st.fired then
         st.fired = true
         st.firedAt = now
         SendParry()
-    elseif now - st.firedAt >= 0.08 and st.tries < 3 then
+    elseif now - st.firedAt >= refireDelay and st.tries < 3 and close then
         st.firedAt = now
         st.tries = st.tries + 1
         SendParry()
@@ -660,7 +666,7 @@ if dist <= threshold or dist <= 10 then
     if cfg.aiParry then
         local st = TrackBall(ball, APState)
         if st.done or st.lastFrame == _parryFrame then return end
-        AIFire(st, os.clock())
+        AIFire(st, os.clock(), RefireDelay(velocity.Magnitude), (dist <= threshold * 0.6 or dist <= 8))
         st.lastFrame = _parryFrame
     else
         local st = APState[ball]
@@ -693,7 +699,7 @@ local range = math.max(cfg.tbRange or 24, 8)
 if dist <= range then
     local st = TrackBall(ball, TBState)
     if st.done or st.lastFrame == _parryFrame then return end
-    AIFire(st, os.clock())
+    AIFire(st, os.clock(), RefireDelay(velocity.Magnitude), (dist <= range * 0.6 or dist <= 8))
     st.lastFrame = _parryFrame
 end
 end
