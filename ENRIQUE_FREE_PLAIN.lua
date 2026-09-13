@@ -297,7 +297,18 @@ task.spawn(function()
 end)
 
 local AI={ping=100,frame=1/60,jitter=0,extra=0,last=0,motion=setmetatable({},{__mode="k"})}
-RunService.Heartbeat:Connect(function(dt) local old=AI.frame AI.frame=old+((dt or 1/60)-old)*.12 AI.jitter=AI.jitter+(math.abs((dt or 1/60)-old)-AI.jitter)*.15 if os.clock()-AI.last>.25 then AI.last=os.clock() local p=LastPing AI.ping=AI.ping+(p-AI.ping)*.22 end if not cfg.aiDetection then AI.extra=0 elseif AI.ping>=220 or AI.frame>=.065 then AI.extra=.05 elseif AI.ping>=140 or AI.frame>=.035 then AI.extra=.028 elseif AI.ping>=85 then AI.extra=.012 else AI.extra=0 end end)
+RunService.Heartbeat:Connect(function(dt)
+ local old=AI.frame AI.frame=old+((dt or 1/60)-old)*.12 AI.jitter=AI.jitter+(math.abs((dt or 1/60)-old)-AI.jitter)*.15
+ if os.clock()-AI.last>.25 then AI.last=os.clock() local p=LastPing AI.ping=AI.ping+(p-AI.ping)*.3 end
+ local target=0
+ if cfg.aiDetection then
+  if AI.ping>=220 or AI.frame>=.065 then target=.05
+  elseif AI.ping>=140 or AI.frame>=.035 then target=.028
+  elseif AI.ping>=85 then target=.012 end
+ end
+ -- Smooth target tracking: AI reach never jumps, so parry timing stays stable.
+ AI.extra = AI.extra + (target - AI.extra) * 0.15
+end)
 
 local function ClosestOpponent() local root=player.Character and player.Character.PrimaryPart local alive=workspace:FindFirstChild("Alive") if not root or not alive then return end local best,res=math.huge,nil for _,c in ipairs(alive:GetChildren()) do if c~=player.Character and c.PrimaryPart then local d=(c.PrimaryPart.Position-root.Position).Magnitude if d<best then best,res=d,c end end end return res end
 
@@ -832,6 +843,8 @@ do
         if saved.manual_tb ~= nil then cfg.manualTB = saved.manual_tb == true end
         if saved.target_change_stop ~= nil then cfg.targetChangeStop = saved.target_change_stop == true end
         if saved.animation_fix ~= nil then cfg.animfix = saved.animation_fix == true end
+        if saved.ai_detection ~= nil then cfg.aiDetection = saved.ai_detection == true end
+        if saved.ai_patterns ~= nil then cfg.aiPatterns = saved.ai_patterns == true end
         if saved.parry_threshold ~= nil then cfg.spamThreshold = tonumber(saved.parry_threshold) or cfg.spamThreshold end
         if saved.distance_multiplier ~= nil then cfg.distanceMultiplier = math.max(tonumber(saved.distance_multiplier) or 100, 1) end
         if saved.spam_rate ~= nil then cfg.spamRate = math.clamp(tonumber(saved.spam_rate) or 100, 1, 500) end
@@ -978,6 +991,20 @@ ParryRight:create_slider("distance_multiplier", {
     default = math.round(math.max(cfg.distanceMultiplier or 1.0, 0.8) * 100),
     rounding = true,
     callback = function(value) cfg.distanceMultiplier = math.max(value / 100, 0.8) end,
+})
+
+local AIMonitor = Parry:create_group("AI Monitor", "right")
+
+AIMonitor:create_toggle("ai_detection", {
+    title = "AI Detection",
+    default = cfg.aiDetection == true,
+    callback = function(value) cfg.aiDetection = value end,
+})
+
+AIMonitor:create_toggle("ai_patterns", {
+    title = "AI Patterns",
+    default = cfg.aiPatterns == true,
+    callback = function(value) cfg.aiPatterns = value end,
 })
 
 local TBGroup = Parry:create_group("Trigger Bot", "left")
