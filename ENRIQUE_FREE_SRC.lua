@@ -67,7 +67,7 @@ cfg.spamThreshold = math.max(0, cfg.spamThreshold or 0)
 
 -- Shared burst size for Auto Spam and Manual Spam (Spam Strength slider).
 local function SpamBurstCount(dt)
- return math.clamp(math.floor(dt * (400 + (cfg.spamRate or 100) * 15)) + 1, 3, 28)
+ return math.clamp(math.floor(dt * (400 + (cfg.spamRate or 100) * 15)) + 1, 3, 20)
 end
 cfg.distanceMultiplier = math.max(0.8, cfg.distanceMultiplier or 1.0)
 
@@ -441,9 +441,17 @@ for _, Function in getgc(true) do
     if _token then break end
 end
 
+local _tokKeyCache = {}
+
 local function _tokenize(_remote_uid)
     local time = tostring(math.floor(workspace:GetServerTimeNow() * 100))
-    local key = _token(_remote_uid, 'TIME')
+    local key = _tokKeyCache[_remote_uid]
+    if not key then
+        local okKey, k = pcall(_token, _remote_uid, 'TIME')
+        if not (okKey and k) then return nil end
+        key = k
+        _tokKeyCache[_remote_uid] = key
+    end
     local characters = table.create(#time)
     for index = 1, #time do
         characters[index] = string.char(bit32.bxor(
