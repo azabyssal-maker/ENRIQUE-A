@@ -65,13 +65,27 @@ spamBindKey = "P"
 cfg.spamThreshold = math.max(0, cfg.spamThreshold or 0)
 
 -- Shared burst size for Auto Spam and Manual Spam (Spam Strength slider).
--- Ping-adaptive pace: when ping rises the burst backs off so the flood never
--- sticks the server (lower ping = packets land faster = feels quicker).
+-- AIMD congestion control: ping healthy = full-speed burst (fast);
+-- ping climbs = back off hard and hold, let the connection recover;
+-- ping recovers = ramp back up. Fast when possible, never stays lagged.
+local _spamPace = 1.0
+local _spamPaceUntil = 0
 local function SpamBurstCount(dt)
  local ping = LastPing or 100
- local pace = math.clamp(1.25 - ping / 500, 0.45, 1.25)
- local n = math.floor(dt * (60 + (cfg.spamRate or 100) * 2.2) * pace) + 1
- return math.clamp(n, 2, 12)
+ local now = os.clock()
+ if now >= _spamPaceUntil then
+  if ping > 230 then
+   _spamPace = math.max(0.25, _spamPace * 0.6)
+   _spamPaceUntil = now + 1.2
+  elseif ping > 150 then
+   _spamPace = math.max(0.35, _spamPace * 0.8)
+   _spamPaceUntil = now + 0.8
+  elseif ping < 80 and _spamPace < 1 then
+   _spamPace = math.min(1, _spamPace + 0.1)
+  end
+ end
+ local n = math.floor(dt * (80 + (cfg.spamRate or 100) * 3.2) * _spamPace) + 1
+ return math.clamp(n, 2, 16)
 end
 cfg.distanceMultiplier = math.max(0.8, cfg.distanceMultiplier or 1.0)
 
