@@ -621,84 +621,30 @@ local _parryFrame = 0
 local function TrackBall(ball, store)
     local st = store[ball]
     if st and st.listening then return st end
-    st = { fired = false, done = false, listening = true, lastFrame = 0, refireCount = 0, newBall = true, away = false }
+    st = { fired = false, done = false, listening = true, lastFrame = 0, firedAt = 0 }
     store[ball] = st
     ball:GetAttributeChangedSignal("target"):Connect(function()
         local t = store[ball]
         if not t then return end
         if ball:GetAttribute("target") ~= player.Name then
-            -- Ball stopped being ours: our parry connected (or it got
-            -- re-targeted) -> never double-parry this ball in this life.
+            -- Ball left us (parried away / re-targeted): arm for its next life.
             t.done = true
-            t.success = true
         else
             t.done = false
-            -- Quick ping-pong retargets do NOT reset the swing; only a real
-            -- re-shot (>=0.3s after our last parry) gets a fresh fire.
+            -- Returned to us after leaving: allow one fresh swing, but never
+            -- mid-approach double swings.
             if not t.fired or os.clock() - (t.firedAt or 0) >= 0.3 then
                 t.fired = false
-                t.refireCount = 0
             end
         end
     end)
     return st
 end
 
--- Real-miss follow-up: ONLY re-swings when the ball genuinely still lives,
--- is still OURS and still closing on us. If our parry connected, the ball
--- reflects away (or re-targets) -> we cancel, so no constant double parry.
--- Frozen/stalled balls are never hammered.
-local function TryRefire(st, ball, charPart, velocity)
- if st.done or not st.fired then return end
- if st.lastFrame == _parryFrame then return end
- if ball:GetAttribute("target") ~= player.Name then
-  st.done = true
-  st.success = true
-  return
- end
-
- local dir = charPart.Position - ball.Position
- local dist = dir.Magnitude
- local speed = velocity.Magnitude
-
- -- Frozen/stalled ball: give it time, never spam it.
- if speed < 2 then return end
-
- if velocity:Dot(dir) <= 0 then
-  -- Moving away: our parry connected or the ball passed by. Stop swinging
-  -- now; if it ever comes back, the next approach starts a fresh cycle.
-  st.away = true
-  return
- end
-
- if st.away then
-  -- A rebound is coming back at us: allow one clean fresh parry attempt.
-  st.away = false
-  if os.clock() - (st.firedAt or 0) >= 0.35 then
-   st.fired = false
-   st.refireCount = 0
-   return
-  end
- end
-
- if st.refireCount >= 2 then return end
- if dist > 24 then return end
-
- local now = os.clock()
- local pingLead = math.clamp((LastPing or 100) / 1000, 0.05, 0.2)
- local delay = 0.05 + pingLead * 0.5 + st.refireCount * 0.04
- if now - (st.firedAt or now) < delay then return end
-
- st.refireCount = st.refireCount + 1
- st.firedAt = now
- st.lastFrame = _parryFrame
- FireParry()
-end
-
 -- Parry reach rebuilt from the original kittylol timing: the swing
 -- distance scales with ball speed + ping + accuracy, so fast balls get
 -- enough lead (never late/失效) and slow balls are not swung at point
--- blank. Capped at 40 so we never swing into the air at far spawns.
+-- blank. Cap 120 = even a spawn-aimed ball gets a fast swing.
 -- aiPatterns adds extra reach for accelerating/curving balls.
 local function ParryReach(ball, velocity)
     local speed = velocity.Magnitude
@@ -726,7 +672,7 @@ local function ParryReach(ball, velocity)
         end
         AI.motion[ball] = { velocity = velocity, time = now }
     end
-    return math.min(result, 40)
+    return math.min(result, 120)
 end
 
 local function ProcessAutoParry(ball)
@@ -740,33 +686,24 @@ local st = TrackBall(ball, ParryState)
 if st.done or st.lastFrame == _parryFrame then return end
 local velocity = z.VectorVelocity
 local speed = velocity.Magnitude
+-- One swing per ball-life, fired the moment the ball is aimed at us and
+-- inside the parry lead (speeds up with the ball, so reaction is always
+-- fast and the swing connects: not too early, not too late). No follow-up
+-- swings = no double parry, ever.
 if not st.fired then
     local dist = (charPart.Position - ball.Position).Magnitude
     if speed < 0.01 then
-        -- Frozen ball on top of us: one swing, no repeat.
-        if dist <= 10 then
-            st.fired = true
-            st.firedAt = os.clock()
-            st.distAtFire = dist
-            st.lastFrame = _parryFrame
-            FireParry()
-        end
-        return
+        if dist > 15 then return end
+    else
+        local reach = math.max(ParryReach(ball, velocity), 15)
+        if dist > reach then return end
     end
-    -- Swing with real lead: reach grows with ball speed/ping, floor 15 so
-    -- even slow balls get swung in time (original kittylol timing).
-    local reach = math.max(ParryReach(ball, velocity), 15)
-    if dist <= reach then
-        st.fired = true
-        st.firedAt = os.clock()
-        st.distAtFire = dist
-        st.lastFrame = _parryFrame
-        FireParry()
-    end
-    return
+    st.fired = true
+    st.firedAt = os.clock()
+    st.distAtFire = dist
+    st.lastFrame = _parryFrame
+    FireParry()
 end
--- Real-miss follow-ups only (a successful parry cancels them).
-TryRefire(st, ball, charPart, velocity)
 end
 
 local manualTBActive = false
@@ -781,34 +718,23 @@ local st = TrackBall(ball, ParryState)
 if st.done or st.lastFrame == _parryFrame then return end
 local velocity = z.VectorVelocity
 local speed = velocity.Magnitude
+-- Trigger bot = fastest reaction: swing as soon as the ball is aimed at
+-- us, one swing per ball-life. TB Range only raises the max swing distance
+-- (default already covers the whole court), no double swings.
 if not st.fired then
     local dist = (root.Position - ball.Position).Magnitude
     if speed < 0.01 then
-        -- Frozen ball on top of us: one swing, no repeat.
-        if dist <= 10 then
-            st.fired = true
-            st.firedAt = os.clock()
-            st.distAtFire = dist
-            st.lastFrame = _parryFrame
-            FireParry()
-        end
-        return
+        if dist > 15 then return end
+    else
+        local reach = math.max(ParryReach(ball, velocity), cfg.tbRange or 24)
+        if dist > math.min(reach, 120) then return end
     end
-    -- TB max reach = TB Range slider (raise it to swing from further out);
-    -- never below the real parry lead, so fast balls are not swung late.
-    local base = math.max(ParryReach(ball, velocity), 15)
-    local reach = math.min(math.max(cfg.tbRange or 24, base), 100)
-    if dist <= reach then
-        st.fired = true
-        st.firedAt = os.clock()
-        st.distAtFire = dist
-        st.lastFrame = _parryFrame
-        FireParry()
-    end
-    return
+    st.fired = true
+    st.firedAt = os.clock()
+    st.distAtFire = dist
+    st.lastFrame = _parryFrame
+    FireParry()
 end
--- Real-miss follow-ups only (a successful parry cancels them).
-TryRefire(st, ball, root, velocity)
 end
 
 
