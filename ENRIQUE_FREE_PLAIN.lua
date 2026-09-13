@@ -296,7 +296,7 @@ task.spawn(function()
  end
 end)
 
-local AI={ping=100,frame=1/60,jitter=0,extra=0,last=0,motion=setmetatable({},{__mode="k"})}
+local AI={ping=100,frame=1/60,jitter=0,extra=0.02,last=0,motion=setmetatable({},{__mode="k"})}
 RunService.Heartbeat:Connect(function(dt)
  local old=AI.frame AI.frame=old+((dt or 1/60)-old)*.12 AI.jitter=AI.jitter+(math.abs((dt or 1/60)-old)-AI.jitter)*.15
  if os.clock()-AI.last>.25 then AI.last=os.clock() local p=LastPing AI.ping=AI.ping+(p-AI.ping)*.3 end
@@ -307,7 +307,7 @@ RunService.Heartbeat:Connect(function(dt)
   elseif AI.ping>=85 then target=.012 end
  end
  -- Smooth target tracking: AI reach never jumps, so parry timing stays stable.
- AI.extra = AI.extra + (target - AI.extra) * 0.15
+ AI.extra = AI.extra + (target - AI.extra) * 0.35
 end)
 
 local function ClosestOpponent() local root=player.Character and player.Character.PrimaryPart local alive=workspace:FindFirstChild("Alive") if not root or not alive then return end local best,res=math.huge,nil for _,c in ipairs(alive:GetChildren()) do if c~=player.Character and c.PrimaryPart then local d=(c.PrimaryPart.Position-root.Position).Magnitude if d<best then best,res=d,c end end end return res end
@@ -653,7 +653,7 @@ local function AIFire(st, now, refireDelay, close)
         st.fired = true
         st.firedAt = now
         SendParry()
-    elseif now - st.firedAt >= refireDelay and st.tries < 3 and close then
+    elseif now - st.firedAt >= refireDelay and st.tries < 1 and close then
         st.firedAt = now
         st.tries = st.tries + 1
         SendParry()
@@ -783,24 +783,50 @@ hb:Wait()
 end
 end)
 
+local _extraBallParents = nil
+local _extraBallScanAt = 0
+
+-- Balls container lookup. Falls back to a throttled full-workspace scan so
+-- Auto Parry also works in the lobby/training ground if the balls live in a
+-- non-standard folder.
+local function BallParents()
+    local res = {}
+    local b = workspace:FindFirstChild("Balls")
+    local t = workspace:FindFirstChild("TrainingBalls")
+    if b then res[#res + 1] = b end
+    if t then res[#res + 1] = t end
+    if not b and not t then
+        local now = os.clock()
+        if not _extraBallParents or now - _extraBallScanAt > 0.5 then
+            _extraBallScanAt = now
+            local found = {}
+            for _, d in ipairs(workspace:GetDescendants()) do
+                if d:GetAttribute("realBall") then
+                    local parent = d.Parent
+                    if parent then found[parent] = true end
+                end
+            end
+            _extraBallParents = found
+        end
+        if _extraBallParents then
+            for parent in pairs(_extraBallParents) do res[#res + 1] = parent end
+        end
+    end
+    return res
+end
+
 RunService.Heartbeat:Connect(function()
 _parryFrame = _parryFrame + 1
 if not RemoteReady() then return end
-local balls=workspace:FindFirstChild("Balls")
-if balls then
- for _,v in ipairs(balls:GetChildren()) do
+local matchBalls = workspace:FindFirstChild("Balls")
+local parents = BallParents()
+for pi = 1, #parents do
+ local p = parents[pi]
+ local isMatch = (p == matchBalls)
+ for _,v in ipairs(p:GetChildren()) do
   if v:GetAttribute("realBall") then
-   if (cfg.trigger or manualTBActive) then ProcessTriggerBot(v) end
+   if isMatch and (cfg.trigger or manualTBActive) then ProcessTriggerBot(v) end
    if cfg.parry and not spamActive then ProcessAutoParry(v) end
-   if v:GetAttribute("target") == player.Name then ProcessAutoSpam(v) end
-  end
- end
-end
-local training=workspace:FindFirstChild("TrainingBalls")
-if training and parryContextAllowed() then
- for _,v in ipairs(training:GetChildren()) do
-  if v:GetAttribute("realBall") then
-   if cfg.parry then ProcessAutoParry(v) end
    if v:GetAttribute("target") == player.Name then ProcessAutoSpam(v) end
   end
  end
