@@ -52,6 +52,7 @@ distanceMultiplier = 1.0,
 targetChangeStop = false,
 aiPatterns = true,
 aiDetection = true,
+ballSpeedAI = true,
 abilityDetections = true,
 animfix = true,
 showStats = true,
@@ -701,12 +702,25 @@ if not st.fired then
     if velocity.Magnitude < 0.01 then return end
     -- Speed-scaled fast trigger: FIXED lead and reaction time (no ping
     -- jitter) so every parry reacts the same - always fast, never slow.
+    -- Ball Speed AI: watch the ball's acceleration live. Speed-up balls get
+    -- intercepted earlier, decelerating/slow balls wait for closer contact.
     local lead = 0.05
     local predicted = ball.Position + velocity * lead
     local dist = (charPart.Position - predicted).Magnitude
     local speed = velocity.Magnitude
     local reaction = 0.16
-    if dist <= math.min(speed * reaction + 6, 48) then
+    local effSpeed = speed
+    if cfg.ballSpeedAI then
+        local now = os.clock()
+        local prevSpeed = st.lastSpeed or speed
+        local dt = math.max(now - (st.lastSpeedAt or now), 0.001)
+        local inst = (speed - prevSpeed) / dt
+        st.smoothAccel = (st.smoothAccel or 0) + (inst - (st.smoothAccel or 0)) * 0.3
+        st.lastSpeed = speed
+        st.lastSpeedAt = now
+        effSpeed = speed + math.clamp(st.smoothAccel * 0.25, -speed * 0.4, speed * 0.9)
+    end
+    if dist <= math.min(effSpeed * reaction + 6, 50) then
         st.fired = true
         st.firedAt = os.clock()
         st.distAtFire = dist
@@ -757,8 +771,20 @@ if not st.fired then
     local dist = (root.Position - predicted).Magnitude
     local speed = velocity.Magnitude
     -- Speed-scaled reach: the TB Range slider stays the floor for slow balls,
-    -- fast balls get intercepted much earlier (consistent, no ping jitter).
-    local reach = math.max(cfg.tbRange or 24, math.min(speed * 0.14 + 6, 48))
+    -- fast balls get intercepted much earlier. Ball Speed AI adds the same
+    -- live acceleration read so accelerating balls are cut off sooner.
+    local effSpeed = speed
+    if cfg.ballSpeedAI then
+        local now = os.clock()
+        local prevSpeed = st.lastSpeed or speed
+        local dt = math.max(now - (st.lastSpeedAt or now), 0.001)
+        local inst = (speed - prevSpeed) / dt
+        st.smoothAccel = (st.smoothAccel or 0) + (inst - (st.smoothAccel or 0)) * 0.3
+        st.lastSpeed = speed
+        st.lastSpeedAt = now
+        effSpeed = speed + math.clamp(st.smoothAccel * 0.25, -speed * 0.4, speed * 0.9)
+    end
+    local reach = math.max(cfg.tbRange or 24, math.min(effSpeed * 0.14 + 6, 50))
     if dist <= reach then
         st.fired = true
         st.firedAt = os.clock()
@@ -927,6 +953,7 @@ do
         if saved.animation_fix ~= nil then cfg.animfix = saved.animation_fix == true end
         if saved.ai_detection ~= nil then cfg.aiDetection = saved.ai_detection == true end
         if saved.ai_patterns ~= nil then cfg.aiPatterns = saved.ai_patterns == true end
+        if saved.ball_speed_ai ~= nil then cfg.ballSpeedAI = saved.ball_speed_ai == true end
         if saved.parry_threshold ~= nil then cfg.spamThreshold = tonumber(saved.parry_threshold) or cfg.spamThreshold end
         if saved.distance_multiplier ~= nil then cfg.distanceMultiplier = math.max(tonumber(saved.distance_multiplier) or 100, 1) end
         if saved.spam_rate ~= nil then cfg.spamRate = math.clamp(tonumber(saved.spam_rate) or 100, 1, 500) end
@@ -1081,6 +1108,12 @@ AIMonitor:create_toggle("ai_patterns", {
     title = "AI Patterns",
     default = cfg.aiPatterns == true,
     callback = function(value) cfg.aiPatterns = value end,
+})
+
+AIMonitor:create_toggle("ball_speed_ai", {
+    title = "Ball Speed AI",
+    default = cfg.ballSpeedAI == true,
+    callback = function(value) cfg.ballSpeedAI = value end,
 })
 
 local TBGroup = Parry:create_group("Trigger Bot", "left")
