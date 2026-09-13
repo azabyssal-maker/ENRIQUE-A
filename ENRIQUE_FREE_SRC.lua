@@ -621,17 +621,20 @@ local _parryFrame = 0
 local function TrackBall(ball, store)
     local st = store[ball]
     if st and st.listening then return st end
-    st = { fired = false, done = false, listening = true, lastFrame = 0, refireCount = 0, newBall = true }
+    st = { fired = false, done = false, listening = true, lastFrame = 0, refireCount = 0, newBall = true, away = false }
     store[ball] = st
     ball:GetAttributeChangedSignal("target"):Connect(function()
         local t = store[ball]
         if not t then return end
         if ball:GetAttribute("target") ~= player.Name then
+            -- Ball stopped being ours: our parry connected (or it got
+            -- re-targeted) -> never double-parry this ball in this life.
             t.done = true
+            t.success = true
         else
             t.done = false
             -- Quick ping-pong retargets do NOT reset the swing; only a real
-            -- re-shot (>=0.45s after our last parry) gets a fresh fire.
+            -- re-shot (>=0.3s after our last parry) gets a fresh fire.
             if not t.fired or os.clock() - (t.firedAt or 0) >= 0.3 then
                 t.fired = false
                 t.refireCount = 0
@@ -641,30 +644,70 @@ local function TrackBall(ball, store)
     return st
 end
 
--- Shared real-miss follow-up: ONLY if a parry did not connect (0.25s later
--- the ball is STILL alive, still coming at us and inside 10 studs) -> one
--- clean 2nd swing. A successful parry reflects fast, so it never shows a 2nd.
+-- Real-miss follow-up: ONLY re-swings when the ball genuinely still lives,
+-- is still OURS and still closing on us. If our parry connected, the ball
+-- reflects away (or re-targets) -> we cancel, so no constant double parry.
+-- Frozen/stalled balls are never hammered.
 local function TryRefire(st, ball, charPart, velocity)
- if st.done or not st.fired or st.refireCount >= 2 then return end
+ if st.done or not st.fired then return end
  if st.lastFrame == _parryFrame then return end
+ if ball:GetAttribute("target") ~= player.Name then
+  st.done = true
+  st.success = true
+  return
+ end
+
+ local dir = charPart.Position - ball.Position
+ local dist = dir.Magnitude
+ local speed = velocity.Magnitude
+
+ -- Frozen/stalled ball: give it time, never spam it.
+ if speed < 2 then return end
+
+ if velocity:Dot(dir) <= 0 then
+  -- Moving away: our parry connected or the ball passed by. Stop swinging
+  -- now; if it ever comes back, the next approach starts a fresh cycle.
+  st.away = true
+  return
+ end
+
+ if st.away then
+  -- A rebound is coming back at us: allow one clean fresh parry attempt.
+  st.away = false
+  if os.clock() - (st.firedAt or 0) >= 0.35 then
+   st.fired = false
+   st.refireCount = 0
+   return
+  end
+ end
+
+ if st.refireCount >= 1 then return end
+ if dist > 22 then return end
+
  local now = os.clock()
- local delay = 0.15
- if st.refireCount >= 1 then delay = 0.12 end
- if now - st.firedAt < delay then return end
- local curDist = (charPart.Position - ball.Position).Magnitude
- local ok = false
- if velocity.Magnitude < 0.01 then
-  ok = curDist <= 12
- else
-  ok = velocity:Dot(charPart.Position - ball.Position) > 0
-   and curDist <= 12
- end
- if ok then
-  st.refireCount = st.refireCount + 1
-  st.firedAt = now
-  st.lastFrame = _parryFrame
-  FireParry()
- end
+ local pingLead = math.clamp((LastPing or 100) / 1000, 0.05, 0.2)
+ if now - (st.firedAt or now) < 0.05 + pingLead * 0.5 then return end
+
+ st.refireCount = st.refireCount + 1
+ st.firedAt = now
+ st.lastFrame = _parryFrame
+ FireParry()
+end
+
+-- Swing timing shared by Auto Parry and TB: reaction follows the ball's
+-- real time-to-impact, so slow balls are not swung at too early (miss) and
+-- fast balls are swung before they land (no late/失效 parries).
+local function ParryWindow(ball, root, velocity, speed)
+ local dir = root.Position - ball.Position
+ local dist = dir.Magnitude
+ local closing = speed > 0.01 and -dir.Unit:Dot(velocity) or 0
+ if closing <= 0 then return false, dist end
+ local tti = dist / closing
+ local pingLead = math.clamp((LastPing or 100) / 1000, 0.03, 0.15)
+ local aiLead = cfg.aiDetection and AI.extra or 0
+ local closeShot = dist <= 16 and tti <= 0.28
+ local timedShot = dist <= 34 and tti <= 0.13 + pingLead + aiLead
+ return (closeShot or timedShot), dist
 end
 
 local function ProcessAutoParry(ball)
@@ -679,47 +722,17 @@ if st.done or st.lastFrame == _parryFrame then return end
 local velocity = z.VectorVelocity
 local speed = velocity.Magnitude
 if not st.fired then
-    -- Frozen ball right on top of us: one immediate swing.
-    if speed < 0.01 then
-        local nowDist = (charPart.Position - ball.Position).Magnitude
-        if nowDist <= 12 then
-            st.fired = true
-            st.firedAt = os.clock()
-            st.distAtFire = nowDist
-            st.lastFrame = _parryFrame
-            FireParry()
-        end
-        return
-    end
-    -- Very close + still coming: fire this frame (no waiting, no spam -
-    -- one swing; retarget lock stops machine-gunning).
-    local nowDist = (charPart.Position - ball.Position).Magnitude
-    if nowDist <= 14 and speed > 0.01
-        and velocity:Dot(charPart.Position - ball.Position) > 0 then
+    local want, dist = ParryWindow(ball, charPart, velocity, speed)
+    if want then
         st.fired = true
         st.firedAt = os.clock()
-        st.distAtFire = nowDist
+        st.distAtFire = dist
         st.lastFrame = _parryFrame
         FireParry()
         return
     end
-    -- Timed reach: ~0.12s before impact, capped 24.
-    local lead = 0.05
-    local predicted = ball.Position + velocity * lead
-    local dist = (charPart.Position - predicted).Magnitude
-    local effSpeed = speed
-    if cfg.ballSpeedAI then
-        local now = os.clock()
-        local prevSpeed = st.lastSpeed or speed
-        local dt = math.max(now - (st.lastSpeedAt or now), 0.001)
-        local inst = (speed - prevSpeed) / dt
-        st.smoothAccel = (st.smoothAccel or 0) + (inst - (st.smoothAccel or 0)) * 0.3
-        st.lastSpeed = speed
-        st.lastSpeedAt = now
-        effSpeed = speed + math.clamp(st.smoothAccel * 0.25, -speed * 0.4, speed * 0.9)
-    end
-    local reach = math.min(math.max(effSpeed * 0.12, 8), 24)
-    if dist <= reach then
+    -- Frozen ball right on top of us: one clean swing, no repeat.
+    if speed < 0.01 and dist <= 8 then
         st.fired = true
         st.firedAt = os.clock()
         st.distAtFire = dist
@@ -728,7 +741,7 @@ if not st.fired then
     end
     return
 end
--- Real-miss follow-ups (close range only, max 2).
+-- Real-miss follow-ups only (a successful parry cancels them).
 TryRefire(st, ball, charPart, velocity)
 end
 
@@ -745,35 +758,18 @@ if st.done or st.lastFrame == _parryFrame then return end
 local velocity = z.VectorVelocity
 local speed = velocity.Magnitude
 if not st.fired then
-    -- Frozen ball right on top of us: one immediate swing.
-    if speed < 0.01 then
-        local nowDist = (root.Position - ball.Position).Magnitude
-        if nowDist <= 12 then
-            st.fired = true
-            st.firedAt = os.clock()
-            st.distAtFire = nowDist
-            st.lastFrame = _parryFrame
-            FireParry()
-        end
-        return
-    end
-    -- Very close + still coming: fire this frame.
-    local nowDist = (root.Position - ball.Position).Magnitude
-    if nowDist <= 14 and speed > 0.01
-        and velocity:Dot(root.Position - ball.Position) > 0 then
+    local want, dist = ParryWindow(ball, root, velocity, speed)
+    -- TB obeys its Range slider (caps how far out it swings).
+    if want and dist <= math.max(cfg.tbRange or 24, 8) then
         st.fired = true
         st.firedAt = os.clock()
-        st.distAtFire = nowDist
+        st.distAtFire = dist
         st.lastFrame = _parryFrame
         FireParry()
         return
     end
-    -- Range from the TB Range slider only.
-    local lead = math.clamp((LastPing or 100) / 1000 + 1 / 120 + 0.02, 0.02, 0.08)
-    local predicted = ball.Position + velocity * lead
-    local dist = (root.Position - predicted).Magnitude
-    local reach = math.max(cfg.tbRange or 24, 8)
-    if dist <= reach then
+    -- Frozen ball right on top of us: one clean swing, no repeat.
+    if speed < 0.01 and dist <= 8 then
         st.fired = true
         st.firedAt = os.clock()
         st.distAtFire = dist
@@ -782,9 +778,10 @@ if not st.fired then
     end
     return
 end
--- Real-miss follow-ups (close range only, max 2).
+-- Real-miss follow-ups only (a successful parry cancels them).
 TryRefire(st, ball, root, velocity)
 end
+
 
 local AS={target=nil,targetTime=0,lastCheck=0,lastFire=0,trackedBall=nil,targetConn=nil,engagedTarget=nil,abortCycle=false}
 local function ResetAutoSpamTargetGuard()
@@ -1057,8 +1054,15 @@ end
 local function ApplyNoLegs(char)
     if not char then return end
     if getgenv().noLegsEnabled ~= true then return end
-    -- "No legs" = keep ONE foot; both legs + the other foot are gone.
-    -- R15: legs and feet are separate parts. R6: the leg IS the foot.
+    -- "No legs" look = ONE complete leg stays (leg + foot on the same side);
+    -- the other leg and its foot are removed. R6 has no feet, so one leg
+    -- stays. Accessories that hang on removed parts go with them.
+    local function SideOf(n)
+        if n:find("Left", 1, true) then return "Left" end
+        if n:find("Right", 1, true) then return "Right" end
+        return nil
+    end
+
     local feet, legs = {}, {}
     for _, part in ipairs(char:GetDescendants()) do
         if part:IsA("BasePart") and not part:IsA("Accessory") then
@@ -1072,43 +1076,30 @@ local function ApplyNoLegs(char)
     end
 
     local toDelete = {}
+    local function mark(p) if p then toDelete[#toDelete + 1] = p end end
 
-    -- R15: keep ONE foot, delete all other feet.
-    local keptFoot = feet[1]
-    for i = 2, #feet do toDelete[#toDelete + 1] = feet[i] end
-
-    -- Find the invisible leg that keeps the kept foot attached.
-    local keptLeg
-    if keptFoot then
-        for _, j in ipairs(keptFoot:GetDescendants()) do
-            if j:IsA("Motor6D") then
-                keptLeg = j.Parent
-            elseif j:IsA("WeldConstraint") then
-                keptLeg = j.Part0
-            elseif j:IsA("Weld") then
-                keptLeg = j.Part1 == keptFoot and j.Parent or nil
-            end
+    if #legs == 0 then
+        -- Weird rig: no legs, only feet -> keep one foot only.
+        local keepSide = SideOf(feet[1] and feet[1].Name or "")
+        for i = 2, #feet do
+            local f = feet[i]
+            if keepSide and SideOf(f.Name) ~= keepSide then mark(f) end
         end
-    end
-
-    -- Delete the other leg(s). The joints leg of the kept foot stays,
-    -- invisible, so the foot does not fall off while moving.
-    for _, l in ipairs(legs) do
-        if l ~= keptLeg then toDelete[#toDelete + 1] = l end
-    end
-
-    -- R6 (no separate feet): keep ONE leg, delete the other.
-    if #feet == 0 and #legs > 0 then
-        keptFoot = nil
-        keptLeg = nil
-        toDelete = {}
-        for i = 2, #legs do toDelete[#toDelete + 1] = legs[i] end
-    end
-
-    -- Hide the joint leg (R15): physical link stays, invisible.
-    if keptFoot and keptLeg then
-        keptLeg.Transparency = 1
-        if not CharFX.orig[keptLeg] then CharFX.orig[keptLeg] = 1 end
+    else
+        local keepSide = SideOf(legs[1].Name)
+        if keepSide then
+            -- Keep the whole kept side (leg + its foot), delete the other.
+            for _, l in ipairs(legs) do
+                if SideOf(l.Name) ~= keepSide then mark(l) end
+            end
+            for _, f in ipairs(feet) do
+                if SideOf(f.Name) ~= keepSide then mark(f) end
+            end
+        else
+            -- No Left/Right in names: keep one leg + one foot, delete the rest.
+            for i = 2, #legs do mark(legs[i]) end
+            for i = 2, #feet do mark(feet[i]) end
+        end
     end
 
     -- Delete accessories that hang on the removed parts.
