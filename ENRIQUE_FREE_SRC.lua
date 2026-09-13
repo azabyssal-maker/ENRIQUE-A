@@ -1057,28 +1057,82 @@ end
 local function ApplyNoLegs(char)
     if not char then return end
     if getgenv().noLegsEnabled ~= true then return end
-    local root = char:FindFirstChild("HumanoidRootPart")
-    if not root then return end
-    local rootY = root.Position.Y
-    local function IsCore(p)
-        local n = p.Name
-        return n == "HumanoidRootPart" or n == "Torso" or n == "UpperTorso"
-            or n:find("Arm", 1, true) or n:find("Hand", 1, true)
-    end
-    -- Delete EVERYTHING below the waist: legs, feet, shoes, pants, spikes.
-    -- Name fallback for Leg/Foot (works even during loading), Y-cut for
-    -- any custom rig part (both sides always, no leftovers).
-    local toDelete = {}
+    -- "No legs" = keep ONE foot; both legs + the other foot are gone.
+    -- R15: legs and feet are separate parts. R6: the leg IS the foot.
+    local feet, legs = {}, {}
     for _, part in ipairs(char:GetDescendants()) do
-        if part:IsA("BasePart") and not IsCore(part) then
+        if part:IsA("BasePart") and not part:IsA("Accessory") then
             local n = part.Name
-            local nameHit = n:find("Leg", 1, true) or n:find("Foot", 1, true)
-            local ok, y = pcall(function() return part.Position.Y end)
-            if nameHit or (ok and y < rootY - 0.4) then
-                toDelete[#toDelete + 1] = part
+            if n:find("Foot", 1, true) then
+                feet[#feet + 1] = part
+            elseif n:find("Leg", 1, true) then
+                legs[#legs + 1] = part
             end
         end
     end
+
+    local toDelete = {}
+
+    -- R15: keep ONE foot, delete all other feet.
+    local keptFoot = feet[1]
+    for i = 2, #feet do toDelete[#toDelete + 1] = feet[i] end
+
+    -- Find the invisible leg that keeps the kept foot attached.
+    local keptLeg
+    if keptFoot then
+        for _, j in ipairs(keptFoot:GetDescendants()) do
+            if j:IsA("Motor6D") then
+                keptLeg = j.Parent
+            elseif j:IsA("WeldConstraint") then
+                keptLeg = j.Part0
+            elseif j:IsA("Weld") then
+                keptLeg = j.Part1 == keptFoot and j.Parent or nil
+            end
+        end
+    end
+
+    -- Delete the other leg(s). The joints leg of the kept foot stays,
+    -- invisible, so the foot does not fall off while moving.
+    for _, l in ipairs(legs) do
+        if l ~= keptLeg then toDelete[#toDelete + 1] = l end
+    end
+
+    -- R6 (no separate feet): keep ONE leg, delete the other.
+    if #feet == 0 and #legs > 0 then
+        keptFoot = nil
+        keptLeg = nil
+        toDelete = {}
+        for i = 2, #legs do toDelete[#toDelete + 1] = legs[i] end
+    end
+
+    -- Hide the joint leg (R15): physical link stays, invisible.
+    if keptFoot and keptLeg then
+        keptLeg.Transparency = 1
+        if not CharFX.orig[keptLeg] then CharFX.orig[keptLeg] = 1 end
+    end
+
+    -- Delete accessories that hang on the removed parts.
+    local function LimbIsDead(p)
+        for _, v in ipairs(toDelete) do
+            if v == p then return true end
+        end
+        return false
+    end
+    for _, acc in ipairs(char:GetDescendants()) do
+        if acc:IsA("Accessory") then
+            local h = acc:FindFirstChild("Handle")
+            if h and h:IsA("BasePart") then
+                local limb
+                for _, j in ipairs(h:GetDescendants()) do
+                    if j:IsA("Motor6D") then limb = j.Parent
+                    elseif j:IsA("WeldConstraint") then limb = j.Part0
+                    elseif j:IsA("Weld") then limb = j.Part1 == h and j.Parent or nil end
+                end
+                if limb and LimbIsDead(limb) then toDelete[#toDelete + 1] = h end
+            end
+        end
+    end
+
     for _, part in ipairs(toDelete) do
         if part and part.Parent then
             pcall(function() part:Destroy() end)
