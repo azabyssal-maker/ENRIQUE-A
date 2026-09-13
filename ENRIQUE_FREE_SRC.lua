@@ -630,28 +630,32 @@ local function TrackBall(ball, store)
             t.done = true
         else
             t.done = false
-            t.fired = false
-            t.refireCount = 0
+            -- Quick ping-pong retargets do NOT reset the swing; only a real
+            -- re-shot (>=0.45s after our last parry) gets a fresh fire.
+            if not t.fired or os.clock() - (t.firedAt or 0) >= 0.45 then
+                t.fired = false
+                t.refireCount = 0
+            end
         end
     end)
     return st
 end
 
--- Shared real-miss follow-up: if a parry did not connect (ball still alive,
--- aimed at us and closing in) allow ONE clean 2nd swing at 0.15s. No
--- firehose, no repeated swings - a successful parry never shows twice.
+-- Shared real-miss follow-up: ONLY if a parry did not connect (0.25s later
+-- the ball is STILL alive, still coming at us and inside 10 studs) -> one
+-- clean 2nd swing. A successful parry reflects fast, so it never shows a 2nd.
 local function TryRefire(st, ball, charPart, velocity)
  if st.done or not st.fired or st.refireCount >= 1 then return end
  if st.lastFrame == _parryFrame then return end
  local now = os.clock()
- if now - st.firedAt < 0.15 then return end
+ if now - st.firedAt < 0.25 then return end
  local curDist = (charPart.Position - ball.Position).Magnitude
  local ok = false
  if velocity.Magnitude < 0.01 then
-  ok = curDist <= 20
+  ok = curDist <= 12
  else
   ok = velocity:Dot(charPart.Position - ball.Position) > 0
-   and curDist <= math.min(st.distAtFire or 24, 16)
+   and curDist <= 10
  end
  if ok then
   st.refireCount = st.refireCount + 1
@@ -671,24 +675,26 @@ if not charPart or not z then return end
 local st = TrackBall(ball, ParryState)
 if st.done or st.lastFrame == _parryFrame then return end
 local velocity = z.VectorVelocity
+local speed = velocity.Magnitude
 if not st.fired then
-    local nowDist = (charPart.Position - ball.Position).Magnitude
-    -- Already close / frozen: fire THIS frame, zero wait (one swing only).
-    if nowDist <= 22 or (velocity.Magnitude < 0.01 and nowDist <= 20) then
-        st.fired = true
-        st.firedAt = os.clock()
-        st.distAtFire = nowDist
-        st.lastFrame = _parryFrame
-        FireParry()
+    -- Frozen/stopped ball right on top of us: one immediate swing.
+    if speed < 0.01 then
+        local nowDist = (charPart.Position - ball.Position).Magnitude
+        if nowDist <= 12 then
+            st.fired = true
+            st.firedAt = os.clock()
+            st.distAtFire = nowDist
+            st.lastFrame = _parryFrame
+            FireParry()
+        end
         return
     end
-    if velocity.Magnitude < 0.01 then return end
-    -- Normal parry range: consistent ~0.12s before impact, hard-capped at
-    -- 26 studs so it NEVER parries from far away.
+    -- Precise timing only: ~0.12s before impact, capped at 24 studs.
+    -- Slow balls wait until they are close, fast balls fire earlier.
+    -- No close-range instant spam, no far-away swings.
     local lead = 0.05
     local predicted = ball.Position + velocity * lead
     local dist = (charPart.Position - predicted).Magnitude
-    local speed = velocity.Magnitude
     local effSpeed = speed
     if cfg.ballSpeedAI then
         local now = os.clock()
@@ -700,7 +706,7 @@ if not st.fired then
         st.lastSpeedAt = now
         effSpeed = speed + math.clamp(st.smoothAccel * 0.25, -speed * 0.4, speed * 0.9)
     end
-    local reach = math.min(math.max(effSpeed * 0.12, 8), 26)
+    local reach = math.min(math.max(effSpeed * 0.12, 6), 24)
     if dist <= reach then
         st.fired = true
         st.firedAt = os.clock()
@@ -725,20 +731,22 @@ if not root or not z then return end
 local st = TrackBall(ball, ParryState)
 if st.done or st.lastFrame == _parryFrame then return end
 local velocity = z.VectorVelocity
+local speed = velocity.Magnitude
 if not st.fired then
-    local nowDist = (root.Position - ball.Position).Magnitude
-    -- Already close / frozen: fire THIS frame, one swing only.
-    if nowDist <= 22 or (velocity.Magnitude < 0.01 and nowDist <= 20) then
-        st.fired = true
-        st.firedAt = os.clock()
-        st.distAtFire = nowDist
-        st.lastFrame = _parryFrame
-        FireParry()
+    -- Frozen/stopped ball right on top of us: one immediate swing.
+    if speed < 0.01 then
+        local nowDist = (root.Position - ball.Position).Magnitude
+        if nowDist <= 12 then
+            st.fired = true
+            st.firedAt = os.clock()
+            st.distAtFire = nowDist
+            st.lastFrame = _parryFrame
+            FireParry()
+        end
         return
     end
-    if velocity.Magnitude < 0.01 then return end
     -- Range comes from the TB Range slider only - no speed extension,
-    -- no far-away parry.
+    -- no instant-close spam, no far-away parry beyond your own setting.
     local lead = math.clamp((LastPing or 100) / 1000 + 1 / 120 + 0.02, 0.02, 0.08)
     local predicted = ball.Position + velocity * lead
     local dist = (root.Position - predicted).Magnitude
@@ -1008,9 +1016,16 @@ end
 local function ApplyNoLegs(char)
     if not char then return end
     local enabled = getgenv().noLegsEnabled == true
-    -- Legs AND feet both go invisible (the leftover foot was the "spike").
+    local root = char:FindFirstChild("HumanoidRootPart")
+    -- Everything below the waist disappears: legs, feet, shoes, spikes,
+    -- whatever the rig calls them (R6/R15/custom avatars all covered).
+    local function isBelowWaist(part)
+        local nameHit = part.Name:find("Leg", 1, true) or part.Name:find("Foot", 1, true)
+        if root and part.Position.Y < root.Position.Y - 0.6 then return true end
+        return nameHit ~= nil
+    end
     for _, part in ipairs(char:GetDescendants()) do
-        if part:IsA("BasePart") and (part.Name:find("Leg", 1, true) or part.Name:find("Foot", 1, true)) then
+        if part:IsA("BasePart") and not part:IsA("Accessory") and isBelowWaist(part) then
             if enabled then
                 if not CharFX.orig[part] then CharFX.orig[part] = part.Transparency end
                 part.Transparency = 1
@@ -1023,23 +1038,19 @@ local function ApplyNoLegs(char)
             end
         end
     end
-    -- Shoe/boot accessories riding on the hidden limbs get hidden too.
+    -- Accessories (shoes, spikes, tails...) below the waist get hidden too.
     for _, acc in ipairs(char:GetDescendants()) do
         if acc:IsA("Accessory") then
-            local name = acc.Name:lower()
-            if name:find("leg", 1, true) or name:find("foot", 1, true)
-                or name:find("shoe", 1, true) or name:find("boot", 1, true) then
-                local h = acc:FindFirstChild("Handle")
-                if h and h:IsA("BasePart") then
-                    if enabled then
-                        if not CharFX.orig[h] then CharFX.orig[h] = h.Transparency end
-                        h.Transparency = 1
-                    else
-                        local o = CharFX.orig[h]
-                        if o then
-                            h.Transparency = o
-                            CharFX.orig[h] = nil
-                        end
+            local h = acc:FindFirstChild("Handle")
+            if h and h:IsA("BasePart") and isBelowWaist(h) then
+                if enabled then
+                    if not CharFX.orig[h] then CharFX.orig[h] = h.Transparency end
+                    h.Transparency = 1
+                else
+                    local o = CharFX.orig[h]
+                    if o then
+                        h.Transparency = o
+                        CharFX.orig[h] = nil
                     end
                 end
             end
