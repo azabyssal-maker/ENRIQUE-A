@@ -39,7 +39,6 @@ end
 local cfg = {
 parry = true,
 lobbyParry = true,
-aiParry = true,
 spam = false,
 trigger = false,
 tbRange = 24,
@@ -321,18 +320,6 @@ local function AIOpponent()
  return AI.opp
 end
 
-local function ReactionTime()
- local ping=LastPing or 100
- local acc=math.clamp(RuntimeAccuracy,1,100)
- -- Fixed time-to-impact window: the same reaction time for every ball,
- -- slow balls simply trigger closer, fast balls further out.
- local t = 0.10 + (acc-1)/99*0.02
- -- AI detection = ping compensation only (smooth, no distance jumps).
- if cfg.aiDetection then t = t + math.clamp(ping/800,0,0.06) end
- if t < 0.09 then t = 0.09 end
- return t
-end
-
 local function Is_Curved(ball)
 local Zoomies = ball:FindFirstChild("zoomies")
 if not Zoomies then return false end
@@ -606,14 +593,14 @@ getgenv().ENRIQUE_SendParryFast=SendParryFast
 
 local ParryState = setmetatable({}, {__mode="k"})
 
--- AI tracking: one clean parry per threat; re-fire only after a REAL miss
--- (ball still aimed at us 0.12s later), max 3 tries. Never blind-spams.
+-- Shared per-ball state: TB and Auto Parry both use this, so one ball is
+-- ever only parried ONCE (no 2 parry), whoever reacts first wins.
 local _parryFrame = 0
 
 local function TrackBall(ball, store)
     local st = store[ball]
     if st and st.listening then return st end
-    st = { firedAt = 0, fired = false, tries = 0, done = false, listening = true, lastFrame = 0 }
+    st = { fired = false, done = false, listening = true, lastFrame = 0 }
     store[ball] = st
     ball:GetAttributeChangedSignal("target"):Connect(function()
         local t = store[ball]
@@ -623,28 +610,9 @@ local function TrackBall(ball, store)
         else
             t.done = false
             t.fired = false
-            t.tries = 0
         end
     end)
     return st
-end
-
--- Slow balls stay in the window longer, so refire slower for them;
--- fast balls get a quick second chance. Never refire while still far.
-local function RefireDelay(speed)
-    return math.clamp(0.10 + (120 - speed) * 0.0015, 0.06, 0.4)
-end
-
-local function AIFire(st, now, refireDelay, close)
-    if not st.fired then
-        st.fired = true
-        st.firedAt = now
-        if not SendParry() then SendParry() end
-    elseif now - st.firedAt >= refireDelay and st.tries < 1 and close then
-        st.firedAt = now
-        st.tries = st.tries + 1
-        SendParry()
-    end
 end
 
 local function ProcessAutoParry(ball)
@@ -656,32 +624,18 @@ local z = ball:FindFirstChild("zoomies")
 if not charPart or not z then return end
 local velocity = z.VectorVelocity
 if velocity.Magnitude < 0.01 then return end
--- Reaction lead: small ping buffer, never extends the reach far away.
+-- Fixed-distance trigger: fire as soon as the ball closes to ~16 studs of the
+-- predicted impact point. Speed and Accuracy never change reaction time,
+-- this is always the fastest clean parry.
 local lead = math.clamp((LastPing or 100) / 1000 + 1 / 60 + 0.02, 0.02, 0.08)
 local predicted = ball.Position + velocity * lead
 local dist = (charPart.Position - predicted).Magnitude
-local speed = velocity.Magnitude
-local tti = dist / math.max(speed, 0.01)
-local window = ReactionTime()
-if (dist <= 22 and tti <= window) or dist <= 8 then
-    if cfg.aiParry then
-        local st = TrackBall(ball, ParryState)
-        if st.done or st.lastFrame == _parryFrame then return end
-        -- TB already intercepts this ball: no extra refire from Auto Parry.
-        local tbActive = cfg.trigger or manualTBActive
-        AIFire(st, os.clock(), RefireDelay(speed), (not tbActive and (dist <= 10 or tti <= window * 0.5)))
-        st.lastFrame = _parryFrame
-    else
-        local st = ParryState[ball]
-        if not st then st = { firedAt = 0, lastFrame = 0 } ParryState[ball] = st end
-        if st.lastFrame == _parryFrame then return end
-        local now = os.clock()
-        if now - st.firedAt >= 0.3 then
-            st.firedAt = now
-            st.lastFrame = _parryFrame
-            SendParry()
-        end
-    end
+if dist <= 16 then
+    local st = TrackBall(ball, ParryState)
+    if st.done or st.fired or st.lastFrame == _parryFrame then return end
+    st.fired = true
+    st.lastFrame = _parryFrame
+    if not SendParry() then SendParry() end
 end
 end
 
@@ -694,7 +648,7 @@ local root = player.Character and player.Character.PrimaryPart
 local z = ball:FindFirstChild("zoomies")
 if not root or not z then return end
 local velocity = z.VectorVelocity
--- Reaction lead: same small buffered prediction so TB reacts on time.
+if velocity.Magnitude < 0.01 then return end
 local lead = math.clamp((LastPing or 100) / 1000 + 1 / 120 + 0.02, 0.02, 0.08)
 local predicted = ball.Position + velocity * lead
 local dist = (root.Position - predicted).Magnitude
@@ -844,7 +798,6 @@ do
     if type(saved) == "table" then
         -- Auto Parry
         if saved.auto_parry ~= nil then cfg.parry = saved.auto_parry == true end
-        if saved.ai_parry ~= nil then cfg.aiParry = saved.ai_parry == true end
         if saved.lobby_parry ~= nil then cfg.lobbyParry = saved.lobby_parry == true end
         if saved.parry_accuracy ~= nil then cfg.accuracy = tonumber(saved.parry_accuracy) or cfg.accuracy end
         if saved.humanizer ~= nil then cfg.randomPingAccuracy = saved.humanizer == true end
@@ -915,12 +868,6 @@ ParryLeft:create_toggle("auto_parry", {
     title = "Auto Parry",
     default = cfg.parry == true,
     callback = function(value) cfg.parry = value end,
-})
-
-ParryLeft:create_toggle("ai_parry", {
-    title = "AI Parry",
-    default = cfg.aiParry == true,
-    callback = function(value) cfg.aiParry = value end,
 })
 
 ParryLeft:create_toggle("lobby_parry", {
