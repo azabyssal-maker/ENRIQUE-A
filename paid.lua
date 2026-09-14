@@ -1426,7 +1426,7 @@ local function ShowKeyUI(callback)
     statusLabel.Size = UDim2.new(1, 0, 0, 16)
     statusLabel.Position = UDim2.new(0, 0, 0, 248)
     statusLabel.BackgroundTransparency = 1
-    statusLabel.Text = "discord.gg/hZhwszmP"
+    statusLabel.Text = "discord.gg/jEA49UNC"
     statusLabel.Font = Enum.Font.Gotham
     statusLabel.TextSize = 11
     statusLabel.TextColor3 = Color3.fromRGB(100, 90, 120)
@@ -1661,6 +1661,7 @@ function UI.Create()
     
     -- 标签
     local TABS = {
+        {name = "Home", icon = "🏠"},
         {name = "Combat", icon = "⚔️"},
         {name = "Spam", icon = "⚡"},
         {name = "Visuals", icon = "👁️"},
@@ -1686,8 +1687,8 @@ function UI.Create()
             for name, frame in pairs(tabFrames) do frame.Visible = (name == tab.name) end
         end)
     end
-    tw(tabButtons["Combat"], 0, {BackgroundColor3 = T.accentDim})
-    tabButtons["Combat"].TextColor3 = Color3.new(1, 1, 1)
+    tw(tabButtons["Home"], 0, {BackgroundColor3 = T.accentDim})
+    tabButtons["Home"].TextColor3 = Color3.new(1, 1, 1)
     
     local function Card(parent, title)
         local card = mk("Frame", {Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundColor3 = T.cardBg, BorderSizePixel = 0, Parent = parent})
@@ -1706,6 +1707,27 @@ function UI.Create()
     end
     
     -- COMBAT
+    local homeCard = Card(tabFrames["Home"], "🏠 HOME")
+    
+    local execName = "Unknown"
+    if syn then execName = "Synapse X"
+    elseif KRNL_LOADED or identifyexecutor then
+        local ok, name = pcall(identifyexecutor)
+        if ok and name then execName = tostring(name) end
+    elseif getexecutorname then
+        local ok, name = pcall(getexecutorname)
+        if ok and name then execName = tostring(name) end
+    end
+    
+    mk("TextLabel", {Size = UDim2.new(1, 0, 0, 20), BackgroundTransparency = 1, Text = "💎 ENRIQUE PAID", Font = Enum.Font.GothamBold, TextSize = 14, TextColor3 = T.accent, TextXAlignment = Enum.TextXAlignment.Left, Parent = homeCard})
+    mk("TextLabel", {Size = UDim2.new(1, 0, 0, 14), BackgroundTransparency = 1, Text = "Version: ENRIQUE PAID v1.0", Font = Enum.Font.Gotham, TextSize = 11, TextColor3 = T.dim, TextXAlignment = Enum.TextXAlignment.Left, Parent = homeCard})
+    mk("TextLabel", {Size = UDim2.new(1, 0, 0, 14), BackgroundTransparency = 1, Text = "Executor: " .. execName, Font = Enum.Font.Gotham, TextSize = 11, TextColor3 = T.dim, TextXAlignment = Enum.TextXAlignment.Left, Parent = homeCard})
+    mk("TextLabel", {Size = UDim2.new(1, 0, 0, 14), BackgroundTransparency = 1, Text = "Player: " .. LocalPlayer.Name .. " (#" .. LocalPlayer.UserId .. ")", Font = Enum.Font.Gotham, TextSize = 11, TextColor3 = T.dim, TextXAlignment = Enum.TextXAlignment.Left, Parent = homeCard})
+    mk("TextLabel", {Size = UDim2.new(1, 0, 0, 14), BackgroundTransparency = 1, Text = "Remote: " .. (ParryRemoteName or "Auto-detecting"), Font = Enum.Font.Gotham, TextSize = 11, TextColor3 = T.dim, TextXAlignment = Enum.TextXAlignment.Left, Parent = homeCard})
+    mk("TextLabel", {Size = UDim2.new(1, 0, 0, 14), BackgroundTransparency = 1, Text = "Key: " .. KeySystem.FormatTime(KeySystem.GetTimeLeft()), Font = Enum.Font.Gotham, TextSize = 11, TextColor3 = T.dim, TextXAlignment = Enum.TextXAlignment.Left, Parent = homeCard})
+    Btn(homeCard, "💬 Discord", T.accent, function() setclipboard("https://discord.gg/jEA49UNC"); Notify("ENRIQUE", "Discord link copied!", 3) end)
+    mk("TextLabel", {Size = UDim2.new(1, 0, 0, 14), BackgroundTransparency = 1, Text = "discord.gg/jEA49UNC", Font = Enum.Font.GothamMedium, TextSize = 11, TextColor3 = T.accent, TextXAlignment = Enum.TextXAlignment.Left, Parent = homeCard})
+    
     local combatCard = Card(tabFrames["Combat"], "🛡️ AUTO PARRY")
     CreateToggle(combatCard, "Auto Parry", "AutoParry", CFG.AutoParry, function(s) if s then AutoParry.Start() else AutoParry.Stop() end end)
     CreateDropdown(combatCard, "Mode", "AutoParryMode", {"Remote", "Keypress"}, CFG.AutoParryMode)
@@ -1785,7 +1807,7 @@ function UI.Create()
     mk("TextLabel", {Size = UDim2.new(1, 0, 0, 16), BackgroundTransparency = 1, Text = "按 RightShift 打开/关闭 UI", Font = Enum.Font.Gotham, TextSize = 11, TextColor3 = T.muted, TextXAlignment = Enum.TextXAlignment.Left, Parent = settingsCard})
     mk("TextLabel", {Size = UDim2.new(1, 0, 0, 16), BackgroundTransparency = 1, Text = "Version: ENRIQUE PAID v1.0", Font = Enum.Font.Gotham, TextSize = 11, TextColor3 = T.muted, TextXAlignment = Enum.TextXAlignment.Left, Parent = settingsCard})
     mk("TextLabel", {Size = UDim2.new(1, 0, 0, 16), BackgroundTransparency = 1, Text = "Remote: " .. (ParryRemoteName or "Auto-detecting"), Font = Enum.Font.Gotham, TextSize = 11, TextColor3 = T.muted, TextXAlignment = Enum.TextXAlignment.Left, Parent = settingsCard})
-    mk("TextLabel", {Size = UDim2.new(1, 0, 0, 16), BackgroundTransparency = 1, Text = "discord.gg/hZhwszmP", Font = Enum.Font.GothamMedium, TextSize = 11, TextColor3 = T.accent, TextXAlignment = Enum.TextXAlignment.Left, Parent = settingsCard})
+    mk("TextLabel", {Size = UDim2.new(1, 0, 0, 16), BackgroundTransparency = 1, Text = "discord.gg/jEA49UNC", Font = Enum.Font.GothamMedium, TextSize = 11, TextColor3 = T.accent, TextXAlignment = Enum.TextXAlignment.Left, Parent = settingsCard})
     
     CreateButton(settingsCard, "🔄 重新扫描 Remote", T.panel3, function()
         RemoteScanner.Scan()
@@ -1895,7 +1917,7 @@ else
     -- 显示 Key 验证界面
     ShowKeyUI(function()
         UI.Create()
-        Notify("⚔️ ENRIQUE PAID", "激活成功！24小时有效\ndiscord.gg/hZhwszmP", 5)
+        Notify("⚔️ ENRIQUE PAID", "激活成功！24小时有效\ndiscord.gg/jEA49UNC", 5)
     end)
 end
 

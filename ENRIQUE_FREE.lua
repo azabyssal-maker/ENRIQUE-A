@@ -1795,6 +1795,7 @@ function UI.Create()
     
     -- Tab definitions
     local TABS = {
+        {name = "Home",     icon = "🏠"},
         {name = "Combat",   icon = "⚔️"},
         {name = "Spam",     icon = "⚡"},
         {name = "Visuals",  icon = "👁️"},
@@ -1852,8 +1853,8 @@ function UI.Create()
     end
     
     -- Highlight first tab
-    tween(tabButtons["Combat"], 0, {BackgroundColor3 = T.accentDim})
-    tabButtons["Combat"].TextColor3 = Color3.new(1, 1, 1)
+    tween(tabButtons["Home"], 0, {BackgroundColor3 = T.accentDim})
+    tabButtons["Home"].TextColor3 = Color3.new(1, 1, 1)
     
     -- Card helper
     local function Card(parent, title)
@@ -1888,6 +1889,29 @@ function UI.Create()
     --============================================================--
     -- TAB: COMBAT
     --============================================================--
+    local homeCard = Card(tabFrames["Home"], "🏠 HOME")
+    
+    local execName = "Unknown"
+    if syn then execName = "Synapse X"
+    elseif KRNL_LOADED or identifyexecutor then
+        local ok, name = pcall(identifyexecutor)
+        if ok and name then execName = tostring(name) end
+    elseif getexecutorname then
+        local ok, name = pcall(getexecutorname)
+        if ok and name then execName = tostring(name) end
+    end
+    
+    mk("TextLabel", {Size = UDim2.new(1, 0, 0, 20), BackgroundTransparency = 1, Text = "⚔️ ENRIQUE FREE", Font = Enum.Font.GothamBold, TextSize = 14, TextColor3 = T.accent, TextXAlignment = Enum.TextXAlignment.Left, Parent = homeCard})
+    mk("TextLabel", {Size = UDim2.new(1, 0, 0, 14), BackgroundTransparency = 1, Text = "Version: ENRIQUE FREE v1.0", Font = Enum.Font.Gotham, TextSize = 11, TextColor3 = T.dim, TextXAlignment = Enum.TextXAlignment.Left, Parent = homeCard})
+    mk("TextLabel", {Size = UDim2.new(1, 0, 0, 14), BackgroundTransparency = 1, Text = "Executor: " .. execName, Font = Enum.Font.Gotham, TextSize = 11, TextColor3 = T.dim, TextXAlignment = Enum.TextXAlignment.Left, Parent = homeCard})
+    mk("TextLabel", {Size = UDim2.new(1, 0, 0, 14), BackgroundTransparency = 1, Text = "Player: " .. LocalPlayer.Name .. " (#" .. LocalPlayer.UserId .. ")", Font = Enum.Font.Gotham, TextSize = 11, TextColor3 = T.dim, TextXAlignment = Enum.TextXAlignment.Left, Parent = homeCard})
+    mk("TextLabel", {Size = UDim2.new(1, 0, 0, 14), BackgroundTransparency = 1, Text = "Remote: " .. (ParryRemoteName or "Auto-detecting"), Font = Enum.Font.Gotham, TextSize = 11, TextColor3 = T.dim, TextXAlignment = Enum.TextXAlignment.Left, Parent = homeCard})
+    CreateButton(homeCard, "💬 Discord", T.accent, function()
+        setclipboard("https://discord.gg/jEA49UNC")
+        Notify("ENRIQUE", "Discord link copied!", 3)
+    end)
+    mk("TextLabel", {Size = UDim2.new(1, 0, 0, 14), BackgroundTransparency = 1, Text = "discord.gg/jEA49UNC", Font = Enum.Font.GothamMedium, TextSize = 11, TextColor3 = T.accent, TextXAlignment = Enum.TextXAlignment.Left, Parent = homeCard})
+    
     local combatCard = Card(tabFrames["Combat"], "🛡️ AUTO PARRY")
     CreateToggle(combatCard, "Auto Parry", "AutoParry", CFG.AutoParry, function(state)
         if state then AutoParry.Start() else AutoParry.Stop() end
@@ -1978,7 +2002,7 @@ function UI.Create()
     mk("TextLabel", {
         Size = UDim2.new(1, 0, 0, 16),
         BackgroundTransparency = 1,
-        Text = "Version: ENRIQUE BB v1.0",
+        Text = "Version: ENRIQUE FREE v1.0",
         Font = Enum.Font.Gotham,
         TextSize = 11,
         TextColor3 = T.muted,
@@ -2020,7 +2044,7 @@ function UI.Create()
     mk("TextLabel", {
         Size = UDim2.new(1, 0, 0, 16),
         BackgroundTransparency = 1,
-        Text = "discord.gg/hZhwszmP",
+        Text = "discord.gg/jEA49UNC",
         Font = Enum.Font.GothamMedium,
         TextSize = 11,
         TextColor3 = T.accent,
@@ -2131,11 +2155,11 @@ InitHook()
 task.wait(0.5)
 UI.Create()
 
-Notify("⚔️ ENRIQUE BB v1.0", 
+Notify("⚔️ ENRIQUE FREE v1.0", 
     "Loaded! Press RightShift to toggle UI\nRemote: " .. (ParryRemoteName or "Auto-detecting") .. 
-    "\ndiscord.gg/hZhwszmP", 5)
+    "\ndiscord.gg/jEA49UNC", 5)
 
-print("⚔️ ENRIQUE BLADE BALL v1.0 — Fully Self-Contained")
+print("⚔️ ENRIQUE FREE v1.0 — Fully Self-Contained")
 print("Remote: " .. (ParryRemoteName or "Auto-detecting"))
 print("Hook: " .. (Hook.hooked and "Active" or "Awaiting"))
 print("PF: " .. (Hook.PF and "Captured" or "Awaiting"))
