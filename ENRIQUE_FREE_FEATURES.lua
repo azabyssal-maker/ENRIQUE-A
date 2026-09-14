@@ -18226,5 +18226,1479 @@ do
         callback = function(state) if state then pcall(function() for k, v in pairs(getgenv()) do if type(v) == "userdata" and tostring(v):find("Connection") then pcall(function() v:Disconnect() end) end end; _G.__ENRIQUE_ACTIVE = false end) end end,})
 end
 
-return Library
+-- ============================================================
+-- ENHANCED FEATURES v1.0 — Extended Combat, Character, Visuals
+-- ============================================================
 
+do
+    local Tab = library:create_tab("Combat+")
+
+    Tab:create_module({title = "Ball Prediction", description = "Predict ball trajectory", flag = "ENQ_BallPred",
+        callback = function(state) getgenv().ENQ_BallPred = state end,})
+
+    Tab:create_module({title = "Curve Detection", description = "Detect curve balls", flag = "ENQ_CurveDet",
+        callback = function(state) getgenv().ENQ_CurveDet = state end,})
+
+    Tab:create_module({title = "Freeze Detection", description = "Detect frozen balls", flag = "ENQ_FreezeDet",
+        callback = function(state) getgenv().ENQ_FreezeDet = state end,})
+
+    Tab:create_module({title = "Multi Parry", description = "Parry multiple balls", flag = "ENQ_MultiParry",
+        callback = function(state) getgenv().ENQ_MultiParry = state end,})
+
+    Tab:create_module({title = "Perfect Timing", description = "Perfect parry timing", flag = "ENQ_PerfTime",
+        callback = function(state) getgenv().ENQ_PerfTime = state end,})
+
+    Tab:create_module({title = "Ball Redirect", description = "Redirect ball to target", flag = "ENQ_BallRedir",
+        callback = function(state) getgenv().ENQ_BallRedir = state end,})
+
+    Tab:create_module({title = "Auto Ability", description = "Auto use abilities", flag = "ENQ_AutoAbil",
+        callback = function(state) getgenv().ENQ_AutoAbil = state end,})
+
+    Tab:create_module({title = "Killaura", description = "Auto attack nearby", flag = "ENQ_Killaura",
+        callback = function(state) getgenv().ENQ_Killaura = state end,})
+
+    Tab:create_module({title = "Click TP", description = "Ctrl+Click teleport", flag = "ENQ_ClickTP",
+        callback = function(state) getgenv().ENQ_ClickTP = state end,})
+
+    Tab:create_module({title = "TP Nearest", description = "Teleport to nearest", flag = "ENQ_TPNear",
+        callback = function(state) getgenv().ENQ_TPNear = state end,})
+
+    Tab:create_module({title = "Speed Parry", description = "Ultra fast parry", flag = "ENQ_SpdParry",
+        callback = function(state) getgenv().ENQ_SpdParry = state end,})
+
+    Tab:create_module({title = "Counter Parry", description = "Counter after parry", flag = "ENQ_CntParry",
+        callback = function(state) getgenv().ENQ_CntParry = state end,})
+
+    Tab:create_module({title = "Fake Parry", description = "Bait opponents", flag = "ENQ_FakeParry",
+        callback = function(state) getgenv().ENQ_FakeParry = state end,})
+
+    Tab:create_module({title = "Auto Block", description = "Auto block attacks", flag = "ENQ_AutoBlock",
+        callback = function(state) getgenv().ENQ_AutoBlock = state end,})
+
+    Tab:create_module({title = "Target Lock", description = "Lock onto target", flag = "ENQ_TargLock",
+        callback = function(state) getgenv().ENQ_TargLock = state end,})
+
+    Tab:create_module({title = "Ball Speed", description = "Ball speed modifier", flag = "ENQ_BallSpd",
+        callback = function(state) getgenv().ENQ_BallSpd = state end,})
+
+    Tab:create_module({title = "Parry Cooldown", description = "Reduce parry cooldown", flag = "ENQ_ParryCD",
+        callback = function(state) getgenv().ENQ_ParryCD = state end,})
+
+    Tab:create_module({title = "Auto Aim", description = "Auto aim ball", flag = "ENQ_AutoAim",
+        callback = function(state) getgenv().ENQ_AutoAim = state end,})
+
+    Tab:create_module({title = "Remote Parry", description = "Remote-based parry", flag = "ENQ_RemParry",
+        callback = function(state) getgenv().ENQ_RemParry = state end,})
+
+    Tab:create_module({title = "Reaction Test", description = "Test reaction time", flag = "ENQ_ReactTest",
+        callback = function(state) getgenv().ENQ_ReactTest = state end,})
+
+end
+
+do
+    local Tab = library:create_tab("Player+")
+
+    Tab:create_slider({title = "WalkSpeed V2", flag = "ENQ_WS2", minimum_value = 16, maximum_value = 1000, value = 50, round_number = true,
+        callback = function(v) getgenv()."ENQ_WS2" = v end,})
+
+    Tab:create_slider({title = "JumpPower V2", flag = "ENQ_JP2", minimum_value = 50, maximum_value = 2000, value = 100, round_number = true,
+        callback = function(v) getgenv()."ENQ_JP2" = v end,})
+
+    Tab:create_module({title = "NoClip V2", description = "Enhanced noclip", flag = "ENQ_NC2",
+        callback = function(state) getgenv().ENQ_NC2 = state end,})
+
+    Tab:create_module({title = "God Mode V2", description = "Enhanced god mode", flag = "ENQ_God2",
+        callback = function(state) getgenv().ENQ_God2 = state end,})
+
+    Tab:create_module({title = "Fly V2", description = "Enhanced flight", flag = "ENQ_Fly2",
+        callback = function(state) getgenv().ENQ_Fly2 = state end,})
+
+    Tab:create_module({title = "Infinite Jump", description = "Jump in mid-air", flag = "ENQ_InfJump",
+        callback = function(state) getgenv().ENQ_InfJump = state end,})
+
+    Tab:create_module({title = "Speed Boost", description = "Hold shift to sprint", flag = "ENQ_SpdBoost",
+        callback = function(state) getgenv().ENQ_SpdBoost = state end,})
+
+    Tab:create_module({title = "Auto Jump", description = "Auto jump continuously", flag = "ENQ_AutoJump",
+        callback = function(state) getgenv().ENQ_AutoJump = state end,})
+
+    Tab:create_module({title = "Anti Void", description = "Prevent falling off", flag = "ENQ_AntiVoid",
+        callback = function(state) getgenv().ENQ_AntiVoid = state end,})
+
+    Tab:create_module({title = "Auto Respawn", description = "Auto respawn on death", flag = "ENQ_AutoRespawn",
+        callback = function(state) getgenv().ENQ_AutoRespawn = state end,})
+
+    Tab:create_module({title = "Float Mode", description = "Float above ground", flag = "ENQ_Float2",
+        callback = function(state) getgenv().ENQ_Float2 = state end,})
+
+    Tab:create_module({title = "Spin Bot V2", description = "Enhanced spin", flag = "ENQ_Spin2",
+        callback = function(state) getgenv().ENQ_Spin2 = state end,})
+
+    Tab:create_module({title = "Air Walk", description = "Walk on air", flag = "ENQ_AirWalk",
+        callback = function(state) getgenv().ENQ_AirWalk = state end,})
+
+    Tab:create_module({title = "Slide Walk", description = "Slide movement", flag = "ENQ_SlideWalk",
+        callback = function(state) getgenv().ENQ_SlideWalk = state end,})
+
+    Tab:create_module({title = "Moon Jump", description = "Low gravity jump", flag = "ENQ_MoonJump",
+        callback = function(state) getgenv().ENQ_MoonJump = state end,})
+
+    Tab:create_module({title = "High Jump", description = "Super high jump", flag = "ENQ_HighJump",
+        callback = function(state) getgenv().ENQ_HighJump = state end,})
+
+    Tab:create_module({title = "Speed Hack", description = "Modified speed", flag = "ENQ_SpdHack",
+        callback = function(state) getgenv().ENQ_SpdHack = state end,})
+
+    Tab:create_module({title = "Jump Hack", description = "Modified jump", flag = "ENQ_JumpHack",
+        callback = function(state) getgenv().ENQ_JumpHack = state end,})
+
+    Tab:create_module({title = "Gravity Control", description = "Custom gravity", flag = "ENQ_GravCtrl",
+        callback = function(state) getgenv().ENQ_GravCtrl = state end,})
+
+    Tab:create_module({title = "Dash", description = "Quick dash forward", flag = "ENQ_Dash",
+        callback = function(state) getgenv().ENQ_Dash = state end,})
+
+end
+
+do
+    local Tab = library:create_tab("Visuals+")
+
+    Tab:create_module({title = "Fullbright V2", description = "Enhanced brightness", flag = "ENQ_FB2",
+        callback = function(state) getgenv().ENQ_FB2 = state end,})
+
+    Tab:create_module({title = "No Fog V2", description = "Enhanced fog removal", flag = "ENQ_NF2",
+        callback = function(state) getgenv().ENQ_NF2 = state end,})
+
+    Tab:create_module({title = "No Particles", description = "Remove particles", flag = "ENQ_NoPart",
+        callback = function(state) getgenv().ENQ_NoPart = state end,})
+
+    Tab:create_module({title = "No Textures", description = "Remove textures", flag = "ENQ_NoTex",
+        callback = function(state) getgenv().ENQ_NoTex = state end,})
+
+    Tab:create_module({title = "Rainbow World", description = "Cycle world colors", flag = "ENQ_RainWorld",
+        callback = function(state) getgenv().ENQ_RainWorld = state end,})
+
+    Tab:create_module({title = "ESP V2", description = "Enhanced ESP", flag = "ENQ_ESP2",
+        callback = function(state) getgenv().ENQ_ESP2 = state end,})
+
+    Tab:create_module({title = "Player Highlights V2", description = "Enhanced highlights", flag = "ENQ_PH2",
+        callback = function(state) getgenv().ENQ_PH2 = state end,})
+
+    Tab:create_module({title = "Bloom V2", description = "Enhanced bloom", flag = "ENQ_Bloom2",
+        callback = function(state) getgenv().ENQ_Bloom2 = state end,})
+
+    Tab:create_module({title = "Color Shift", description = "Shift colors", flag = "ENQ_ColorShift",
+        callback = function(state) getgenv().ENQ_ColorShift = state end,})
+
+    Tab:create_module({title = "Night Vision V2", description = "Enhanced night vision", flag = "ENQ_NV2",
+        callback = function(state) getgenv().ENQ_NV2 = state end,})
+
+    Tab:create_module({title = "X-Ray V2", description = "Enhanced x-ray", flag = "ENQ_XRay2",
+        callback = function(state) getgenv().ENQ_XRay2 = state end,})
+
+    Tab:create_module({title = "Speed Lines", description = "FOV zoom effect", flag = "ENQ_SpdLines",
+        callback = function(state) getgenv().ENQ_SpdLines = state end,})
+
+    Tab:create_module({title = "Chromatic", description = "Color distortion", flag = "ENQ_Chromatic",
+        callback = function(state) getgenv().ENQ_Chromatic = state end,})
+
+    Tab:create_module({title = "Custom Skybox", description = "Custom sky textures", flag = "ENQ_CustSky",
+        callback = function(state) getgenv().ENQ_CustSky = state end,})
+
+    Tab:create_module({title = "Sky Color", description = "Change sky color", flag = "ENQ_SkyColor",
+        callback = function(state) getgenv().ENQ_SkyColor = state end,})
+
+    Tab:create_module({title = "FOV Changer", description = "Change field of view", flag = "ENQ_FOVChg",
+        callback = function(state) getgenv().ENQ_FOVChg = state end,})
+
+    Tab:create_module({title = "Depth of Field", description = "Blur effect", flag = "ENQ_DoF",
+        callback = function(state) getgenv().ENQ_DoF = state end,})
+
+    Tab:create_module({title = "Sun Rays", description = "Add sun rays", flag = "ENQ_SunRays",
+        callback = function(state) getgenv().ENQ_SunRays = state end,})
+
+    Tab:create_module({title = "Atmosphere", description = "Atmosphere effect", flag = "ENQ_Atmos",
+        callback = function(state) getgenv().ENQ_Atmos = state end,})
+
+    Tab:create_module({title = "Vignette", description = "Vignette overlay", flag = "ENQ_Vignette",
+        callback = function(state) getgenv().ENQ_Vignette = state end,})
+
+    Tab:create_module({title = "Grayscale", description = "Black and white", flag = "ENQ_Grayscale",
+        callback = function(state) getgenv().ENQ_Grayscale = state end,})
+
+    Tab:create_module({title = "Invert Colors", description = "Invert screen colors", flag = "ENQ_Invert",
+        callback = function(state) getgenv().ENQ_Invert = state end,})
+
+    Tab:create_module({title = "Pixelate", description = "Pixel effect", flag = "ENQ_Pixelate",
+        callback = function(state) getgenv().ENQ_Pixelate = state end,})
+
+    Tab:create_module({title = "Contrast Boost", description = "Increase contrast", flag = "ENQ_Contrast",
+        callback = function(state) getgenv().ENQ_Contrast = state end,})
+
+    Tab:create_module({title = "Saturation Boost", description = "Increase saturation", flag = "ENQ_SatBoost",
+        callback = function(state) getgenv().ENQ_SatBoost = state end,})
+
+end
+
+do
+    local Tab = library:create_tab("World+")
+
+    Tab:create_module({title = "Custom Lighting V2", description = "Advanced lighting", flag = "ENQ_CustLight",
+        callback = function(state) getgenv().ENQ_CustLight = state end,})
+
+    Tab:create_module({title = "Ambient R/G/B", description = "Custom ambient colors", flag = "ENQ_AmbRGB",
+        callback = function(state) getgenv().ENQ_AmbRGB = state end,})
+
+    Tab:create_module({title = "Shadow Control", description = "Shadow settings", flag = "ENQ_Shadow",
+        callback = function(state) getgenv().ENQ_Shadow = state end,})
+
+    Tab:create_module({title = "Time Cycle V2", description = "Enhanced day/night", flag = "ENQ_TimeCyc2",
+        callback = function(state) getgenv().ENQ_TimeCyc2 = state end,})
+
+    Tab:create_module({title = "Fast Time V2", description = "Enhanced time speed", flag = "ENQ_FastTime2",
+        callback = function(state) getgenv().ENQ_FastTime2 = state end,})
+
+    Tab:create_module({title = "No Terrain", description = "Remove terrain", flag = "ENQ_NoTerrain",
+        callback = function(state) getgenv().ENQ_NoTerrain = state end,})
+
+    Tab:create_module({title = "Remove Decor", description = "Remove decorations", flag = "ENQ_RemDecor",
+        callback = function(state) getgenv().ENQ_RemDecor = state end,})
+
+    Tab:create_module({title = "Mute World V2", description = "Enhanced muting", flag = "ENQ_MuteWorld2",
+        callback = function(state) getgenv().ENQ_MuteWorld2 = state end,})
+
+    Tab:create_module({title = "Third Person V2", description = "Enhanced camera", flag = "ENQ_ThirdP2",
+        callback = function(state) getgenv().ENQ_ThirdP2 = state end,})
+
+    Tab:create_module({title = "Camera Distance", description = "Camera distance slider", flag = "ENQ_CamDist",
+        callback = function(state) getgenv().ENQ_CamDist = state end,})
+
+    Tab:create_module({title = "Anti Void V2", description = "Enhanced anti-void", flag = "ENQ_AntiVoid2",
+        callback = function(state) getgenv().ENQ_AntiVoid2 = state end,})
+
+    Tab:create_module({title = "No Sound", description = "Remove all sounds", flag = "ENQ_NoSound",
+        callback = function(state) getgenv().ENQ_NoSound = state end,})
+
+    Tab:create_module({title = "No Explosions", description = "Remove explosions", flag = "ENQ_NoExplos",
+        callback = function(state) getgenv().ENQ_NoExplos = state end,})
+
+    Tab:create_module({title = "No Trails", description = "Remove trails", flag = "ENQ_NoTrails",
+        callback = function(state) getgenv().ENQ_NoTrails = state end,})
+
+    Tab:create_module({title = "No Beams", description = "Remove beams", flag = "ENQ_NoBeams",
+        callback = function(state) getgenv().ENQ_NoBeams = state end,})
+
+    Tab:create_module({title = "No Fire", description = "Remove fire effects", flag = "ENQ_NoFire",
+        callback = function(state) getgenv().ENQ_NoFire = state end,})
+
+    Tab:create_module({title = "No Smoke", description = "Remove smoke", flag = "ENQ_NoSmoke",
+        callback = function(state) getgenv().ENQ_NoSmoke = state end,})
+
+    Tab:create_module({title = "Clean Workspace", description = "Remove all effects", flag = "ENQ_CleanWS",
+        callback = function(state) getgenv().ENQ_CleanWS = state end,})
+
+    Tab:create_module({title = "Fog Color", description = "Custom fog color", flag = "ENQ_FogColor",
+        callback = function(state) getgenv().ENQ_FogColor = state end,})
+
+    Tab:create_module({title = "Brightness Slider", description = "Custom brightness", flag = "ENQ_BrightSl",
+        callback = function(state) getgenv().ENQ_BrightSl = state end,})
+
+end
+
+do
+    local Tab = library:create_tab("Config+")
+
+    Tab:create_module({title = "Save Config", description = "Save settings", flag = "ENQ_SaveCfg",
+        callback = function(state) getgenv().ENQ_SaveCfg = state end,})
+
+    Tab:create_module({title = "Load Config", description = "Load settings", flag = "ENQ_LoadCfg",
+        callback = function(state) getgenv().ENQ_LoadCfg = state end,})
+
+    Tab:create_module({title = "Reset Config", description = "Reset defaults", flag = "ENQ_ResetCfg",
+        callback = function(state) getgenv().ENQ_ResetCfg = state end,})
+
+    Tab:create_module({title = "Export Config", description = "Export as string", flag = "ENQ_ExportCfg",
+        callback = function(state) getgenv().ENQ_ExportCfg = state end,})
+
+    Tab:create_module({title = "Import Config", description = "Import from string", flag = "ENQ_ImportCfg",
+        callback = function(state) getgenv().ENQ_ImportCfg = state end,})
+
+    Tab:create_module({title = "Auto Save", description = "Auto save on change", flag = "ENQ_AutoSave",
+        callback = function(state) getgenv().ENQ_AutoSave = state end,})
+
+    Tab:create_module({title = "Profile 1", description = "Quick profile 1", flag = "ENQ_Prof1",
+        callback = function(state) getgenv().ENQ_Prof1 = state end,})
+
+    Tab:create_module({title = "Profile 2", description = "Quick profile 2", flag = "ENQ_Prof2",
+        callback = function(state) getgenv().ENQ_Prof2 = state end,})
+
+    Tab:create_module({title = "Profile 3", description = "Quick profile 3", flag = "ENQ_Prof3",
+        callback = function(state) getgenv().ENQ_Prof3 = state end,})
+
+    Tab:create_module({title = "Copy Discord", description = "Copy invite link", flag = "ENQ_CopyDisc",
+        callback = function(state) getgenv().ENQ_CopyDisc = state end,})
+
+    Tab:create_module({title = "Unload Script", description = "Unload everything", flag = "ENQ_Unload2",
+        callback = function(state) getgenv().ENQ_Unload2 = state end,})
+
+    Tab:create_module({title = "Toggle UI", description = "Show/hide UI", flag = "ENQ_TogUI",
+        callback = function(state) getgenv().ENQ_TogUI = state end,})
+
+    Tab:create_module({title = "Minimize UI", description = "Minimize to icon", flag = "ENQ_MinUI",
+        callback = function(state) getgenv().ENQ_MinUI = state end,})
+
+    Tab:create_module({title = "Watermark V2", description = "Enhanced watermark", flag = "ENQ_WM2",
+        callback = function(state) getgenv().ENQ_WM2 = state end,})
+
+    Tab:create_module({title = "Server Info V2", description = "Detailed server info", flag = "ENQ_SrvInfo",
+        callback = function(state) getgenv().ENQ_SrvInfo = state end,})
+
+    Tab:create_module({title = "Player List", description = "Show player list", flag = "ENQ_PlyList",
+        callback = function(state) getgenv().ENQ_PlyList = state end,})
+
+    Tab:create_module({title = "About", description = "About ENRIQUE", flag = "ENQ_About",
+        callback = function(state) getgenv().ENQ_About = state end,})
+
+    Tab:create_module({title = "Credits", description = "Show credits", flag = "ENQ_Credits",
+        callback = function(state) getgenv().ENQ_Credits = state end,})
+
+    Tab:create_module({title = "Update Log", description = "Show updates", flag = "ENQ_UpdLog",
+        callback = function(state) getgenv().ENQ_UpdLog = state end,})
+
+    Tab:create_module({title = "Bug Report", description = "Report bugs", flag = "ENQ_BugReport",
+        callback = function(state) getgenv().ENQ_BugReport = state end,})
+
+end
+
+do
+    local Tab = library:create_tab("Character")
+
+    Tab:create_module({title = "No Head V2", description = "Enhanced head removal", flag = "ENQ_NoHead2",
+        callback = function(state) getgenv().ENQ_NoHead2 = state end,})
+
+    Tab:create_module({title = "No Left Leg", description = "Remove left leg", flag = "ENQ_NoLeftLeg",
+        callback = function(state) getgenv().ENQ_NoLeftLeg = state end,})
+
+    Tab:create_module({title = "No Right Leg V2", description = "Enhanced right leg removal", flag = "ENQ_NoRL2",
+        callback = function(state) getgenv().ENQ_NoRL2 = state end,})
+
+    Tab:create_module({title = "No Arms V2", description = "Enhanced arm removal", flag = "ENQ_NoArms2",
+        callback = function(state) getgenv().ENQ_NoArms2 = state end,})
+
+    Tab:create_module({title = "Glow Body V2", description = "Enhanced glow", flag = "ENQ_Glow2",
+        callback = function(state) getgenv().ENQ_Glow2 = state end,})
+
+    Tab:create_module({title = "Invisible V2", description = "Enhanced invisibility", flag = "ENQ_Invis2",
+        callback = function(state) getgenv().ENQ_Invis2 = state end,})
+
+    Tab:create_module({title = "Big Head V2", description = "Enhanced big head", flag = "ENQ_BigHead2",
+        callback = function(state) getgenv().ENQ_BigHead2 = state end,})
+
+    Tab:create_module({title = "Tiny Body", description = "Shrink character", flag = "ENQ_TinyBody",
+        callback = function(state) getgenv().ENQ_TinyBody = state end,})
+
+    Tab:create_module({title = "Giant Mode", description = "Scale up character", flag = "ENQ_GiantMode",
+        callback = function(state) getgenv().ENQ_GiantMode = state end,})
+
+    Tab:create_module({title = "Ghost Mode", description = "Transparent body", flag = "ENQ_GhostMode",
+        callback = function(state) getgenv().ENQ_GhostMode = state end,})
+
+    Tab:create_module({title = "Neon Body", description = "Neon material", flag = "ENQ_NeonBody",
+        callback = function(state) getgenv().ENQ_NeonBody = state end,})
+
+    Tab:create_module({title = "Rainbow Body V2", description = "Enhanced rainbow", flag = "ENQ_RainBody2",
+        callback = function(state) getgenv().ENQ_RainBody2 = state end,})
+
+    Tab:create_module({title = "Fire Body", description = "Fire effect on body", flag = "ENQ_FireBody",
+        callback = function(state) getgenv().ENQ_FireBody = state end,})
+
+    Tab:create_module({title = "Ice Body", description = "Ice effect on body", flag = "ENQ_IceBody",
+        callback = function(state) getgenv().ENQ_IceBody = state end,})
+
+    Tab:create_module({title = "Lightning Body", description = "Lightning effect", flag = "ENQ_LightningBody",
+        callback = function(state) getgenv().ENQ_LightningBody = state end,})
+
+    Tab:create_module({title = "Sparkle Body", description = "Sparkle effect", flag = "ENQ_SparkleBody",
+        callback = function(state) getgenv().ENQ_SparkleBody = state end,})
+
+    Tab:create_module({title = "Trail Body", description = "Body trails", flag = "ENQ_TrailBody",
+        callback = function(state) getgenv().ENQ_TrailBody = state end,})
+
+    Tab:create_module({title = "Aura Body", description = "Aura effect", flag = "ENQ_AuraBody",
+        callback = function(state) getgenv().ENQ_AuraBody = state end,})
+
+    Tab:create_module({title = "Shield Body", description = "Shield effect", flag = "ENQ_ShieldBody",
+        callback = function(state) getgenv().ENQ_ShieldBody = state end,})
+
+    Tab:create_module({title = "Speed Trail", description = "Speed lines on move", flag = "ENQ_SpdTrail",
+        callback = function(state) getgenv().ENQ_SpdTrail = state end,})
+
+end
+
+do
+    local Tab = library:create_tab("Music")
+
+    Tab:create_module({title = "Play V2", description = "Enhanced player", flag = "ENQ_MPlay2",
+        callback = function(state) getgenv().ENQ_MPlay2 = state end,})
+
+    Tab:create_module({title = "Stop V2", description = "Enhanced stop", flag = "ENQ_MStop2",
+        callback = function(state) getgenv().ENQ_MStop2 = state end,})
+
+    Tab:create_module({title = "Volume V2", description = "Enhanced volume", flag = "ENQ_MVol2",
+        callback = function(state) getgenv().ENQ_MVol2 = state end,})
+
+    Tab:create_module({title = "Pitch V2", description = "Enhanced pitch", flag = "ENQ_MPitch2",
+        callback = function(state) getgenv().ENQ_MPitch2 = state end,})
+
+    Tab:create_module({title = "Fade In", description = "Fade in music", flag = "ENQ_MFadeIn",
+        callback = function(state) getgenv().ENQ_MFadeIn = state end,})
+
+    Tab:create_module({title = "Fade Out", description = "Fade out music", flag = "ENQ_MFadeOut",
+        callback = function(state) getgenv().ENQ_MFadeOut = state end,})
+
+    Tab:create_module({title = "3D Audio", description = "Spatial audio", flag = "ENQ_M3DAudio",
+        callback = function(state) getgenv().ENQ_M3DAudio = state end,})
+
+    Tab:create_module({title = "Stereo", description = "Stereo mode", flag = "ENQ_MStereo",
+        callback = function(state) getgenv().ENQ_MStereo = state end,})
+
+    Tab:create_module({title = "Loop Toggle", description = "Toggle loop", flag = "ENQ_MLoop",
+        callback = function(state) getgenv().ENQ_MLoop = state end,})
+
+    Tab:create_module({title = "Pause", description = "Pause music", flag = "ENQ_MPause",
+        callback = function(state) getgenv().ENQ_MPause = state end,})
+
+    Tab:create_module({title = "Resume", description = "Resume music", flag = "ENQ_MResume",
+        callback = function(state) getgenv().ENQ_MResume = state end,})
+
+    Tab:create_module({title = "Next Song", description = "Next track", flag = "ENQ_MNext",
+        callback = function(state) getgenv().ENQ_MNext = state end,})
+
+    Tab:create_module({title = "Previous Song", description = "Previous track", flag = "ENQ_MPrev",
+        callback = function(state) getgenv().ENQ_MPrev = state end,})
+
+    Tab:create_module({title = "Shuffle", description = "Shuffle mode", flag = "ENQ_MShuffle",
+        callback = function(state) getgenv().ENQ_MShuffle = state end,})
+
+    Tab:create_module({title = "Equalizer", description = "Audio equalizer", flag = "ENQ_MEqual",
+        callback = function(state) getgenv().ENQ_MEqual = state end,})
+
+    Tab:create_module({title = "Reverb", description = "Reverb effect", flag = "ENQ_MReverb",
+        callback = function(state) getgenv().ENQ_MReverb = state end,})
+
+    Tab:create_module({title = "Echo", description = "Echo effect", flag = "ENQ_MEcho",
+        callback = function(state) getgenv().ENQ_MEcho = state end,})
+
+    Tab:create_module({title = "Distortion", description = "Distortion effect", flag = "ENQ_MDist",
+        callback = function(state) getgenv().ENQ_MDist = state end,})
+
+    Tab:create_module({title = "Bass Boost", description = "Boost bass", flag = "ENQ_MBass",
+        callback = function(state) getgenv().ENQ_MBass = state end,})
+
+    Tab:create_module({title = "Treble Boost", description = "Boost treble", flag = "ENQ_MTreble",
+        callback = function(state) getgenv().ENQ_MTreble = state end,})
+
+end
+
+-- ======================== COMBAT+ DETAILED ========================
+do
+    local C = library:create_tab("Combat+")
+    C:create_module({title = "Ball Prediction", description = "Ball trajectory prediction", flag = "ENQ_BallPred",
+        callback = function(state)
+            if state then getgenv()._ENQ_BP_Conn = game:GetService("RunService").Heartbeat:Connect(function() pcall(function()
+        local char = LocalPlayer.Character; if not char then return end
+        local hrp = char:FindFirstChild("HumanoidRootPart"); if not hrp then return end
+        for _, obj in pairs(workspace:GetDescendants()) do
+            if obj.Name == "Ball" or obj.Name == "Part" then
+                if obj:IsA("BasePart") and obj:FindFirstChild("Velocity") then
+                    local dist = (obj.Position - hrp.Position).Magnitude
+                    local speed = obj.Velocity.Magnitude
+                    local timeToHit = dist / math.max(speed, 1)
+                    local predicted = obj.Position + obj.Velocity * timeToHit * 0.8
+                    if dist < 50 then
+                        getgenv()._ENQ_BP_Ready = true
+                        getgenv()._ENQ_BP_Time = timeToHit
+                    end
+                end
+            end
+        end
+    end) end) else
+        if getgenv()._ENQ_BP_Conn then getgenv()._ENQ_BP_Conn:Disconnect(); getgenv()._ENQ_BP_Conn = nil end
+    end
+        end,})
+
+    C:create_module({title = "Curve Detection", description = "Detect curve balls", flag = "ENQ_CurveDet",
+        callback = function(state)
+            if state then getgenv()._ENQ_CD_Conn = game:GetService("RunService").Heartbeat:Connect(function() pcall(function()
+        for _, obj in pairs(workspace:GetDescendants()) do
+            if obj:IsA("BasePart") and (obj.Name == "Ball" or obj.Name == "Part") then
+                local vel = obj.Velocity
+                local accel = obj.AssemblyAngularVelocity
+                if accel.Magnitude > 0.1 then
+                    getgenv()._ENQ_CD_Curve = true
+                    getgenv()._ENQ_CD_Dir = accel.Unit
+                end
+            end
+        end
+    end) end) else
+        if getgenv()._ENQ_CD_Conn then getgenv()._ENQ_CD_Conn:Disconnect(); getgenv()._ENQ_CD_Conn = nil end
+    end
+        end,})
+
+    C:create_module({title = "Freeze Detection", description = "Detect frozen balls", flag = "ENQ_FreezeDet",
+        callback = function(state)
+            if state then getgenv()._ENQ_FD_Conn = game:GetService("RunService").Heartbeat:Connect(function() pcall(function()
+        for _, obj in pairs(workspace:GetDescendants()) do
+            if obj:IsA("BasePart") and (obj.Name == "Ball" or obj.Name == "Part") then
+                if obj.Velocity.Magnitude < 0.5 and obj.Anchored then
+                    getgenv()._ENQ_FD_Frozen = true
+                    getgenv()._ENQ_FD_Pos = obj.Position
+                end
+            end
+        end
+    end) end) else
+        if getgenv()._ENQ_FD_Conn then getgenv()._ENQ_FD_Conn:Disconnect(); getgenv()._ENQ_FD_Conn = nil end
+    end
+        end,})
+
+    C:create_module({title = "Multi Parry", description = "Parry multiple balls simultaneously", flag = "ENQ_MultiParry",
+        callback = function(state)
+            if state then getgenv()._ENQ_MP_Conn = game:GetService("RunService").Heartbeat:Connect(function() pcall(function()
+        local char = LocalPlayer.Character; if not char then return end
+        local hrp = char:FindFirstChild("HumanoidRootPart"); if not hrp then return end
+        local tool = char:FindFirstChildOfClass("Tool")
+        local ballCount = 0
+        for _, obj in pairs(workspace:GetDescendants()) do
+            if obj:IsA("BasePart") and (obj.Name == "Ball" or obj.Name == "Part") then
+                local dist = (obj.Position - hrp.Position).Magnitude
+                if dist < 30 then ballCount = ballCount + 1 end
+            end
+        end
+        if ballCount > 1 and tool then tool:Activate() end
+    end) end) else
+        if getgenv()._ENQ_MP_Conn then getgenv()._ENQ_MP_Conn:Disconnect(); getgenv()._ENQ_MP_Conn = nil end
+    end
+        end,})
+
+    C:create_module({title = "Perfect Timing", description = "Parry at perfect frame", flag = "ENQ_PerfTime",
+        callback = function(state)
+            if state then getgenv()._ENQ_PT_Conn = game:GetService("RunService").Heartbeat:Connect(function() pcall(function()
+        local char = LocalPlayer.Character; if not char then return end
+        local hrp = char:FindFirstChild("HumanoidRootPart"); if not hrp then return end
+        for _, obj in pairs(workspace:GetDescendants()) do
+            if obj:IsA("BasePart") and (obj.Name == "Ball" or obj.Name == "Part") then
+                local dist = (obj.Position - hrp.Position).Magnitude
+                if dist < 8 and dist > 3 then
+                    local tool = char:FindFirstChildOfClass("Tool")
+                    if tool then tool:Activate() end
+                end
+            end
+        end
+    end) end) else
+        if getgenv()._ENQ_PT_Conn then getgenv()._ENQ_PT_Conn:Disconnect(); getgenv()._ENQ_PT_Conn = nil end
+    end
+        end,})
+
+    C:create_module({title = "Ball Redirect", description = "Redirect ball to nearest player", flag = "ENQ_BallRedir",
+        callback = function(state)
+            if state then getgenv()._ENQ_BR_Conn = game:GetService("RunService").Heartbeat:Connect(function() pcall(function()
+        local char = LocalPlayer.Character; if not char then return end
+        local hrp = char:FindFirstChild("HumanoidRootPart"); if not hrp then return end
+        local nearest, nearDist = nil, math.huge
+        for _, player in pairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer and player.Character then
+                local tHRP = player.Character:FindFirstChild("HumanoidRootPart")
+                if tHRP then
+                    local d = (tHRP.Position - hrp.Position).Magnitude
+                    if d < nearDist then nearDist = d; nearest = tHRP end
+                end
+            end
+        end
+        if nearest then getgenv()._ENQ_BR_Target = nearest.Position end
+    end) end) else
+        if getgenv()._ENQ_BR_Conn then getgenv()._ENQ_BR_Conn:Disconnect(); getgenv()._ENQ_BR_Conn = nil end
+    end
+        end,})
+
+    C:create_module({title = "Auto Ability", description = "Auto activate abilities", flag = "ENQ_AutoAbil",
+        callback = function(state)
+            if state then getgenv()._ENQ_AA_Conn = game:GetService("RunService").Heartbeat:Connect(function() pcall(function()
+        local char = LocalPlayer.Character; if not char then return end
+        for _, tool in pairs(char:GetChildren()) do
+            if tool:IsA("Tool") then tool:Activate() end
+        end
+    end) end) else
+        if getgenv()._ENQ_AA_Conn then getgenv()._ENQ_AA_Conn:Disconnect(); getgenv()._ENQ_AA_Conn = nil end
+    end
+        end,})
+
+    C:create_module({title = "Killaura", description = "Auto attack nearby players", flag = "ENQ_Killaura",
+        callback = function(state)
+            if state then getgenv()._ENQ_KA_Conn = game:GetService("RunService").Heartbeat:Connect(function() pcall(function()
+        local char = LocalPlayer.Character; if not char then return end
+        local hrp = char:FindFirstChild("HumanoidRootPart"); if not hrp then return end
+        local tool = char:FindFirstChildOfClass("Tool")
+        if tool then
+            for _, player in pairs(Players:GetPlayers()) do
+                if player ~= LocalPlayer and player.Character then
+                    local tHRP = player.Character:FindFirstChild("HumanoidRootPart")
+                    if tHRP and (tHRP.Position - hrp.Position).Magnitude < 15 then
+                        tool:Activate()
+                    end
+                end
+            end
+        end
+    end) end) else
+        if getgenv()._ENQ_KA_Conn then getgenv()._ENQ_KA_Conn:Disconnect(); getgenv()._ENQ_KA_Conn = nil end
+    end
+        end,})
+
+    C:create_module({title = "Click TP", description = "Ctrl+Click to teleport", flag = "ENQ_ClickTP",
+        callback = function(state)
+            if state then
+        getgenv()._ENQ_CTP_Conn = LocalPlayer:GetMouse().Button1Down:Connect(function()
+            pcall(function()
+                if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then
+                    local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                    if hrp then hrp.CFrame = CFrame.new(LocalPlayer:GetMouse().Hit.Position + Vector3.new(0, 3, 0)) end
+                end
+            end)
+        end)
+    else
+        if getgenv()._ENQ_CTP_Conn then getgenv()._ENQ_CTP_Conn:Disconnect(); getgenv()._ENQ_CTP_Conn = nil end
+    end
+        end,})
+
+    C:create_module({title = "TP Nearest", description = "Teleport to nearest player", flag = "ENQ_TPNear",
+        callback = function(state)
+            if state then pcall(function()
+        local char = LocalPlayer.Character; if not char then return end
+        local hrp = char:FindFirstChild("HumanoidRootPart"); if not hrp then return end
+        local nearest, nearDist = nil, math.huge
+        for _, player in pairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer and player.Character then
+                local tHRP = player.Character:FindFirstChild("HumanoidRootPart")
+                if tHRP then
+                    local d = (tHRP.Position - hrp.Position).Magnitude
+                    if d < nearDist then nearDist = d; nearest = tHRP end
+                end
+            end
+        end
+        if nearest then hrp.CFrame = nearest.CFrame * CFrame.new(0, 0, 3) end
+    end) end
+        end,})
+
+    C:create_module({title = "Speed Parry", description = "Ultra fast parry reaction", flag = "ENQ_SpdParry",
+        callback = function(state)
+            if state then getgenv()._ENQ_SP_Conn = game:GetService("RunService").Heartbeat:Connect(function() pcall(function()
+        local char = LocalPlayer.Character; if not char then return end
+        local hrp = char:FindFirstChild("HumanoidRootPart"); if not hrp then return end
+        for _, obj in pairs(workspace:GetDescendants()) do
+            if obj:IsA("BasePart") and (obj.Name == "Ball" or obj.Name == "Part") then
+                local dist = (obj.Position - hrp.Position).Magnitude
+                if dist < 12 then
+                    local tool = char:FindFirstChildOfClass("Tool")
+                    if tool then tool:Activate() end
+                end
+            end
+        end
+    end) end) else
+        if getgenv()._ENQ_SP_Conn then getgenv()._ENQ_SP_Conn:Disconnect(); getgenv()._ENQ_SP_Conn = nil end
+    end
+        end,})
+
+    C:create_module({title = "Counter Parry", description = "Counter attack after opponent", flag = "ENQ_CntParry",
+        callback = function(state)
+            if state then getgenv()._ENQ_CP_Conn = game:GetService("RunService").Heartbeat:Connect(function() pcall(function()
+        local char = LocalPlayer.Character; if not char then return end
+        local hrp = char:FindFirstChild("HumanoidRootPart"); if not hrp then return end
+        for _, obj in pairs(workspace:GetDescendants()) do
+            if obj:IsA("BasePart") and (obj.Name == "Ball" or obj.Name == "Part") then
+                if obj.Velocity.Magnitude > 10 then
+                    local dist = (obj.Position - hrp.Position).Magnitude
+                    if dist < 20 and dist > 5 then
+                        local tool = char:FindFirstChildOfClass("Tool")
+                        if tool then task.delay(0.05, function() tool:Activate() end) end
+                    end
+                end
+            end
+        end
+    end) end) else
+        if getgenv()._ENQ_CP_Conn then getgenv()._ENQ_CP_Conn:Disconnect(); getgenv()._ENQ_CP_Conn = nil end
+    end
+        end,})
+
+    C:create_module({title = "Fake Parry", description = "Fake parry to bait", flag = "ENQ_FakeParry",
+        callback = function(state)
+            if state then getgenv()._ENQ_FP_Conn = game:GetService("RunService").Heartbeat:Connect(function() pcall(function()
+        local char = LocalPlayer.Character; if not char then return end
+        local tool = char:FindFirstChildOfClass("Tool")
+        if tool then tool:Deactivate() end
+    end) end) else
+        if getgenv()._ENQ_FP_Conn then getgenv()._ENQ_FP_Conn:Disconnect(); getgenv()._ENQ_FP_Conn = nil end
+    end
+        end,})
+
+    C:create_module({title = "Auto Block", description = "Auto block incoming", flag = "ENQ_AutoBlock",
+        callback = function(state)
+            if state then getgenv()._ENQ_AB_Conn = game:GetService("RunService").Heartbeat:Connect(function() pcall(function()
+        local char = LocalPlayer.Character; if not char then return end
+        local hrp = char:FindFirstChild("HumanoidRootPart"); if not hrp then return end
+        for _, obj in pairs(workspace:GetDescendants()) do
+            if obj:IsA("BasePart") and (obj.Name == "Ball" or obj.Name == "Part") then
+                local dist = (obj.Position - hrp.Position).Magnitude
+                if dist < 25 then
+                    local tool = char:FindFirstChildOfClass("Tool")
+                    if tool then tool:Activate() end
+                end
+            end
+        end
+    end) end) else
+        if getgenv()._ENQ_AB_Conn then getgenv()._ENQ_AB_Conn:Disconnect(); getgenv()._ENQ_AB_Conn = nil end
+    end
+        end,})
+
+    C:create_module({title = "Target Lock", description = "Lock onto nearest player", flag = "ENQ_TargLock",
+        callback = function(state)
+            if state then getgenv()._ENQ_TL_Conn = game:GetService("RunService").RenderStepped:Connect(function() pcall(function()
+        local char = LocalPlayer.Character; if not char then return end
+        local hrp = char:FindFirstChild("HumanoidRootPart"); if not hrp then return end
+        local cam = workspace.CurrentCamera
+        local nearest, nearDist = nil, math.huge
+        for _, player in pairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer and player.Character then
+                local tHead = player.Character:FindFirstChild("Head")
+                if tHead then
+                    local screenPos, onScreen = cam:WorldToScreenPoint(tHead.Position)
+                    if onScreen then
+                        local dist = (Vector2.new(screenPos.X, screenPos.Y) - Vector2.new(cam.ViewportSize.X/2, cam.ViewportSize.Y/2)).Magnitude
+                        if dist < nearDist then nearDist = dist; nearest = tHead end
+                    end
+                end
+            end
+        end
+        if nearest and nearDist < 300 then cam.CFrame = CFrame.new(cam.CFrame.Position, nearest.Position) end
+    end) end) else
+        if getgenv()._ENQ_TL_Conn then getgenv()._ENQ_TL_Conn:Disconnect(); getgenv()._ENQ_TL_Conn = nil end
+    end
+        end,})
+
+    C:create_module({title = "Ball Speed", description = "Ball speed modifier", flag = "ENQ_BallSpd",
+        callback = function(state)
+            if state then getgenv()._ENQ_BS_Conn = game:GetService("RunService").Heartbeat:Connect(function() pcall(function()
+        for _, obj in pairs(workspace:GetDescendants()) do
+            if obj:IsA("BasePart") and (obj.Name == "Ball" or obj.Name == "Part") then
+                if obj.Velocity.Magnitude > 0 then
+                    local dir = obj.Velocity.Unit
+                    obj.Velocity = dir * 150
+                end
+            end
+        end
+    end) end) else
+        if getgenv()._ENQ_BS_Conn then getgenv()._ENQ_BS_Conn:Disconnect(); getgenv()._ENQ_BS_Conn = nil end
+    end
+        end,})
+
+    C:create_module({title = "Parry Cooldown", description = "Reduce parry cooldown", flag = "ENQ_ParryCD",
+        callback = function(state)
+            if state then getgenv()._ENQ_PCD = true
+    else getgenv()._ENQ_PCD = false end
+        end,})
+
+    C:create_module({title = "Auto Aim", description = "Auto aim at ball", flag = "ENQ_AutoAim",
+        callback = function(state)
+            if state then getgenv()._ENQ_AAA_Conn = game:GetService("RunService").RenderStepped:Connect(function() pcall(function()
+        local char = LocalPlayer.Character; if not char then return end
+        local hrp = char:FindFirstChild("HumanoidRootPart"); if not hrp then return end
+        local cam = workspace.CurrentCamera
+        for _, obj in pairs(workspace:GetDescendants()) do
+            if obj:IsA("BasePart") and (obj.Name == "Ball" or obj.Name == "Part") then
+                local dist = (obj.Position - hrp.Position).Magnitude
+                if dist < 60 then
+                    cam.CFrame = CFrame.new(cam.CFrame.Position, obj.Position)
+                end
+            end
+        end
+    end) end) else
+        if getgenv()._ENQ_AAA_Conn then getgenv()._ENQ_AAA_Conn:Disconnect(); getgenv()._ENQ_AAA_Conn = nil end
+    end
+        end,})
+
+    C:create_module({title = "Remote Parry", description = "Remote-based parry", flag = "ENQ_RemParry",
+        callback = function(state)
+            if state then getgenv()._ENQ_RP = true
+    else getgenv()._ENQ_RP = false end
+        end,})
+
+    C:create_module({title = "Reaction Test", description = "Test parry reaction time", flag = "ENQ_ReactTest",
+        callback = function(state)
+            if state then getgenv()._ENQ_RT_Start = tick()
+        getgenv()._ENQ_RT_Conn = game:GetService("RunService").Heartbeat:Connect(function() pcall(function()
+            local char = LocalPlayer.Character; if not char then return end
+            local hrp = char:FindFirstChild("HumanoidRootPart"); if not hrp then return end
+            for _, obj in pairs(workspace:GetDescendants()) do
+                if obj:IsA("BasePart") and (obj.Name == "Ball" or obj.Name == "Part") then
+                    local dist = (obj.Position - hrp.Position).Magnitude
+                    if dist < 15 then
+                        local elapsed = tick() - getgenv()._ENQ_RT_Start
+                        Library:notify({title = "Reaction", text = "Time: " .. string.format("%.3f", elapsed) .. "s", duration = 2})
+                        getgenv()._ENQ_RT_Start = tick()
+                    end
+                end
+            end
+        end) end)
+    else
+        if getgenv()._ENQ_RT_Conn then getgenv()._ENQ_RT_Conn:Disconnect(); getgenv()._ENQ_RT_Conn = nil end
+    end
+        end,})
+
+end
+
+-- ======================== PLAYER+ DETAILED ========================
+do
+    local P = library:create_tab("Player+")
+    P:create_module({title = "WalkSpeed V2", description = "Enhanced walk speed", flag = "ENQ_WS2",
+        callback = function(state)
+            if state then getgenv()._ENQ_WS2_Conn = game:GetService("RunService").Heartbeat:Connect(function()
+            pcall(function() local h = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+            if h then h.WalkSpeed = getgenv().ENQ_WS2_V or 50 end end)
+            end) else if getgenv()._ENQ_WS2_Conn then getgenv()._ENQ_WS2_Conn:Disconnect(); getgenv()._ENQ_WS2_Conn = nil end
+            pcall(function() LocalPlayer.Character:FindFirstChildOfClass("Humanoid").WalkSpeed = 16) end
+        end,})
+
+    P:create_module({title = "JumpPower V2", description = "Enhanced jump power", flag = "ENQ_JP2",
+        callback = function(state)
+            if state then getgenv()._ENQ_JP2_Conn = game:GetService("RunService").Heartbeat:Connect(function()
+            pcall(function() local h = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+            if h then h.UseJumpPower = true; h.JumpPower = getgenv().ENQ_JP2_V or 100 end end)
+            end) else if getgenv()._ENQ_JP2_Conn then getgenv()._ENQ_JP2_Conn:Disconnect(); getgenv()._ENQ_JP2_Conn = nil end
+            pcall(function() local h = LocalPlayer.Character:FindFirstChildOfClass("Humanoid"); h.UseJumpPower = true; h.JumpPower = 50) end
+        end,})
+
+    P:create_module({title = "NoClip V2", description = "Enhanced noclip", flag = "ENQ_NC2",
+        callback = function(state)
+            if state then getgenv()._ENQ_NC2_Conn = game:GetService("RunService").Stepped:Connect(function()
+            pcall(function() for _, p in pairs(LocalPlayer.Character:GetDescendants()) do
+            if p:IsA("BasePart") then p.CanCollide = false end end end)
+            end) else if getgenv()._ENQ_NC2_Conn then getgenv()._ENQ_NC2_Conn:Disconnect(); getgenv()._ENQ_NC2_Conn = nil end end
+        end,})
+
+    P:create_module({title = "God Mode V2", description = "Enhanced god mode", flag = "ENQ_God2",
+        callback = function(state)
+            if state then getgenv()._ENQ_God2_Conn = game:GetService("RunService").Heartbeat:Connect(function()
+            pcall(function() local h = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+            if h then h.Health = h.MaxHealth end end)
+            end) else if getgenv()._ENQ_God2_Conn then getgenv()._ENQ_God2_Conn:Disconnect(); getgenv()._ENQ_God2_Conn = nil end end
+        end,})
+
+    P:create_module({title = "Fly V2", description = "Enhanced flight", flag = "ENQ_Fly2",
+        callback = function(state)
+            if state then
+            local speed = 50
+            getgenv()._ENQ_Fly2_Conn = game:GetService("RunService").Heartbeat:Connect(function()
+            pcall(function()
+            local hrp = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+            local cam = workspace.CurrentCamera
+            if not hrp then return end
+            local bg = hrp:FindFirstChildOfClass("BodyGyro")
+            local bv = hrp:FindFirstChildOfClass("BodyVelocity")
+            if not bg then
+            bg = Instance.new("BodyGyro", hrp); bg.P = 9e4; bg.MaxTorque = Vector3.new(9e9, 9e9, 9e9)
+            bv = Instance.new("BodyVelocity", hrp); bv.MaxForce = Vector3.new(9e9, 9e9, 9e9)
+            end
+            bg.CFrame = cam.CFrame
+            bv.Velocity = cam.CFrame.LookVector * speed
+            if UserInputService:IsKeyDown(Enum.KeyCode.Space) then bv.Velocity = bv.Velocity + Vector3.new(0, speed, 0) end
+            if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then bv.Velocity = bv.Velocity - Vector3.new(0, speed, 0) end
+            end)
+            end)
+            else
+            if getgenv()._ENQ_Fly2_Conn then getgenv()._ENQ_Fly2_Conn:Disconnect(); getgenv()._ENQ_Fly2_Conn = nil end
+            pcall(function() LocalPlayer.Character.HumanoidRootPart:FindFirstChildOfClass("BodyGyro"):Destroy()
+            LocalPlayer.Character.HumanoidRootPart:FindFirstChildOfClass("BodyVelocity"):Destroy() end)
+            end
+        end,})
+
+    P:create_module({title = "Infinite Jump", description = "Jump in mid-air", flag = "ENQ_InfJump",
+        callback = function(state)
+            if state then getgenv()._ENQ_IJ_Conn = LocalPlayer.Character:FindFirstChildOfClass("Humanoid"):GetPropertyChangedSignal("FloorMaterial"):Connect(function()
+            pcall(function() local h = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+            if h and h.FloorMaterial == Enum.Material.Air then h:ChangeState(Enum.HumanoidStateType.Jumping) end end)
+            end) else if getgenv()._ENQ_IJ_Conn then getgenv()._ENQ_IJ_Conn:Disconnect(); getgenv()._ENQ_IJ_Conn = nil end end
+        end,})
+
+    P:create_module({title = "Speed Boost", description = "Hold shift to sprint", flag = "ENQ_SpdBoost",
+        callback = function(state)
+            if state then
+            getgenv()._ENQ_SB_Down = UserInputService.InputBegan:Connect(function(i, p) if not p and i.KeyCode == Enum.KeyCode.LeftShift then pcall(function() LocalPlayer.Character.Humanoid.WalkSpeed = 50 end) end end)
+            getgenv()._ENQ_SB_Up = UserInputService.InputEnded:Connect(function(i) if i.KeyCode == Enum.KeyCode.LeftShift then pcall(function() LocalPlayer.Character.Humanoid.WalkSpeed = 16 end) end end)
+            else
+            if getgenv()._ENQ_SB_Down then getgenv()._ENQ_SB_Down:Disconnect() end
+            if getgenv()._ENQ_SB_Up then getgenv()._ENQ_SB_Up:Disconnect() end
+            end
+        end,})
+
+    P:create_module({title = "Auto Jump", description = "Auto jump continuously", flag = "ENQ_AutoJump",
+        callback = function(state)
+            if state then getgenv()._ENQ_AJ_Conn = game:GetService("RunService").Heartbeat:Connect(function()
+            pcall(function() LocalPlayer.Character.Humanoid.Jump = true end)
+            end) else if getgenv()._ENQ_AJ_Conn then getgenv()._ENQ_AJ_Conn:Disconnect(); getgenv()._ENQ_AJ_Conn = nil end end
+        end,})
+
+    P:create_module({title = "Anti Void", description = "Prevent falling off map", flag = "ENQ_AntiVoid",
+        callback = function(state)
+            if state then getgenv()._ENQ_AV_Pos = nil
+            getgenv()._ENQ_AV_Conn = game:GetService("RunService").Heartbeat:Connect(function() pcall(function()
+            local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+            if hrp then
+            getgenv()._ENQ_AV_Pos = hrp.CFrame
+            if hrp.Position.Y < -50 then hrp.CFrame = getgenv()._ENQ_AV_Pos or CFrame.new(0, 50, 0) end
+            end
+            end) end)
+            else if getgenv()._ENQ_AV_Conn then getgenv()._ENQ_AV_Conn:Disconnect(); getgenv()._ENQ_AV_Conn = nil end end
+        end,})
+
+    P:create_module({title = "Auto Respawn", description = "Auto respawn on death", flag = "ENQ_AutoRespawn",
+        callback = function(state)
+            if state then getgenv()._ENQ_AR_Conn = LocalPlayer.CharacterAdded:Connect(function(char) task.wait(0.5)
+            pcall(function() char:FindFirstChildOfClass("Humanoid").Died:Connect(function()
+            task.wait(0.3) LocalPlayer.Character:FindFirstChildOfClass("Humanoid"):ChangeState(Enum.HumanoidStateType.Dead)
+            end) end)
+            end) else if getgenv()._ENQ_AR_Conn then getgenv()._ENQ_AR_Conn:Disconnect(); getgenv()._ENQ_AR_Conn = nil end end
+        end,})
+
+    P:create_module({title = "Float Mode", description = "Float above ground", flag = "ENQ_Float2",
+        callback = function(state)
+            if state then getgenv()._ENQ_FM_Conn = game:GetService("RunService").Heartbeat:Connect(function() pcall(function()
+            local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+            if hrp then local p = hrp.Position; hrp.Velocity = Vector3.new(hrp.Velocity.X, 0, hrp.Velocity.Z) end
+            end) end) else if getgenv()._ENQ_FM_Conn then getgenv()._ENQ_FM_Conn:Disconnect(); getgenv()._ENQ_FM_Conn = nil end end
+        end,})
+
+    P:create_module({title = "Spin Bot V2", description = "Enhanced spin", flag = "ENQ_Spin2",
+        callback = function(state)
+            if state then getgenv()._ENQ_S2_Conn = game:GetService("RunService").Heartbeat:Connect(function() pcall(function()
+            LocalPlayer.Character.HumanoidRootPart.CFrame = LocalPlayer.Character.HumanoidRootPart.CFrame * CFrame.Angles(0, math.rad(20), 0)
+            end) end) else if getgenv()._ENQ_S2_Conn then getgenv()._ENQ_S2_Conn:Disconnect(); getgenv()._ENQ_S2_Conn = nil end end
+        end,})
+
+    P:create_module({title = "Air Walk", description = "Walk in mid-air", flag = "ENQ_AirWalk",
+        callback = function(state)
+            if state then getgenv()._ENQ_AW_Conn = game:GetService("RunService").Stepped:Connect(function() pcall(function()
+            local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+            if hrp then
+            local ray = workspace:Raycast(hrp.Position, Vector3.new(0, -3, 0))
+            if not ray then
+            local part = Instance.new("Part", workspace)
+            part.Size = Vector3.new(4, 0.2, 4)
+            part.Anchored = true
+            part.CanCollide = true
+            part.Transparency = 0.8
+            part.Position = hrp.Position - Vector3.new(0, 3, 0)
+            game:GetService("Debris"):AddItem(part, 0.1)
+            end
+            end
+            end) end) else if getgenv()._ENQ_AW_Conn then getgenv()._ENQ_AW_Conn:Disconnect(); getgenv()._ENQ_AW_Conn = nil end end
+        end,})
+
+    P:create_module({title = "Slide Walk", description = "Slide movement", flag = "ENQ_SlideWalk",
+        callback = function(state)
+            if state then getgenv()._ENQ_SW_Conn = game:GetService("RunService").Heartbeat:Connect(function() pcall(function()
+            local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+            local hum = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+            if hrp and hum then hrp.CFrame = CFrame.new(hrp.Position.X, hrp.Position.Y - 1.5, hrp.Position.Z) * (hrp.CFrame - hrp.CFrame.Position) end
+            end) end) else if getgenv()._ENQ_SW_Conn then getgenv()._ENQ_SW_Conn:Disconnect(); getgenv()._ENQ_SW_Conn = nil end end
+        end,})
+
+    P:create_module({title = "Moon Jump", description = "Low gravity jump", flag = "ENQ_MoonJump",
+        callback = function(state)
+            if state then game:GetService("Workspace").Gravity = 10
+            else game:GetService("Workspace").Gravity = 196.2 end
+        end,})
+
+    P:create_module({title = "High Jump", description = "Super high jump", flag = "ENQ_HighJump",
+        callback = function(state)
+            if state then pcall(function() local h = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+            h.UseJumpPower = true; h.JumpPower = 200 end)
+            else pcall(function() LocalPlayer.Character:FindFirstChildOfClass("Humanoid").JumpPower = 50) end
+        end,})
+
+    P:create_module({title = "Gravity Control", description = "Custom gravity", flag = "ENQ_GravCtrl",
+        callback = function(state)
+            if state then game:GetService("Workspace").Gravity = 50
+            else game:GetService("Workspace").Gravity = 196.2 end
+        end,})
+
+    P:create_module({title = "Dash", description = "Quick dash forward", flag = "ENQ_Dash",
+        callback = function(state)
+            if state then getgenv()._ENQ_Dash_Conn = UserInputService.InputBegan:Connect(function(i, p)
+            if not p and i.KeyCode == Enum.KeyCode.Q then pcall(function()
+            local hrp = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+            if hrp then hrp.CFrame = hrp.CFrame + hrp.CFrame.LookVector * 30 end
+            end) end
+            end) else if getgenv()._ENQ_Dash_Conn then getgenv()._ENQ_Dash_Conn:Disconnect(); getgenv()._ENQ_Dash_Conn = nil end end
+        end,})
+
+end
+
+-- ======================== VISUALS+ DETAILED ========================
+do
+    local V = library:create_tab("Visuals+")
+    V:create_module({title = "Fullbright V2", description = "Max brightness all areas", flag = "ENQ_FB2",
+        callback = function(state)
+            if state then
+            getgenv()._ENQ_FB2_Bak = {Ambient = Lighting.Ambient, OutdoorAmbient = Lighting.OutdoorAmbient, Brightness = Lighting.Brightness, ClockTime = Lighting.ClockTime, GlobalShadows = Lighting.GlobalShadows, FogEnd = Lighting.FogEnd}
+            Lighting.Ambient = Color3.fromRGB(255,255,255); Lighting.OutdoorAmbient = Color3.fromRGB(255,255,255)
+            Lighting.Brightness = 3; Lighting.ClockTime = 14; Lighting.GlobalShadows = false; Lighting.FogEnd = 100000
+            else
+            if getgenv()._ENQ_FB2_Bak then local b = getgenv()._ENQ_FB2_Bak; for k,v in pairs(b) do Lighting[k] = v end; getgenv()._ENQ_FB2_Bak = nil end
+            end
+        end,})
+
+    V:create_module({title = "No Fog V2", description = "Enhanced fog removal", flag = "ENQ_NF2",
+        callback = function(state)
+            if state then Lighting.FogEnd = 999999; Lighting.FogStart = 0
+            else Lighting.FogEnd = 100000 end
+        end,})
+
+    V:create_module({title = "No Particles", description = "Remove all particles", flag = "ENQ_NoPart",
+        callback = function(state)
+            if state then
+            getgenv()._ENQ_NP = {}
+            for _, v in pairs(workspace:GetDescendants()) do
+            if v:IsA("ParticleEmitter") or v:IsA("Trail") or v:IsA("Beam") or v:IsA("Smoke") or v:IsA("Fire") then
+            table.insert(getgenv()._ENQ_NP, {o=v, e=v.Enabled}); v.Enabled = false
+            end
+            end
+            else
+            if getgenv()._ENQ_NP then for _, d in pairs(getgenv()._ENQ_NP) do if d.o and d.o.Parent then d.o.Enabled = d.e end end; getgenv()._ENQ_NP = nil end
+            end
+        end,})
+
+    V:create_module({title = "No Textures", description = "Remove textures for FPS", flag = "ENQ_NoTex",
+        callback = function(state)
+            if state then
+            getgenv()._ENQ_NT = {}
+            for _, v in pairs(workspace:GetDescendants()) do
+            if v:IsA("Texture") or v:IsA("Decal") then
+            table.insert(getgenv()._ENQ_NT, {o=v, t=v.Transparency}); v.Transparency = 1
+            end
+            end
+            else
+            if getgenv()._ENQ_NT then for _, d in pairs(getgenv()._ENQ_NT) do if d.o and d.o.Parent then d.o.Transparency = d.t end end; getgenv()._ENQ_NT = nil end
+            end
+        end,})
+
+    V:create_module({title = "Rainbow World", description = "Cycle world colors", flag = "ENQ_RainWorld",
+        callback = function(state)
+            if state then getgenv()._ENQ_RW_Conn = game:GetService("RunService").Heartbeat:Connect(function() pcall(function()
+            local c = Color3.fromHSV(tick() % 5 / 5, 1, 1)
+            for _, v in pairs(workspace:GetDescendants()) do
+            if (v:IsA("BasePart") or v:IsA("MeshPart")) and v.Name ~= "HumanoidRootPart" then v.Color = c end
+            end
+            end) end) else if getgenv()._ENQ_RW_Conn then getgenv()._ENQ_RW_Conn:Disconnect(); getgenv()._ENQ_RW_Conn = nil end end
+        end,})
+
+    V:create_module({title = "ESP V2", description = "Player names through walls", flag = "ENQ_ESP2",
+        callback = function(state)
+            if state then
+            getgenv()._ENQ_ESP2 = true
+            getgenv()._ENQ_ESP2_Conn = game:GetService("RunService").Heartbeat:Connect(function()
+            if not getgenv()._ENQ_ESP2 then return end
+            pcall(function()
+            for _, player in pairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("Head") then
+            local head = player.Character.Head
+            if not head:FindFirstChild("ENQ_ESP") then
+            local bb = Instance.new("BillboardGui"); bb.Name = "ENQ_ESP"; bb.Size = UDim2.new(0,150,0,40); bb.StudsOffset = Vector3.new(0,2.5,0); bb.AlwaysOnTop = true; bb.Parent = head
+            local nl = Instance.new("TextLabel"); nl.Size = UDim2.new(1,0,0.5,0); nl.BackgroundTransparency = 1; nl.Text = player.DisplayName; nl.TextColor3 = Color3.fromRGB(255,255,255); nl.TextStrokeTransparency = 0; nl.TextSize = 14; nl.Font = Enum.Font.GothamBold; nl.Parent = bb
+            local dl = Instance.new("TextLabel"); dl.Size = UDim2.new(1,0,0.5,0); dl.Position = UDim2.new(0,0,0.5,0); dl.BackgroundTransparency = 1; dl.TextColor3 = Color3.fromRGB(200,200,200); dl.TextStrokeTransparency = 0; dl.TextSize = 12; dl.Font = Enum.Font.Gotham; dl.Parent = bb
+            end
+            end
+            end
+            end)
+            end)
+            else
+            getgenv()._ENQ_ESP2 = false
+            if getgenv()._ENQ_ESP2_Conn then getgenv()._ENQ_ESP2_Conn:Disconnect(); getgenv()._ENQ_ESP2_Conn = nil end
+            for _, player in pairs(Players:GetPlayers()) do
+            pcall(function() local bb = player.Character.Head:FindFirstChild("ENQ_ESP"); if bb then bb:Destroy() end end)
+            end
+            end
+        end,})
+
+    V:create_module({title = "Player Highlights V2", description = "Enhanced highlights", flag = "ENQ_PH2",
+        callback = function(state)
+            if state then
+            getgenv()._ENQ_PH2 = {}
+            for _, pl in pairs(Players:GetPlayers()) do
+            if pl ~= LocalPlayer and pl.Character then
+            for _, v in pairs(pl.Character:GetDescendants()) do
+            if v:IsA("BasePart") then
+            local hl = Instance.new("Highlight"); hl.FillColor = Color3.fromRGB(255,0,0); hl.FillTransparency = 0.7; hl.OutlineColor = Color3.fromRGB(255,255,0); hl.OutlineTransparency = 0; hl.Parent = v
+            table.insert(getgenv()._ENQ_PH2, hl)
+            end
+            end
+            end
+            end
+            else
+            if getgenv()._ENQ_PH2 then for _, hl in pairs(getgenv()._ENQ_PH2) do if hl and hl.Parent then hl:Destroy() end end; getgenv()._ENQ_PH2 = nil end
+            end
+        end,})
+
+    V:create_module({title = "Bloom V2", description = "Enhanced bloom glow", flag = "ENQ_Bloom2",
+        callback = function(state)
+            if state then pcall(function()
+            getgenv()._ENQ_BL2 = Instance.new("BloomEffect"); getgenv()._ENQ_BL2.Intensity = 0.6; getgenv()._ENQ_BL2.Size = 30; getgenv()._ENQ_BL2.Threshold = 0.7; getgenv()._ENQ_BL2.Parent = Lighting
+            end) else pcall(function() if getgenv()._ENQ_BL2 then getgenv()._ENQ_BL2:Destroy() end end) end
+        end,})
+
+    V:create_module({title = "Color Shift", description = "Shift world colors", flag = "ENQ_ColorShift",
+        callback = function(state)
+            if state then pcall(function()
+            getgenv()._ENQ_CS = Instance.new("ColorCorrectionEffect"); getgenv()._ENQ_CS.Saturation = 0.5; getgenv()._ENQ_CS.Contrast = 0.1; getgenv()._ENQ_CS.Brightness = 0.05; getgenv()._ENQ_CS.Parent = Lighting
+            end) else pcall(function() if getgenv()._ENQ_CS then getgenv()._ENQ_CS:Destroy() end end) end
+        end,})
+
+    V:create_module({title = "Night Vision V2", description = "Enhanced night vision", flag = "ENQ_NV2",
+        callback = function(state)
+            if state then pcall(function()
+            getgenv()._ENQ_NV2 = Instance.new("ColorCorrectionEffect"); getgenv()._ENQ_NV2.TintColor = Color3.fromRGB(100,255,100); getgenv()._ENQ_NV2.Saturation = -0.8; getgenv()._ENQ_NV2.Brightness = 0.2; getgenv()._ENQ_NV2.Parent = Lighting
+            Lighting.Brightness = 0; Lighting.ClockTime = 0
+            end) else pcall(function() if getgenv()._ENQ_NV2 then getgenv()._ENQ_NV2:Destroy(); Lighting.Brightness = 1.5; Lighting.ClockTime = 12 end end) end
+        end,})
+
+    V:create_module({title = "X-Ray V2", description = "Enhanced x-ray vision", flag = "ENQ_XRay2",
+        callback = function(state)
+            if state then
+            getgenv()._ENQ_XR2 = {}
+            for _, v in pairs(workspace:GetDescendants()) do
+            if v:IsA("BasePart") and v.Transparency < 0.5 then
+            table.insert(getgenv()._ENQ_XR2, {o=v, t=v.Transparency}); v.Transparency = 0.7
+            end
+            end
+            else
+            if getgenv()._ENQ_XR2 then for _, d in pairs(getgenv()._ENQ_XR2) do if d.o and d.o.Parent then d.o.Transparency = d.t end end; getgenv()._ENQ_XR2 = nil end
+            end
+        end,})
+
+    V:create_module({title = "Speed Lines", description = "FOV zoom effect", flag = "ENQ_SpdLines",
+        callback = function(state)
+            if state then getgenv()._ENQ_SL_Conn = game:GetService("RunService").Heartbeat:Connect(function()
+            pcall(function() local cam = workspace.CurrentCamera
+            local hum = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+            if hum and hum.MoveDirection.Magnitude > 0 then cam.FieldOfView = math.min(cam.FieldOfView + 0.5, 100)
+            else cam.FieldOfView = math.max(cam.FieldOfView - 1, 70) end
+            end)
+            end) else if getgenv()._ENQ_SL_Conn then getgenv()._ENQ_SL_Conn:Disconnect(); getgenv()._ENQ_SL_Conn = nil end; workspace.CurrentCamera.FieldOfView = 70 end
+        end,})
+
+    V:create_module({title = "Custom Skybox", description = "Custom sky textures", flag = "ENQ_CustSky",
+        callback = function(state)
+            if state then pcall(function()
+            for _, v in pairs(Lighting:GetChildren()) do if v:IsA("Sky") then v:Destroy() end end
+            local sky = Instance.new("Sky"); sky.SkyboxBk = "rbxassetid://1518403437"; sky.SkyboxDn = "rbxassetid://1518403437"; sky.SkyboxFt = "rbxassetid://1518403437"; sky.SkyboxLf = "rbxassetid://1518403437"; sky.SkyboxRt = "rbxassetid://1518403437"; sky.SkyboxUp = "rbxassetid://1518403437"; sky.StarCount = 3000; sky.Parent = Lighting
+            getgenv()._ENQ_CSky = sky
+            end) else pcall(function() if getgenv()._ENQ_CSky then getgenv()._ENQ_CSky:Destroy() end end) end
+        end,})
+
+    V:create_module({title = "FOV Changer", description = "Change field of view", flag = "ENQ_FOVChg",
+        callback = function(state)
+            if state then workspace.CurrentCamera.FieldOfView = 90
+            else workspace.CurrentCamera.FieldOfView = 70 end
+        end,})
+
+end
+
+-- ======================== WORLD+ DETAILED ========================
+do
+    local W = library:create_tab("World+")
+    W:create_module({title = "No Terrain", description = "Remove terrain", flag = "ENQ_NoTerrain",
+        callback = function(state)
+            if state then getgenv()._ENQ_NT_Tr = workspace.Terrain.Transparency; workspace.Terrain.Transparency = 1
+            else workspace.Terrain.Transparency = getgenv()._ENQ_NT_Tr or 0.85 end
+        end,})
+
+    W:create_module({title = "Remove Decor", description = "Remove decorations", flag = "ENQ_RemDecor",
+        callback = function(state)
+            if state then
+            getgenv()._ENQ_RD = {}
+            for _, v in pairs(workspace:GetDescendants()) do
+            if v:IsA("ParticleEmitter") or v:IsA("Trail") or v:IsA("Beam") or v:IsA("Smoke") or v:IsA("Fire") or v:IsA("Sparkles") then
+            table.insert(getgenv()._ENQ_RD, {o=v, e=v.Enabled}); v.Enabled = false
+            end
+            end
+            else if getgenv()._ENQ_RD then for _, d in pairs(getgenv()._ENQ_RD) do if d.o and d.o.Parent then d.o.Enabled = d.e end end; getgenv()._ENQ_RD = nil end end
+        end,})
+
+    W:create_module({title = "Mute World V2", description = "Enhanced muting", flag = "ENQ_MuteWorld2",
+        callback = function(state)
+            if state then
+            getgenv()._ENQ_MW = {}
+            for _, v in pairs(workspace:GetDescendants()) do
+            if v:IsA("Sound") then table.insert(getgenv()._ENQ_MW, {o=v, v=v.Volume, p=v.Playing}); v.Volume = 0; v.Playing = false end
+            end
+            else if getgenv()._ENQ_MW then for _, d in pairs(getgenv()._ENQ_MW) do if d.o and d.o.Parent then d.o.Volume = d.v; d.o.Playing = d.p end end; getgenv()._ENQ_MW = nil end end
+        end,})
+
+    W:create_module({title = "Time Cycle V2", description = "Enhanced day/night", flag = "ENQ_TimeCyc2",
+        callback = function(state)
+            if state then getgenv()._ENQ_TC2_Conn = game:GetService("RunService").Heartbeat:Connect(function() Lighting.ClockTime = (Lighting.ClockTime + 0.001) % 24 end)
+            else if getgenv()._ENQ_TC2_Conn then getgenv()._ENQ_TC2_Conn:Disconnect(); getgenv()._ENQ_TC2_Conn = nil end end
+        end,})
+
+    W:create_module({title = "Fast Time V2", description = "Enhanced time speed", flag = "ENQ_FastTime2",
+        callback = function(state)
+            if state then getgenv()._ENQ_FT2_Conn = game:GetService("RunService").Heartbeat:Connect(function() Lighting.ClockTime = (Lighting.ClockTime + 0.01) % 24 end)
+            else if getgenv()._ENQ_FT2_Conn then getgenv()._ENQ_FT2_Conn:Disconnect(); getgenv()._ENQ_FT2_Conn = nil end end
+        end,})
+
+    W:create_module({title = "Third Person V2", description = "Enhanced camera", flag = "ENQ_ThirdP2",
+        callback = function(state)
+            if state then LocalPlayer.CameraMaxZoomDistance = 999; LocalPlayer.CameraMinZoomDistance = 5
+            else LocalPlayer.CameraMaxZoomDistance = 0.5; LocalPlayer.CameraMinZoomDistance = 0.5 end
+        end,})
+
+    W:create_module({title = "Clean Workspace", description = "Remove all effects", flag = "ENQ_CleanWS",
+        callback = function(state)
+            if state then
+            getgenv()._ENQ_CW = {}
+            for _, v in pairs(workspace:GetDescendants()) do
+            if v:IsA("ParticleEmitter") or v:IsA("Trail") or v:IsA("Beam") or v:IsA("Smoke") or v:IsA("Fire") or v:IsA("Sparkles") or v:IsA("Explosion") then
+            table.insert(getgenv()._ENQ_CW, {o=v, e=v.Enabled}); v.Enabled = false
+            end
+            end
+            else if getgenv()._ENQ_CW then for _, d in pairs(getgenv()._ENQ_CW) do if d.o and d.o.Parent then d.o.Enabled = d.e end end; getgenv()._ENQ_CW = nil end end
+        end,})
+
+end
+
+-- ======================== CHARACTER DETAILED ========================
+do
+    local CH = library:create_tab("Character")
+    CH:create_module({title = "Headless V2", description = "Enhanced head removal", flag = "ENQ_NoHead2",
+        callback = function(state)
+            if state then pcall(function()
+            local head = LocalPlayer.Character:FindFirstChild("Head")
+            if head then head.Transparency = 1; for _, v in pairs(head:GetDescendants()) do if v:IsA("Decal") then v.Transparency = 1 end end
+            getgenv()._ENQ_NH2 = head.DescendantAdded:Connect(function(v) if v:IsA("Decal") then v.Transparency = 1 end end) end
+            end) else pcall(function()
+            if getgenv()._ENQ_NH2 then getgenv()._ENQ_NH2:Disconnect() end
+            local head = LocalPlayer.Character:FindFirstChild("Head")
+            if head then head.Transparency = 0; for _, v in pairs(head:GetDescendants()) do if v:IsA("Decal") then v.Transparency = 0 end end end
+            end) end
+        end,})
+
+    CH:create_module({title = "Korblox V2", description = "Enhanced leg removal", flag = "ENQ_NoRL2",
+        callback = function(state)
+            if state then pcall(function()
+            local leg = LocalPlayer.Character:FindFirstChild("RightLeg") or LocalPlayer.Character:FindFirstChild("Right Lower Leg")
+            if leg then getgenv()._ENQ_KB2 = {} for _, v in pairs(leg:GetDescendants()) do
+            if v:IsA("BasePart") then table.insert(getgenv()._ENQ_KB2, {p=v, t=v.Transparency, c=v.CanCollide}); v.Transparency = 1; v.CanCollide = false end end end
+            end) else pcall(function() if getgenv()._ENQ_KB2 then for _, d in pairs(getgenv()._ENQ_KB2) do if d.p and d.p.Parent then d.p.Transparency = d.t; d.p.CanCollide = d.c end end; getgenv()._ENQ_KB2 = nil end end) end
+        end,})
+
+    CH:create_module({title = "No Arms V2", description = "Enhanced arm removal", flag = "ENQ_NoArms2",
+        callback = function(state)
+            if state then pcall(function()
+            for _, n in ipairs({"Left Arm","Right Arm"}) do local arm = LocalPlayer.Character:FindFirstChild(n)
+            if arm then arm.Transparency = 1; for _, v in pairs(arm:GetDescendants()) do if v:IsA("BasePart") then v.Transparency = 1 end end end end
+            end) else pcall(function()
+            for _, n in ipairs({"Left Arm","Right Arm"}) do local arm = LocalPlayer.Character:FindFirstChild(n)
+            if arm then arm.Transparency = 0; for _, v in pairs(arm:GetDescendants()) do if v:IsA("BasePart") then v.Transparency = 0 end end end end
+            end) end
+        end,})
+
+    CH:create_module({title = "Big Head V2", description = "Giant head mode", flag = "ENQ_BigHead2",
+        callback = function(state)
+            if state then pcall(function() local head = LocalPlayer.Character:FindFirstChild("Head")
+            if head then getgenv()._ENQ_BH2 = head.Size; head.Size = Vector3.new(6,6,6) end end)
+            else pcall(function() local head = LocalPlayer.Character:FindFirstChild("Head")
+            if head and getgenv()._ENQ_BH2 then head.Size = getgenv()._ENQ_BH2 end end) end
+        end,})
+
+    CH:create_module({title = "Tiny Body", description = "Shrink character", flag = "ENQ_TinyBody",
+        callback = function(state)
+            if state then pcall(function() for _, v in pairs(LocalPlayer.Character:GetDescendants()) do
+            if (v:IsA("BasePart") or v:IsA("MeshPart")) and v.Name ~= "HumanoidRootPart" then v.Size = v.Size * 0.5 end end end)
+            else pcall(function() for _, v in pairs(LocalPlayer.Character:GetDescendants()) do
+            if (v:IsA("BasePart") or v:IsA("MeshPart")) and v.Name ~= "HumanoidRootPart" then v.Size = v.Size * 2 end end end) end
+        end,})
+
+    CH:create_module({title = "Giant Mode", description = "Scale up character", flag = "ENQ_GiantMode",
+        callback = function(state)
+            if state then pcall(function() for _, v in pairs(LocalPlayer.Character:GetDescendants()) do
+            if (v:IsA("BasePart") or v:IsA("MeshPart")) and v.Name ~= "HumanoidRootPart" then v.Size = v.Size * 3 end end end)
+            else pcall(function() for _, v in pairs(LocalPlayer.Character:GetDescendants()) do
+            if (v:IsA("BasePart") or v:IsA("MeshPart")) and v.Name ~= "HumanoidRootPart" then v.Size = v.Size / 3 end end end) end
+        end,})
+
+    CH:create_module({title = "Ghost Mode", description = "Transparent body", flag = "ENQ_GhostMode",
+        callback = function(state)
+            if state then pcall(function() for _, v in pairs(LocalPlayer.Character:GetDescendants()) do
+            if v:IsA("BasePart") then v.Transparency = 0.7 end if v:IsA("Decal") then v.Transparency = 0.7 end end end)
+            else pcall(function() for _, v in pairs(LocalPlayer.Character:GetDescendants()) do
+            if v:IsA("BasePart") then v.Transparency = 0 end if v:IsA("Decal") then v.Transparency = 0 end end end) end
+        end,})
+
+    CH:create_module({title = "Neon Body", description = "Neon material body", flag = "ENQ_NeonBody",
+        callback = function(state)
+            if state then pcall(function() for _, v in pairs(LocalPlayer.Character:GetDescendants()) do
+            if v:IsA("BasePart") or v:IsA("MeshPart") then v.Material = Enum.Material.Neon end end end)
+            else pcall(function() for _, v in pairs(LocalPlayer.Character:GetDescendants()) do
+            if v:IsA("BasePart") or v:IsA("MeshPart") then v.Material = Enum.Material.Plastic end end end) end
+        end,})
+
+    CH:create_module({title = "Rainbow Body V2", description = "Enhanced rainbow", flag = "ENQ_RainBody2",
+        callback = function(state)
+            if state then getgenv()._ENQ_RB2_Conn = game:GetService("RunService").Heartbeat:Connect(function() pcall(function()
+            local c = Color3.fromHSV(tick() % 5 / 5, 1, 1)
+            for _, v in pairs(LocalPlayer.Character:GetDescendants()) do
+            if v:IsA("BasePart") and v.Name ~= "HumanoidRootPart" then v.Color = c end
+            end
+            end) end) else if getgenv()._ENQ_RB2_Conn then getgenv()._ENQ_RB2_Conn:Disconnect(); getgenv()._ENQ_RB2_Conn = nil end end
+        end,})
+
+    CH:create_module({title = "Fire Body", description = "Fire effect on body", flag = "ENQ_FireBody",
+        callback = function(state)
+            if state then pcall(function()
+            for _, v in pairs(LocalPlayer.Character:GetDescendants()) do
+            if v:IsA("BasePart") and v.Name ~= "HumanoidRootPart" then
+            local fire = Instance.new("Fire"); fire.Color = Color3.fromRGB(255,100,0); fire.Heat = 5; fire.Size = 5; fire.Parent = v
+            end
+            end
+            end) else pcall(function() for _, v in pairs(LocalPlayer.Character:GetDescendants()) do
+            if v:IsA("Fire") then v:Destroy() end end end) end
+        end,})
+
+    CH:create_module({title = "Trail Body", description = "Body trails", flag = "ENQ_TrailBody",
+        callback = function(state)
+            if state then pcall(function()
+            for _, v in pairs(LocalPlayer.Character:GetDescendants()) do
+            if v:IsA("BasePart") and v.Name ~= "HumanoidRootPart" then
+            local att0 = Instance.new("Attachment", v); local att1 = Instance.new("Attachment", v)
+            att1.Position = Vector3.new(0, 0, 0)
+            local trail = Instance.new("Trail"); trail.Attachment0 = att0; trail.Attachment1 = att1; trail.Color = ColorSequence.new(Color3.fromRGB(200,80,255), Color3.fromRGB(100,200,255))
+            trail.Lifetime = 0.5; trail.MinLength = 0.1; trail.Parent = v
+            end
+            end
+            end) else pcall(function() for _, v in pairs(LocalPlayer.Character:GetDescendants()) do
+            if v:IsA("Trail") then v:Destroy() end if v:IsA("Attachment") and v.Name == "" then v:Destroy() end end end) end
+        end,})
+
+end
+
+-- ======================== MUSIC DETAILED ========================
+do
+    local M = library:create_tab("Music")
+    local SONGS = {{"Chill","rbxassetid://1837849285"},{"Dark Angel","rbxassetid://1845756489"},{"Nightcore","rbxassetid://5984320263"},{"Phonk","rbxassetid://6482820464"},{"Epic","rbxassetid://6527444856"},{"Trap","rbxassetid://6686391774"},{"LoFi","rbxassetid://7092051279"},{"Synth","rbxassetid://7763138143"},{"Rock","rbxassetid://8063831868"},{"HipHop","rbxassetid://8254373333"},{"Retro","rbxassetid://9043114384"},{"Vapor","rbxassetid://9132945420"},{"Cyberpunk","rbxassetid://9178309497"},{"Ambient","rbxassetid://9216713645"},{"Techno","rbxassetid://9268304973"}}
+    local curSnd = nil
+
+    M:create_module({title = "Play V2", description = "Play music from list", flag = "ENQ_MPlay2",
+        callback = function(state)
+            if state then pcall(function()
+            if curSnd then curSnd:Stop(); curSnd:Destroy() end
+            local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+            if not hrp then return end
+            curSnd = Instance.new("Sound"); curSnd.SoundId = SONGS[math.random(1, #SONGS)][2]; curSnd.Volume = 0.5; curSnd.Looped = true; curSnd.Parent = hrp; curSnd:Play()
+            end) else pcall(function() if curSnd then curSnd:Stop(); curSnd:Destroy(); curSnd = nil end end) end
+        end,})
+
+    M:create_module({title = "Stop V2", description = "Stop all music", flag = "ENQ_MStop2",
+        callback = function(state)
+            if state then pcall(function() if curSnd then curSnd:Stop(); curSnd:Destroy(); curSnd = nil end end) end
+        end,})
+
+    M:create_module({title = "Fade In", description = "Fade in music", flag = "ENQ_MFadeIn",
+        callback = function(state)
+            if state then pcall(function() if curSnd then for i = 0, 1, 0.1 do curSnd.Volume = i * 0.5; task.wait(0.1) end end end) end
+        end,})
+
+    M:create_module({title = "Fade Out", description = "Fade out music", flag = "ENQ_MFadeOut",
+        callback = function(state)
+            if state then pcall(function() if curSnd then for i = 1, 0, -0.1 do curSnd.Volume = i * 0.5; task.wait(0.1) end end end) end
+        end,})
+
+    M:create_module({title = "Pause", description = "Pause music", flag = "ENQ_MPause",
+        callback = function(state)
+            if state then pcall(function() if curSnd then curSnd:Pause() end end) end
+        end,})
+
+    M:create_module({title = "Resume", description = "Resume music", flag = "ENQ_MResume",
+        callback = function(state)
+            if state then pcall(function() if curSnd then curSnd:Resume() end end) end
+        end,})
+
+    M:create_module({title = "Loop Toggle", description = "Toggle loop", flag = "ENQ_MLoop",
+        callback = function(state)
+            if state then pcall(function() if curSnd then curSnd.Looped = not curSnd.Looped end end) end
+        end,})
+
+    M:create_slider({title = "Volume V2", flag = "ENQ_MVol2", minimum_value = 0, maximum_value = 100, value = 50, round_number = true, callback = function(v) if curSnd then curSnd.Volume = v / 100 end end,})
+    M:create_slider({title = "Pitch V2", flag = "ENQ_MPitch2", minimum_value = 50, maximum_value = 200, value = 100, round_number = true, callback = function(v) if curSnd then curSnd.PlaybackSpeed = v / 100 end end,})
+end
+
+-- ======================== CONFIG DETAILED ========================
+do
+    local CFG = library:create_tab("Config")
+    CFG:create_module({title = "Save Config", description = "Save settings to file", flag = "ENQ_SaveCfg2",
+        callback = function(state)
+            if state then pcall(function()
+            local cfg = {} for k,v in pairs(Library._config or {}) do if type(v) ~= "function" then cfg[k] = v end end
+            writefile("ENRIQUE_Config.json", game:GetService("HttpService"):JSONEncode(cfg))
+            Library:notify({title = "ENRIQUE", text = "Config saved!", duration = 3})
+            end) end
+        end,})
+
+    CFG:create_module({title = "Load Config", description = "Load settings from file", flag = "ENQ_LoadCfg2",
+        callback = function(state)
+            if state then pcall(function()
+            if isfile("ENRIQUE_Config.json") then
+            local cfg = game:GetService("HttpService"):JSONDecode(readfile("ENRIQUE_Config.json"))
+            for k,v in pairs(cfg) do Library._config[k] = v end
+            Library:notify({title = "ENRIQUE", text = "Config loaded!", duration = 3})
+            else Library:notify({title = "ENRIQUE", text = "No config found", duration = 3}) end
+            end) end
+        end,})
+
+    CFG:create_module({title = "Reset Config", description = "Reset all settings", flag = "ENQ_ResetCfg2",
+        callback = function(state)
+            if state then pcall(function() Library._config = {}; pcall(delfile, "ENRIQUE_Config.json") end) end
+        end,})
+
+    CFG:create_module({title = "Copy Discord", description = "Copy invite link", flag = "ENQ_CopyDisc2",
+        callback = function(state)
+            if state and setclipboard then pcall(setclipboard, "https://discord.gg/jEA49UNC"); Library:notify({title = "ENRIQUE", text = "Discord copied!", duration = 3}) end
+        end,})
+
+    CFG:create_module({title = "Toggle UI", description = "Show/hide UI", flag = "ENQ_TogUI2",
+        callback = function(state)
+            if state then pcall(function() local gui = (gethui and gethui() or CoreGui):FindFirstChild("ENQ_Main"); if gui then gui.Enabled = not gui.Enabled end end) end
+        end,})
+
+    CFG:create_module({title = "Unload All", description = "Unload everything", flag = "ENQ_UnloadAll",
+        callback = function(state)
+            if state then pcall(function() for k,v in pairs(getgenv()) do if type(v) == "userdata" and tostring(v):find("Connection") then pcall(function() v:Disconnect() end) end end end) end
+        end,})
+
+    CFG:create_module({title = "Watermark V2", description = "Show watermark", flag = "ENQ_WM2",
+        callback = function(state)
+            if state then pcall(function()
+            local sg = Instance.new("ScreenGui"); sg.Name = "ENQ_WM2"; sg.Parent = gethui and gethui() or CoreGui
+            local f = Instance.new("Frame"); f.Size = UDim2.new(0,220,0,30); f.Position = UDim2.new(0,10,0,5); f.BackgroundColor3 = Color3.fromRGB(15,12,25); f.BackgroundTransparency = 0.3; f.Parent = sg; Instance.new("UICorner", f).CornerRadius = UDim.new(0,6)
+            local l = Instance.new("TextLabel"); l.Size = UDim2.new(1,-10,1,0); l.Position = UDim2.new(0,5,0,0); l.BackgroundTransparency = 1; l.Text = "ENRIQUE v1.0 | " .. game.PlaceId; l.TextColor3 = Color3.fromRGB(200,180,255); l.TextSize = 11; l.Font = Enum.Font.GothamBold; l.TextXAlignment = Enum.TextXAlignment.Left; l.Parent = f
+            local s = Instance.new("UIStroke"); s.Color = Color3.fromRGB(100,60,160); s.Thickness = 1; s.Transparency = 0.5; s.Parent = f
+            end) else pcall(function() local sg = (gethui and gethui() or CoreGui):FindFirstChild("ENQ_WM2"); if sg then sg:Destroy() end end) end
+        end,})
+
+    CFG:create_module({title = "Server Info V2", description = "Show server info", flag = "ENQ_SrvInfo2",
+        callback = function(state)
+            if state then pcall(function()
+            Library:notify({title = "Server Info", text = string.format("Players: %d/%d | Place: %d", #Players:GetPlayers(), Players.MaxPlayers, game.PlaceId), duration = 5})
+            end) end
+        end,})
+
+end
+
+
+return Library
