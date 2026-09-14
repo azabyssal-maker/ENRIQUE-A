@@ -18021,4 +18021,210 @@ end
 getgenv()._ZX_SetupWorldTab()
 
 
+
+-- ============================================================
+-- ENHANCED FEATURES v1.0 — Character, Visuals, Combat, Music
+-- ============================================================
+
+do
+    local CharTab = library:create_tab("Character")
+    CharTab:create_module({title = "Headless", description = "Remove character head", flag = "ENQ_Headless",
+        callback = function(state) pcall(function()
+            local char = LocalPlayer.Character; if not char then return end
+            local head = char:FindFirstChild("Head")
+            if state and head then
+                getgenv()._ENQ_HLC = head.DescendantAdded:Connect(function(v)
+                    if v:IsA("Decal") then v.Transparency = 1 end
+                end)
+                for _, v in pairs(head:GetDescendants()) do if v:IsA("Decal") then v.Transparency = 1 end end
+                head.Transparency = 1
+            elseif head then
+                if getgenv()._ENQ_HLC then getgenv()._ENQ_HLC:Disconnect() end
+                head.Transparency = 0
+                for _, v in pairs(head:GetDescendants()) do if v:IsA("Decal") then v.Transparency = 0 end end
+            end
+        end) end,})
+    CharTab:create_module({title = "Korblox", description = "Remove left leg", flag = "ENQ_Korblox",
+        callback = function(state) pcall(function()
+            local char = LocalPlayer.Character; if not char then return end
+            local leg = char:FindFirstChild("LeftLeg") or char:FindFirstChild("Left Lower Leg")
+            if state and leg then
+                getgenv()._ENQ_KL = {}
+                for _, v in pairs(leg:GetDescendants()) do
+                    if v:IsA("BasePart") then
+                        table.insert(getgenv()._ENQ_KL, {p=v, t=v.Transparency, c=v.CanCollide})
+                        v.Transparency = 1; v.CanCollide = false
+                    end
+                end
+            elseif not state and getgenv()._ENQ_KL then
+                for _, d in pairs(getgenv()._ENQ_KL) do
+                    if d.p and d.p.Parent then d.p.Transparency = d.t; d.p.CanCollide = d.c end
+                end
+                getgenv()._ENQ_KL = nil
+            end
+        end) end,})
+    CharTab:create_module({title = "No Right Leg", description = "Remove right leg", flag = "ENQ_NoRL",
+        callback = function(state) pcall(function()
+            local char = LocalPlayer.Character; if not char then return end
+            local leg = char:FindFirstChild("RightLeg") or char:FindFirstChild("Right Lower Leg")
+            if state and leg then
+                getgenv()._ENQ_RL = {}
+                for _, v in pairs(leg:GetDescendants()) do
+                    if v:IsA("BasePart") then table.insert(getgenv()._ENQ_RL, {p=v, t=v.Transparency}); v.Transparency = 1; v.CanCollide = false end
+                end
+            elseif not state and getgenv()._ENQ_RL then
+                for _, d in pairs(getgenv()._ENQ_RL) do if d.p and d.p.Parent then d.p.Transparency = d.t end end
+                getgenv()._ENQ_RL = nil
+            end
+        end) end,})
+    CharTab:create_module({title = "No Arms", description = "Remove both arms", flag = "ENQ_NoArms",
+        callback = function(state) pcall(function()
+            local char = LocalPlayer.Character; if not char then return end
+            for _, n in ipairs({"Left Arm","Right Arm"}) do
+                local arm = char:FindFirstChild(n)
+                if arm then arm.Transparency = state and 1 or 0 for _, v in pairs(arm:GetDescendants()) do if v:IsA("BasePart") then v.Transparency = state and 1 or 0 end end end
+            end
+        end) end,})
+    CharTab:create_module({title = "Glow Body", description = "Neon glow on body", flag = "ENQ_Glow",
+        callback = function(state) pcall(function()
+            local char = LocalPlayer.Character; if not char then return end
+            if state then
+                getgenv()._ENQ_GL = {}
+                for _, v in pairs(char:GetDescendants()) do
+                    if v:IsA("BasePart") and v.Name ~= "HumanoidRootPart" then
+                        local pe = Instance.new("PointLight"); pe.Color = Color3.fromRGB(200,80,255); pe.Brightness = 1.5; pe.Range = 12; pe.Parent = v
+                        table.insert(getgenv()._ENQ_GL, pe)
+                    end
+                end
+            else
+                if getgenv()._ENQ_GL then for _, pe in pairs(getgenv()._ENQ_GL) do if pe and pe.Parent then pe:Destroy() end end; getgenv()._ENQ_GL = nil end
+            end
+        end) end,})
+    CharTab:create_module({title = "Invisible", description = "Full body invisible", flag = "ENQ_Invis",
+        callback = function(state) pcall(function()
+            local char = LocalPlayer.Character; if not char then return end
+            if state then
+                getgenv()._ENQ_IV = {}
+                for _, v in pairs(char:GetDescendants()) do
+                    if (v:IsA("BasePart") or v:IsA("Decal")) then table.insert(getgenv()._ENQ_IV, {p=v, t=v.Transparency}); v.Transparency = 1 end
+                end
+            else
+                if getgenv()._ENQ_IV then for _, d in pairs(getgenv()._ENQ_IV) do if d.p and d.p.Parent then d.p.Transparency = d.t end end; getgenv()._ENQ_IV = nil end
+            end
+        end) end,})
+    CharTab:create_module({title = "Big Head", description = "Giant head", flag = "ENQ_BigHead",
+        callback = function(state) pcall(function()
+            local head = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Head")
+            if head then
+                if state then getgenv()._ENQ_HS = head.Size; head.Size = Vector3.new(5,5,5) elseif getgenv()._ENQ_HS then head.Size = getgenv()._ENQ_HS end
+            end
+        end) end,})
+    CharTab:create_module({title = "Float", description = "Float above ground", flag = "ENQ_Float",
+        callback = function(state) pcall(function()
+            if state then
+                getgenv()._ENQ_FlC = game:GetService("RunService").Heartbeat:Connect(function()
+                    local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                    if hrp then local p = hrp.Position; hrp.CFrame = CFrame.new(p.X, p.Y + 0.3, p.Z) * (hrp.CFrame - hrp.CFrame.Position) end
+                end)
+            else
+                if getgenv()._ENQ_FlC then getgenv()._ENQ_FlC:Disconnect(); getgenv()._ENQ_FlC = nil end
+            end
+        end) end,})
+    CharTab:create_module({title = "Spin", description = "Spin continuously", flag = "ENQ_Spin",
+        callback = function(state) pcall(function()
+            if state then
+                getgenv()._ENQ_SpC = game:GetService("RunService").Heartbeat:Connect(function()
+                    local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                    if hrp then hrp.CFrame = hrp.CFrame * CFrame.Angles(0, math.rad(15), 0) end
+                end)
+            else
+                if getgenv()._ENQ_SpC then getgenv()._ENQ_SpC:Disconnect(); getgenv()._ENQ_SpC = nil end
+            end
+        end) end,})
+end
+
+do
+    local MusicTab = library:create_tab("Music")
+    local SONGS = {{"Chill","rbxassetid://1837849285"},{"Dark Angel","rbxassetid://1845756489"},{"Nightcore","rbxassetid://5984320263"},{"Phonk","rbxassetid://6482820464"},{"Epic","rbxassetid://6527444856"},{"Trap","rbxassetid://6686391774"},{"LoFi","rbxassetid://7092051279"},{"Synth","rbxassetid://7763138143"},{"Rock","rbxassetid://8063831868"},{"HipHop","rbxassetid://8254373333"}}
+    local curSnd = nil
+    MusicTab:create_module({title = "Play", description = "Play music", flag = "ENQ_MPlay",
+        callback = function(state) pcall(function()
+            if state then
+                if curSnd then curSnd:Stop(); curSnd:Destroy() end
+                local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                if not hrp then return end
+                curSnd = Instance.new("Sound"); curSnd.SoundId = SONGS[1][2]; curSnd.Volume = 0.5; curSnd.Looped = true; curSnd.Parent = hrp; curSnd:Play()
+            else
+                if curSnd then curSnd:Stop(); curSnd:Destroy(); curSnd = nil end
+            end
+        end) end,})
+    MusicTab:create_slider({title = "Volume", flag = "ENQ_MVol", minimum_value = 0, maximum_value = 100, value = 50, round_number = true,
+        callback = function(v) if curSnd then curSnd.Volume = v / 100 end end,})
+    MusicTab:create_slider({title = "Pitch", flag = "ENQ_MPitch", minimum_value = 50, maximum_value = 200, value = 100, round_number = true,
+        callback = function(v) if curSnd then curSnd.PlaybackSpeed = v / 100 end end,})
+end
+
+do
+    local EP = library:create_tab("Enhance")
+    EP:create_slider({title = "WalkSpeed", flag = "ENQ_WSpeed", minimum_value = 0, maximum_value = 500, value = 32, round_number = true,
+        callback = function(v) pcall(function() LocalPlayer.Character:FindFirstChildOfClass("Humanoid").WalkSpeed = v end) end,})
+    EP:create_slider({title = "JumpPower", flag = "ENQ_JPow", minimum_value = 0, maximum_value = 500, value = 100, round_number = true,
+        callback = function(v) pcall(function() local h = LocalPlayer.Character:FindFirstChildOfClass("Humanoid"); h.UseJumpPower = true; h.JumpPower = v end) end,})
+    EP:create_module({title = "NoClip", description = "Walk through walls", flag = "ENQ_NoClip",
+        callback = function(state) if state then getgenv()._ENQ_NC = game:GetService("RunService").Stepped:Connect(function() pcall(function() for _, p in pairs(LocalPlayer.Character:GetDescendants()) do if p:IsA("BasePart") then p.CanCollide = false end end end) end) else if getgenv()._ENQ_NC then getgenv()._ENQ_NC:Disconnect(); getgenv()._ENQ_NC = nil end end end,})
+    EP:create_module({title = "God Mode", description = "Prevent death", flag = "ENQ_God",
+        callback = function(state) if state then getgenv()._ENQ_GM = LocalPlayer.Character:FindFirstChildOfClass("Humanoid").HealthChanged:Connect(function(h) h = h end) else if getgenv()._ENQ_GM then getgenv()._ENQ_GM:Disconnect() end end end,})
+    EP:create_module({title = "Anti-AFK", description = "Prevent idle kick", flag = "ENQ_AFK",
+        callback = function(state) if state then getgenv()._ENQ_AF = Players.LocalPlayer.Idled:Connect(function() game:GetService("VirtualUser"):CaptureController(); game:GetService("VirtualUser"):ClickButton2(Vector2.new()) end) else if getgenv()._ENQ_AF then getgenv()._ENQ_AF:Disconnect() end end end,})
+    EP:create_module({title = "Rejoin", description = "Rejoin server", flag = "ENQ_Rejoin",
+        callback = function(state) if state then pcall(function() game:GetService("TeleportService"):Teleport(game.PlaceId, LocalPlayer) end) end end,})
+    EP:create_module({title = "Server Hop", description = "Join different server", flag = "ENQ_Shop",
+        callback = function(state) if state then pcall(function() local s = game:GetService("HttpService"):JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/"..game.PlaceId.."/servers/Public?sortOrder=Asc&limit=100"))
+            for _, sv in ipairs(s.data) do if sv.id ~= game.JobId and sv.playing < sv.maxPlayers then game:GetService("TeleportService"):TeleportToPlaceInstance(game.PlaceId, sv.id, LocalPlayer); break end end end) end end,})
+end
+
+do
+    local VT = library:create_tab("Effects")
+    VT:create_module({title = "Fullbright", description = "Max brightness", flag = "ENQ_FB",
+        callback = function(state) if state then Lighting.Ambient = Color3.fromRGB(255,255,255); Lighting.OutdoorAmbient = Color3.fromRGB(255,255,255); Lighting.Brightness = 3; Lighting.ClockTime = 14; Lighting.GlobalShadows = false else Lighting.Brightness = 1.5; Lighting.ClockTime = 12 end end,})
+    VT:create_module({title = "No Fog", description = "Remove fog", flag = "ENQ_NF",
+        callback = function(state) if state then Lighting.FogEnd = 999999 else Lighting.FogEnd = 100000 end end,})
+    VT:create_module({title = "Rainbow Body", description = "Cycle colors", flag = "ENQ_RB",
+        callback = function(state) if state then getgenv()._ENQ_RC = game:GetService("RunService").Heartbeat:Connect(function() pcall(function() local c = Color3.fromHSV(tick() % 5 / 5, 1, 1) for _, v in pairs(LocalPlayer.Character:GetDescendants()) do if v:IsA("BasePart") and v.Name ~= "HumanoidRootPart" then v.Color = c end end end) end) else if getgenv()._ENQ_RC then getgenv()._ENQ_RC:Disconnect(); getgenv()._ENQ_RC = nil end end end,})
+    VT:create_module({title = "ESP", description = "Player highlights through walls", flag = "ENQ_ESP",
+        callback = function(state) getgenv()._ENQ_ESP = state end,})
+    VT:create_module({title = "Player Highlights", description = "Highlight enemies", flag = "ENQ_PH",
+        callback = function(state) if state then getgenv()._ENQ_PH = {} for _, pl in pairs(Players:GetPlayers()) do if pl ~= LocalPlayer and pl.Character then for _, v in pairs(pl.Character:GetDescendants()) do if v:IsA("BasePart") then local hl = Instance.new("Highlight"); hl.FillColor = Color3.fromRGB(255,0,0); hl.FillTransparency = 0.7; hl.OutlineColor = Color3.fromRGB(255,255,0); hl.Parent = v; table.insert(getgenv()._ENQ_PH, hl) end end end end else if getgenv()._ENQ_PH then for _, hl in pairs(getgenv()._ENQ_PH) do if hl and hl.Parent then hl:Destroy() end end; getgenv()._ENQ_PH = nil end end end,})
+    VT:create_module({title = "Bloom", description = "Glow effect", flag = "ENQ_Bloom",
+        callback = function(state) pcall(function() if state then getgenv()._ENQ_BL = Instance.new("BloomEffect"); getgenv()._ENQ_BL.Intensity = 0.5; getgenv()._ENQ_BL.Size = 24; getgenv()._ENQ_BL.Threshold = 0.8; getgenv()._ENQ_BL.Parent = Lighting else if getgenv()._ENQ_BL then getgenv()._ENQ_BL:Destroy() end end end) end,})
+    VT:create_module({title = "Night Vision", description = "Green tint", flag = "ENQ_NV",
+        callback = function(state) pcall(function() if state then getgenv()._ENQ_NV = Instance.new("ColorCorrectionEffect"); getgenv()._ENQ_NV.TintColor = Color3.fromRGB(100,255,100); getgenv()._ENQ_NV.Saturation = -0.8; getgenv()._ENQ_NV.Parent = Lighting; Lighting.ClockTime = 0 else if getgenv()._ENQ_NV then getgenv()._ENQ_NV:Destroy(); Lighting.ClockTime = 12 end end end) end,})
+    VT:create_module({title = "X-Ray", description = "See through walls", flag = "ENQ_XRay",
+        callback = function(state) if state then getgenv()._ENQ_XR = {} for _, v in pairs(workspace:GetDescendants()) do if v:IsA("BasePart") and v.Transparency < 0.5 then table.insert(getgenv()._ENQ_XR, {p=v, t=v.Transparency}); v.Transparency = 0.7 end end else if getgenv()._ENQ_XR then for _, d in pairs(getgenv()._ENQ_XR) do if d.p and d.p.Parent then d.p.Transparency = d.t end end; getgenv()._ENQ_XR = nil end end end,})
+    VT:create_slider({title = "Custom Time", flag = "ENQ_CT", minimum_value = 0, maximum_value = 24, value = 14, round_number = true,
+        callback = function(v) Lighting.ClockTime = v end,})
+    VT:create_slider({title = "FOV", flag = "ENQ_FOV", minimum_value = 70, maximum_value = 120, value = 70, round_number = true,
+        callback = function(v) workspace.CurrentCamera.FieldOfView = v end,})
+end
+
+do
+    local MT = library:create_tab("Extras")
+    MT:create_module({title = "Panic Key (RightShift)", description = "Disable all features", flag = "ENQ_Panic",
+        callback = function(state) if state then getgenv()._ENQ_PK = game:GetService("UserInputService").InputBegan:Connect(function(input, p) if not p and input.KeyCode == Enum.KeyCode.RightShift then for k, v in pairs(getgenv()) do if type(v) == "userdata" and tostring(v):find("Connection") then pcall(function() v:Disconnect() end) end end end end) else if getgenv()._ENQ_PK then getgenv()._ENQ_PK:Disconnect() end end end,})
+    MT:create_module({title = "FPS Boost", description = "Max performance", flag = "ENQ_FPS",
+        callback = function(state) pcall(function() settings().Rendering.QualityLevel = state and Enum.QualityLevel.Level01 or Enum.QualityLevel.Automatic end) end,})
+    MT:create_module({title = "Test Notification", description = "Test notify", flag = "ENQ_TNotif",
+        callback = function(state) if state then Library:notify({title = "ENRIQUE", text = "Working!", duration = 3}) end end,})
+    MT:create_module({title = "Watermark", description = "Show watermark", flag = "ENQ_WM",
+        callback = function(state) pcall(function()
+            if state then local sg = Instance.new("ScreenGui"); sg.Name = "ENQ_WM"; sg.Parent = gethui and gethui() or CoreGui
+            local l = Instance.new("TextLabel"); l.Size = UDim2.new(0,200,0,25); l.Position = UDim2.new(0,10,0,5); l.BackgroundColor3 = Color3.fromRGB(15,12,25); l.BackgroundTransparency = 0.3; l.Text = " ENRIQUE v1.0"; l.TextColor3 = Color3.fromRGB(200,180,255); l.TextSize = 11; l.Font = Enum.Font.GothamBold; l.TextXAlignment = Enum.TextXAlignment.Left; l.Parent = sg; Instance.new("UICorner", l).CornerRadius = UDim.new(0,6)
+            else local sg = (gethui and gethui() or CoreGui):FindFirstChild("ENQ_WM"); if sg then sg:Destroy() end end end) end,})
+    MT:create_module({title = "Discord Link", description = "Copy Discord", flag = "ENQ_Disc",
+        callback = function(state) if state and setclipboard then pcall(setclipboard, "https://discord.gg/jEA49UNC"); Library:notify({title = "ENRIQUE", text = "Discord copied!", duration = 3}) end end,})
+    MT:create_module({title = "Unload", description = "Unload all features", flag = "ENQ_Unload",
+        callback = function(state) if state then pcall(function() for k, v in pairs(getgenv()) do if type(v) == "userdata" and tostring(v):find("Connection") then pcall(function() v:Disconnect() end) end end; _G.__ENRIQUE_ACTIVE = false end) end end,})
+end
+
 return Library
+
