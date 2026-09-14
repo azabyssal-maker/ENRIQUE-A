@@ -25,7 +25,6 @@ local C = {
     accent=Color3.fromRGB(200,70,255), accentHi=Color3.fromRGB(230,110,255), accentDim=Color3.fromRGB(140,50,190),
     stroke=Color3.fromRGB(90,40,140), text=Color3.fromRGB(240,235,255), dim=Color3.fromRGB(160,140,190),
     faint=Color3.fromRGB(110,95,140), danger=Color3.fromRGB(255,70,90), success=Color3.fromRGB(80,255,140),
-    muted=Color3.fromRGB(120,100,155), subtext=Color3.fromRGB(140,120,170),
 }
 
 local function safeParent(gui)
@@ -42,9 +41,9 @@ local function createParticles(parent,count)
         local p=mk("Frame",{Size=UDim2.fromOffset(math.random(2,4),math.random(2,4)),Position=UDim2.fromScale(math.random(),math.random()),BackgroundColor3=C.accent,BackgroundTransparency=math.random(4,9)/10,BorderSizePixel=0,Parent=parent})
         Instance.new("UICorner",p).CornerRadius=UDim.new(1,0)
     end
-    local conn
     local frames={}
     for _,child in ipairs(parent:GetChildren()) do if child:IsA("Frame") then table.insert(frames,{f=child,sx=(math.random()-0.5)*0.002,sy=(math.random()-0.5)*0.002,a=math.random(1,3)/1000}) end end
+    local conn
     conn=RunService.Heartbeat:Connect(function()
         if not parent.Parent then conn:Disconnect() return end
         for _,pt in ipairs(frames) do
@@ -69,7 +68,7 @@ local function showLoading(cb)
     local gui=mk("ScreenGui",{Name="ENQ_Load",ResetOnSpawn=false,IgnoreGuiInset=true,DisplayOrder=99999})
     safeParent(gui)
     local bg=mk("Frame",{Size=UDim2.fromScale(1,1),BackgroundColor3=Color3.fromRGB(3,3,8),BorderSizePixel=0,Parent=gui})
-    mk("UIGradient",{Rotation=160,Parent=bg,Color=ColorSequence.new{ColorSequenceKeypoint.new(0,Color3.fromRGB(12,5,20)),ColorSequenceKeypoint.new(0.5,Color3.fromRGB(5,3,10)),ColorSequenceKeypoint.new(1,Color3.fromRGB(2,2,5))}})
+    mk("UIGradient",{Rotation=160,Parent=bg,Color=ColorSequence.new(ColorSequenceKeypoint.new(0,Color3.fromRGB(12,5,20)),ColorSequenceKeypoint.new(0.5,Color3.fromRGB(5,3,10)),ColorSequenceKeypoint.new(1,Color3.fromRGB(2,2,5)))})
     createParticles(bg,30)
     local ct=mk("Frame",{AnchorPoint=Vector2.new(0.5,0.5),Position=UDim2.fromScale(0.5,0.5),Size=UDim2.fromOffset(400,320),BackgroundTransparency=1,Parent=bg})
     local ab=mk("ImageLabel",{Size=UDim2.new(1,0,0,140),Position=UDim2.new(0,0,0,10),BackgroundTransparency=1,Image="rbxassetid://"..IMG,ScaleType=Enum.ScaleType.Crop,ImageTransparency=0.15,Parent=ct})
@@ -77,7 +76,7 @@ local function showLoading(cb)
     mk("UIStroke",{Color=C.accent,Thickness=1,Transparency=0.4,Parent=ab})
     local bOv=mk("Frame",{Size=UDim2.fromScale(1,1),BackgroundTransparency=0.35,BackgroundColor3=Color3.new(0,0,0),BorderSizePixel=0,Parent=ab})
     Instance.new("UICorner",bOv).CornerRadius=UDim.new(0,12)
-    local lf=mk("Frame",{AnchorPoint=Vector2.new(0.5,0.5),Position=UDim2.new(0.5,0,0,80),Size=UDim2.fromOffset(70,70),BackgroundTransparency=1,Parent=ct})
+    local lf=mk("Frame",{AnchorPoint=Vector2.new(0.5,0.5),Position=UDim2.fromScale(0.5,0),Size=UDim2.fromOffset(70,70),BackgroundTransparency=1,Parent=ct})
     local gl=mk("ImageLabel",{Size=UDim2.fromScale(1.5,1.5),AnchorPoint=Vector2.new(0.5,0.5),Position=UDim2.fromScale(0.5,0.5),BackgroundTransparency=1,Image="rbxassetid://5028857084",ImageColor3=C.accent,ImageTransparency=0.7,ScaleType=Enum.ScaleType.Slice,SliceCenter=Rect.new(24,24,276,276),Parent=lf})
     local lg=mk("ImageLabel",{AnchorPoint=Vector2.new(0.5,0.5),Position=UDim2.fromScale(0.5,0.5),Size=UDim2.new(1,0,1,0),BackgroundTransparency=1,Image="rbxassetid://"..IMG,Parent=lf})
     Instance.new("UICorner",lg).CornerRadius=UDim.new(1,0)
@@ -87,13 +86,14 @@ local function showLoading(cb)
     mk("UIStroke",{Color=C.accent,Thickness=2,Transparency=0.4,Parent=ri})
     local ti=mk("TextLabel",{AnchorPoint=Vector2.new(0.5,0),Position=UDim2.new(0.5,0,0,130),Size=UDim2.new(1,0,0,30),BackgroundTransparency=1,Text="",TextColor3=Color3.new(1,1,1),TextSize=24,Font=Enum.Font.GothamBold,TextStrokeTransparency=0.8,Parent=ct})
     local su=mk("TextLabel",{AnchorPoint=Vector2.new(0.5,0),Position=UDim2.new(0.5,0,0,165),Size=UDim2.new(1,0,0,16),BackgroundTransparency=1,Text="",TextColor3=C.dim,TextSize=12,Font=Enum.Font.Gotham,Parent=ct})
-    mk("TextLabel",{AnchorPoint=Vector2.new(0.5,0),Position=UDim2.new(0.5,0,0,185),Size=UDim2.new(0,90,0,18),BackgroundTransparency=1,BackgroundTransparency=0.15,BorderSizePixel=0,BackgroundColor3=C.accent,Text="v1.0 UNIFIED",TextColor3=Color3.fromRGB(240,200,255),TextSize=10,Font=Enum.Font.GothamBold,Parent=ct}).Parent=ct
+    local badge=mk("TextLabel",{AnchorPoint=Vector2.new(0.5,0),Position=UDim2.new(0.5,0,0,185),Size=UDim2.new(0,90,0,18),BackgroundColor3=C.accent,BackgroundTransparency=0.15,BorderSizePixel=0,Text="v1.0 UNIFIED",TextColor3=Color3.fromRGB(240,200,255),TextSize=10,Font=Enum.Font.GothamBold,Parent=ct})
+    Instance.new("UICorner",badge).CornerRadius=UDim.new(1,0)
     local bBg=mk("Frame",{AnchorPoint=Vector2.new(0.5,0),Position=UDim2.new(0.5,0,0,218),Size=UDim2.fromOffset(280,5),BackgroundColor3=Color3.fromRGB(25,25,35),BorderSizePixel=0,Parent=ct})
     Instance.new("UICorner",bBg).CornerRadius=UDim.new(1,0)
     mk("UIStroke",{Color=C.accent,Thickness=1,Transparency=0.7,Parent=bBg})
     local bF=mk("Frame",{Size=UDim2.fromScale(0,1),BackgroundColor3=C.accent,BorderSizePixel=0,Parent=bBg})
     Instance.new("UICorner",bF).CornerRadius=UDim.new(1,0)
-    mk("UIGradient",{Color=ColorSequence.new{ColorSequenceKeypoint.new(0,C.accentDim),ColorSequenceKeypoint.new(1,C.accentHi)},Parent=bF})
+    mk("UIGradient",{Color=ColorSequence.new(ColorSequenceKeypoint.new(0,C.accentDim),ColorSequenceKeypoint.new(1,C.accentHi)),Parent=bF})
     local pc=mk("TextLabel",{AnchorPoint=Vector2.new(0.5,0),Position=UDim2.new(0.5,0,0,228),Size=UDim2.new(0,50,0,14),BackgroundTransparency=1,Text="0%",TextColor3=C.dim,TextSize=11,Font=Enum.Font.GothamBold,Parent=ct})
     task.spawn(function() while gui.Parent do tw(gl,1.2,{ImageTransparency=0.85},Enum.EasingStyle.Sine) task.wait(1.2) tw(gl,1.2,{ImageTransparency=0.55},Enum.EasingStyle.Sine) task.wait(1.2) end end)
     task.spawn(function() while gui.Parent do ri.Rotation=(ri.Rotation+2)%360 task.wait() end end)
@@ -130,7 +130,7 @@ local function showSelection(onFree,onPaid)
     local main=mk("Frame",{AnchorPoint=Vector2.new(0.5,0.5),Position=UDim2.fromScale(0.5,0.5),Size=UDim2.new(1,0,1,0),BackgroundColor3=C.bg,BorderSizePixel=0,ClipsDescendants=true,Parent=root})
     Instance.new("UICorner",main).CornerRadius=UDim.new(0,14)
     local ms=mk("UIStroke",{Color=C.accent,Thickness=1.5,Transparency=0.2,Parent=main})
-    mk("UIGradient",{Rotation=145,Parent=main,Color=ColorSequence.new{ColorSequenceKeypoint.new(0,Color3.fromRGB(22,12,32)),ColorSequenceKeypoint.new(0.5,C.bg),ColorSequenceKeypoint.new(1,Color3.fromRGB(8,5,14))}})
+    mk("UIGradient",{Rotation=145,Parent=main,Color=ColorSequence.new(ColorSequenceKeypoint.new(0,Color3.fromRGB(22,12,32)),ColorSequenceKeypoint.new(0.5,C.bg),ColorSequenceKeypoint.new(1,Color3.fromRGB(8,5,14)))})
     local bn=mk("ImageLabel",{Size=UDim2.new(1,-20,0,110),Position=UDim2.new(0,10,0,10),BackgroundTransparency=1,Image="rbxassetid://"..IMG,ScaleType=Enum.ScaleType.Crop,Parent=main})
     Instance.new("UICorner",bn).CornerRadius=UDim.new(0,10)
     mk("UIStroke",{Color=C.accent,Thickness=1,Transparency=0.3,Parent=bn})
@@ -146,12 +146,10 @@ local function showSelection(onFree,onPaid)
     Instance.new("UICorner",fb).CornerRadius=UDim.new(0,10)
     local fs=mk("UIStroke",{Color=C.accent,Thickness=1.5,Transparency=0.3,Parent=fb})
     mk("TextLabel",{Size=UDim2.new(1,0,0,20),Position=UDim2.new(0,0,0,4),BackgroundTransparency=1,Text="⚔️ FREE",TextColor3=Color3.new(1,1,1),TextSize=16,Font=Enum.Font.GothamBold,Parent=fb})
-    mk("TextLabel",{Size=UDim2.new(1,0,0,14),Position=UDim2.new(0,0,0,26),BackgroundTransparency=1,Text="36K lines",TextColor3=C.faint,TextSize=10,Font=Enum.Font.Gotham,Parent=fb})
     local pb=mk("TextButton",{AnchorPoint=Vector2.new(0.5,0),Position=UDim2.new(0.65,0,0,205),Size=UDim2.new(0.52,0,0,48),BackgroundColor3=Color3.fromRGB(40,15,30),BorderSizePixel=0,Text="",AutoButtonColor=false,Parent=main})
     Instance.new("UICorner",pb).CornerRadius=UDim.new(0,10)
     local ps=mk("UIStroke",{Color=C.danger,Thickness=1.5,Transparency=0.3,Parent=pb})
     mk("TextLabel",{Size=UDim2.new(1,0,0,20),Position=UDim2.new(0,0,0,4),BackgroundTransparency=1,Text="💎 PAID",TextColor3=Color3.new(1,1,1),TextSize=16,Font=Enum.Font.GothamBold,Parent=pb})
-    mk("TextLabel",{Size=UDim2.new(1,0,0,14),Position=UDim2.new(0,0,0,26),BackgroundTransparency=1,Text="70K lines",TextColor3=C.faint,TextSize=10,Font=Enum.Font.Gotham,Parent=pb})
     mk("TextLabel",{AnchorPoint=Vector2.new(0.5,0),Position=UDim2.new(0.5,0,0,270),Size=UDim2.new(1,-20,0,14),BackgroundTransparency=1,Text="discord.gg/jEA49UNC",TextColor3=C.accent,TextSize=10,Font=Enum.Font.GothamMedium,TextXAlignment=Enum.TextXAlignment.Center,Parent=main})
     task.spawn(function() while gui.Parent do tw(ms,1.5,{Transparency=0.4},Enum.EasingStyle.Sine) task.wait(1.5) tw(ms,1.5,{Transparency=0.15},Enum.EasingStyle.Sine) task.wait(1.5) end end)
     root.Size=UDim2.new(0,W-30,0,H-20)
@@ -166,26 +164,29 @@ local function showSelection(onFree,onPaid)
     pb.MouseButton1Click:Connect(function() closeSel(onPaid) end)
 end
 
--- LOADING FUNCTIONS
+-- LOAD SCRIPTS
 local REPO = "https://raw.githubusercontent.com/azabyssal-maker/ENRIQUE-A/main/"
 
--- FREE: load from GitHub (the 18K line script)
 local function launchFree()
-    Notify("⚔️ ENRIQUE", "Loading FREE (36K lines)...", 3)
+    Notify("⚔️ ENRIQUE", "Loading FREE...", 3)
     local ok, err = pcall(function()
-        -- The full FREE script is at a separate URL
         loadstring(game:HttpGet(REPO .. "ENRIQUE_FREE_FEATURES.lua", true))()
     end)
-    if not ok then warn("[ENRIQUE] " .. tostring(err)) end
+    if not ok then
+        warn("[ENRIQUE] FREE error: " .. tostring(err))
+        Notify("❌ Error", tostring(err), 5)
+    end
 end
 
--- PAID: load from GitHub (the 36K line script)
 local function launchPaid()
-    Notify("💎 ENRIQUE PAID", "Loading PAID (70K lines)...", 3)
+    Notify("💎 ENRIQUE PAID", "Loading PAID...", 3)
     local ok, err = pcall(function()
         loadstring(game:HttpGet(REPO .. "paid.lua", true))()
     end)
-    if not ok then warn("[ENRIQUE] " .. tostring(err)) end
+    if not ok then
+        warn("[ENRIQUE] PAID error: " .. tostring(err))
+        Notify("❌ Error", tostring(err), 5)
+    end
 end
 
 -- MAIN
