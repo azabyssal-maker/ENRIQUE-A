@@ -524,7 +524,7 @@ local function showKeySystem(onSuccess)
         Size = UDim2.fromOffset(30, 38),
         Position = UDim2.new(0, 8, 0, 0),
         BackgroundTransparency = 1,
-        Text = "\u{1F511}",
+        Text = "🔑",
         TextSize = 14,
         TextColor3 = Color3.fromRGB(255, 30, 60),
         Font = Enum.Font.GothamBold,
@@ -593,7 +593,7 @@ local function showKeySystem(onSuccess)
         Position = UDim2.fromScale(0.5, 0.5),
         Size = UDim2.new(1, 0, 0, 16),
         BackgroundTransparency = 1,
-        Text = "\u{1F517} Get Free Key \u{2192} enrique-keys.vercel.app",
+        Text = "🔗 Get Free Key → enrique-keys.vercel.app",
         TextColor3 = Color3.fromRGB(120, 160, 255),
         TextSize = 10,
         Font = Enum.Font.GothamMedium,
@@ -646,9 +646,9 @@ local function showKeySystem(onSuccess)
     -- Copy link
     getKeyLink.MouseButton1Click:Connect(function()
         pcall(function() setclipboard("https://enrique-keys.vercel.app") end)
-        getKeyLink.Text = "\u2705 Copied to clipboard!"
+        getKeyLink.Text = "✅ Copied to clipboard!"
         task.delay(2, function()
-            getKeyLink.Text = "\u{1F517} Get Free Key \u{2192} enrique-keys.vercel.app"
+            getKeyLink.Text = "🔗 Get Free Key → enrique-keys.vercel.app"
         end)
     end)
     
@@ -660,13 +660,13 @@ local function showKeySystem(onSuccess)
         local key = input.Text:gsub("%s", "")
         
         if key == "" then
-            statusMsg.Text = "\u26A0 Please enter a key"
+            statusMsg.Text = "⚠ Please enter a key"
             shake(card, 4)
             return
         end
         
         if not isValidKeyFormat(key) then
-            statusMsg.Text = "\u26A0 Invalid format (XXXX-XXXX-XXXX-XXXX)"
+            statusMsg.Text = "⚠ Invalid format (XXXX-XXXX-XXXX-XXXX)"
             shake(card, 4)
             return
         end
@@ -682,7 +682,7 @@ local function showKeySystem(onSuccess)
         
         if valid then
             verified = true
-            submitBtn.Text = "\u2713 AUTHENTICATED"
+            submitBtn.Text = "✓ AUTHENTICATED"
             submitBtn.BackgroundColor3 = Color3.fromRGB(34, 197, 94)
             statusMsg.Text = "Welcome! Tier: " .. (tier or "Premium")
             statusMsg.TextColor3 = Color3.fromRGB(80, 255, 120)
@@ -702,7 +702,7 @@ local function showKeySystem(onSuccess)
         else
             submitBtn.Text = "AUTHENTICATE"
             submitBtn.BackgroundColor3 = Color3.fromRGB(255, 30, 60)
-            statusMsg.Text = "\u2717 Invalid or expired key"
+            statusMsg.Text = "✗ Invalid or expired key"
             statusMsg.TextColor3 = Color3.fromRGB(255, 80, 80)
             shake(card, 6)
         end
