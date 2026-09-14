@@ -699,7 +699,7 @@ local function showSelection(onFree, onPaid)
         Position = UDim2.new(0.5, 0, 0, 250),
         Size = UDim2.new(1, -20, 0, 14),
         BackgroundTransparency = 1,
-        Text = "discord.gg/hZhwszmP",
+        Text = "discord.gg/jEA49UNC",
         TextColor3 = T.accent,
         TextSize = 10,
         Font = Enum.Font.GothamMedium,
@@ -958,7 +958,7 @@ local function showPaidKeyUI(onSuccess)
         Size = UDim2.new(1, 0, 0, 14),
         Position = UDim2.new(0, 0, 0, 295),
         BackgroundTransparency = 1,
-        Text = "discord.gg/hZhwszmP",
+        Text = "discord.gg/jEA49UNC",
         TextColor3 = T.accent,
         TextSize = 10,
         Font = Enum.Font.GothamMedium,
@@ -1097,4 +1097,4 @@ showLoading(function()
 end)
 
 print("⚔️ ENRIQUE UNIFIED LAUNCHER v3.0")
-print("discord.gg/hZhwszmP")
+print("discord.gg/jEA49UNC")
