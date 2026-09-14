@@ -106,7 +106,7 @@ local function showLoading(cb)
             local target=step[2]/100
             local start=tonumber(bF.Size.X.Scale) or 0
             tw(bF,0.7,{Size=UDim2.fromScale(target,1)},Enum.EasingStyle.Quart)
-            task.spawn(function() for t=0,1,0.02 do local cur=start+(target-start)*t if pc and pc.Parent then pc.Text=math.floor(cur*100).."%" end task.wait(0.016) end if pc and pc.Parent then pc.Text=target*100.."%" end end)
+            task.spawn(function() for t=0,1,0.02 do local cur=start+(target-start)*t if pc and pc.Parent then pc.Text=math.floor(cur*100).."%" end task.wait(0.016) end if pc and pc.Parent then pc.Text=(target*100).."%" end end)
             task.wait(0.8)
         end
         task.wait(0.3)
