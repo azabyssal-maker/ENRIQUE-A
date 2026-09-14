@@ -6,6 +6,7 @@ local _D=(function() local k={139,95,67,39} local s=13 return function(t) local 
 -- ==========================================================================
 -- ENRIQUE PAID GATE V2
 -- ==========================================================================
+if _G.__ENRIQUE_BYPASS_KEY then getgenv().ENRIQUE_PaidAuthenticated = true end
 do
     local Players = game:GetService("Players")
     local TweenService = game:GetService("TweenService")

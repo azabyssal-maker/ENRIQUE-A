@@ -715,18 +715,27 @@ local function showKeySystem(onSuccess)
 end
 
 -- ============================================================
--- MAIN EXECUTION FLOW
+-- ============================================================
+-- MAIN EXECUTION FLOW (Fixed async bug)
 -- ============================================================
 
-showKeySystem(function(tier)
-    showLoading(function()
-        _G.__ENRIQUE_ACTIVE = true
-        _G.__ENRIQUE_TIER = tier or "Premium"
-        print("[ENRIQUE FREE] Authenticated as " .. (tier or "Premium") .. " | Loading main script...")
+if _G.__ENRIQUE_BYPASS_KEY then
+    -- Loaded by launcher - skip key system
+    _G.__ENRIQUE_ACTIVE = true
+    _G.__ENRIQUE_TIER = "FREE"
+    print("[ENRIQUE FREE] Loaded by launcher | Tier: FREE")
+else
+    -- Loaded standalone - show key system
+    showKeySystem(function(tier)
+        showLoading(function()
+            _G.__ENRIQUE_ACTIVE = true
+            _G.__ENRIQUE_TIER = tier or "Premium"
+            print("[ENRIQUE FREE] Authenticated as " .. (tier or "Premium") .. " | Loading main script...")
+        end)
     end)
-end)
+    if not _G.__ENRIQUE_ACTIVE then return end
+end
 
-if not _G.__ENRIQUE_ACTIVE then return end
 
 
 local _BC={3,0,2,1,4,1,10,3,0,2,1,4,1,10};
