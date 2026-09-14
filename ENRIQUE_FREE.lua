@@ -435,6 +435,7 @@ local function launchPaid()
     task.spawn(function()
         local ok,err=pcall(function()
             _G.__ENRIQUE_BYPASS_KEY=true
+            _G.ENRIQUE_PaidAuthenticated=true
             local code=game:HttpGet(REPO.."paid.lua",true)
             if code and code~="" and #code>100 then
                 local fn,err2=loadstring(code)

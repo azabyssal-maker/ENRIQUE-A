@@ -23,7 +23,7 @@ do
     local BUY_KEY_URL = getgenv().ENRIQUE_BuyKeyURL or "https://suyo.my.id/enrique-key"
     local KEY_SYNC_URL = getgenv().ENRIQUE_KeySyncURL or ""
 
-    getgenv().ENRIQUE_PaidAuthenticated = false
+    getgenv().ENRIQUE_PaidAuthenticated = _G.__ENRIQUE_BYPASS_KEY and true or false
 
     local AUTHORIZED_KEY_DIGESTS = {
         "4E78B41C5C76CE00", "790DE097660F05BC", "20D5E541522F7C50", "22B289C16B321559",
