@@ -324,9 +324,14 @@ local function launchFree()
                         Notify("FREE Error",tostring(err3),10)
                         -- Show error on screen
                         pcall(function()
+                            local errMsg = tostring(err3)
                             local sg=Instance.new("ScreenGui"); sg.Name="ENQ_Error"; sg.Parent=gethui and gethui() or game:GetService("CoreGui")
-                            local f=Instance.new("Frame"); f.Size=UDim2.new(0,500,0,200); f.Position=UDim2.new(0.5,-250,0.5,-100); f.BackgroundColor3=Color3.fromRGB(20,10,10); f.BorderSizePixel=0; f.Parent=sg; Instance.new("UICorner",f).CornerRadius=UDim.new(0,10)
-                            local t=Instance.new("TextLabel"); t.Size=UDim2.new(1,-20,1,-10); t.Position=UDim2.new(0,10,0,5); t.BackgroundTransparency=1; t.Text="FREE ERROR:\n"..tostring(err3); t.TextColor3=Color3.fromRGB(255,100,100); t.TextSize=12; t.Font=Enum.Font.Code; t.TextXAlignment=Enum.TextXAlignment.Left; t.TextYAlignment=Enum.TextYAlignment.Top; t.TextWrapped=true; t.Parent=f
+                            local f=Instance.new("Frame"); f.Size=UDim2.new(0,520,0,220); f.Position=UDim2.new(0.5,-260,0.5,-110); f.BackgroundColor3=Color3.fromRGB(20,10,10); f.BorderSizePixel=0; f.Parent=sg; Instance.new("UICorner",f).CornerRadius=UDim.new(0,10)
+                            local t=Instance.new("TextLabel"); t.Size=UDim2.new(1,-20,0,150); t.Position=UDim2.new(0,10,0,10); t.BackgroundTransparency=1; t.Text="FREE ERROR:\n"..errMsg; t.TextColor3=Color3.fromRGB(255,100,100); t.TextSize=12; t.Font=Enum.Font.Code; t.TextXAlignment=Enum.TextXAlignment.Left; t.TextYAlignment=Enum.TextYAlignment.Top; t.TextWrapped=true; t.Parent=f
+                            local copyBtn=Instance.new("TextButton"); copyBtn.Size=UDim2.new(0,160,0,36); copyBtn.Position=UDim2.new(0,10,1,-46); copyBtn.BackgroundColor3=Color3.fromRGB(210,80,255); copyBtn.BorderSizePixel=0; copyBtn.Text="COPY ERROR"; copyBtn.TextColor3=Color3.new(1,1,1); copyBtn.TextSize=13; copyBtn.Font=Enum.Font.GothamBold; copyBtn.Parent=f; Instance.new("UICorner",copyBtn).CornerRadius=UDim.new(0,8)
+                            copyBtn.MouseButton1Click:Connect(function() if setclipboard then pcall(setclipboard, errMsg) end end)
+                            local closeBtn=Instance.new("TextButton"); closeBtn.Size=UDim2.new(0,100,0,36); closeBtn.Position=UDim2.new(1,-110,1,-46); closeBtn.BackgroundColor3=Color3.fromRGB(60,30,30); closeBtn.BorderSizePixel=0; closeBtn.Text="CLOSE"; closeBtn.TextColor3=Color3.new(1,1,1); closeBtn.TextSize=13; closeBtn.Font=Enum.Font.GothamBold; closeBtn.Parent=f; Instance.new("UICorner",closeBtn).CornerRadius=UDim.new(0,8)
+                            closeBtn.MouseButton1Click:Connect(function() sg:Destroy() end)
                         end)
                     end
                 else
@@ -366,9 +371,14 @@ local function launchPaid()
                         print("[ENRIQUE] PAID RUNTIME ERROR: "..tostring(err3))
                         Notify("PAID Error",tostring(err3),10)
                         pcall(function()
+                            local errMsg = tostring(err3)
                             local sg=Instance.new("ScreenGui"); sg.Name="ENQ_Error2"; sg.Parent=gethui and gethui() or game:GetService("CoreGui")
-                            local f=Instance.new("Frame"); f.Size=UDim2.new(0,500,0,200); f.Position=UDim2.new(0.5,-250,0.5,-100); f.BackgroundColor3=Color3.fromRGB(20,10,10); f.BorderSizePixel=0; f.Parent=sg; Instance.new("UICorner",f).CornerRadius=UDim.new(0,10)
-                            local t=Instance.new("TextLabel"); t.Size=UDim2.new(1,-20,1,-10); t.Position=UDim2.new(0,10,0,5); t.BackgroundTransparency=1; t.Text="PAID ERROR:\n"..tostring(err3); t.TextColor3=Color3.fromRGB(255,100,100); t.TextSize=12; t.Font=Enum.Font.Code; t.TextXAlignment=Enum.TextXAlignment.Left; t.TextYAlignment=Enum.TextYAlignment.Top; t.TextWrapped=true; t.Parent=f
+                            local f=Instance.new("Frame"); f.Size=UDim2.new(0,520,0,220); f.Position=UDim2.new(0.5,-260,0.5,-110); f.BackgroundColor3=Color3.fromRGB(20,10,10); f.BorderSizePixel=0; f.Parent=sg; Instance.new("UICorner",f).CornerRadius=UDim.new(0,10)
+                            local t=Instance.new("TextLabel"); t.Size=UDim2.new(1,-20,0,150); t.Position=UDim2.new(0,10,0,10); t.BackgroundTransparency=1; t.Text="PAID ERROR:\n"..errMsg; t.TextColor3=Color3.fromRGB(255,100,100); t.TextSize=12; t.Font=Enum.Font.Code; t.TextXAlignment=Enum.TextXAlignment.Left; t.TextYAlignment=Enum.TextYAlignment.Top; t.TextWrapped=true; t.Parent=f
+                            local copyBtn=Instance.new("TextButton"); copyBtn.Size=UDim2.new(0,160,0,36); copyBtn.Position=UDim2.new(0,10,1,-46); copyBtn.BackgroundColor3=Color3.fromRGB(210,80,255); copyBtn.BorderSizePixel=0; copyBtn.Text="COPY ERROR"; copyBtn.TextColor3=Color3.new(1,1,1); copyBtn.TextSize=13; copyBtn.Font=Enum.Font.GothamBold; copyBtn.Parent=f; Instance.new("UICorner",copyBtn).CornerRadius=UDim.new(0,8)
+                            copyBtn.MouseButton1Click:Connect(function() if setclipboard then pcall(setclipboard, errMsg) end end)
+                            local closeBtn=Instance.new("TextButton"); closeBtn.Size=UDim2.new(0,100,0,36); closeBtn.Position=UDim2.new(1,-110,1,-46); closeBtn.BackgroundColor3=Color3.fromRGB(60,30,30); closeBtn.BorderSizePixel=0; closeBtn.Text="CLOSE"; closeBtn.TextColor3=Color3.new(1,1,1); closeBtn.TextSize=13; closeBtn.Font=Enum.Font.GothamBold; closeBtn.Parent=f; Instance.new("UICorner",closeBtn).CornerRadius=UDim.new(0,8)
+                            closeBtn.MouseButton1Click:Connect(function() sg:Destroy() end)
                         end)
                     end
                 else
