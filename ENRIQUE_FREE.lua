@@ -303,71 +303,105 @@ local function showPaidKeyUI(onSuccess)
 end
 
 local function showErrorBox(title, errMsg)
-    pcall(function()
-        local sg = Instance.new("ScreenGui")
-        sg.Name = "ENQ_ErrorBox"
-        sg.ResetOnSpawn = false
-        pcall(function() if type(gethui)=="function" then sg.Parent=gethui() else sg.Parent=game:GetService("CoreGui") end end)
-        if not sg.Parent then sg.Parent=LocalPlayer:WaitForChild("PlayerGui",3) end
-        local f = Instance.new("Frame")
-        f.Size = UDim2.new(0,520,0,240)
-        f.Position = UDim2.new(0.5,-260,0.5,-120)
-        f.BackgroundColor3 = Color3.fromRGB(20,10,10)
-        f.BorderSizePixel = 0
-        f.Parent = sg
-        Instance.new("UICorner",f).CornerRadius = UDim.new(0,10)
-        local tl = Instance.new("TextLabel")
-        tl.Size = UDim2.new(1,-20,0,30)
-        tl.Position = UDim2.new(0,10,0,10)
-        tl.BackgroundTransparency = 1
-        tl.Text = title
-        tl.TextColor3 = Color3.fromRGB(255,200,100)
-        tl.TextSize = 16
-        tl.Font = Enum.Font.GothamBold
-        tl.TextXAlignment = Enum.TextXAlignment.Left
-        tl.Parent = f
-        local el = Instance.new("TextLabel")
-        el.Size = UDim2.new(1,-20,0,140)
-        el.Position = UDim2.new(0,10,0,45)
-        el.BackgroundTransparency = 1
-        el.Text = errMsg
-        el.TextColor3 = Color3.fromRGB(255,100,100)
-        el.TextSize = 12
-        el.Font = Enum.Font.Code
-        el.TextXAlignment = Enum.TextXAlignment.Left
-        el.TextYAlignment = Enum.TextYAlignment.Top
-        el.TextWrapped = true
-        el.Parent = f
-        local cb = Instance.new("TextButton")
-        cb.Size = UDim2.new(0,180,0,40)
-        cb.Position = UDim2.new(0,10,1,-50)
-        cb.BackgroundColor3 = Color3.fromRGB(210,80,255)
-        cb.BorderSizePixel = 0
-        cb.Text = "COPY ERROR"
-        cb.TextColor3 = Color3.new(1,1,1)
-        cb.TextSize = 14
-        cb.Font = Enum.Font.GothamBold
-        cb.Parent = f
-        Instance.new("UICorner",cb).CornerRadius = UDim.new(0,8)
-        local xb = Instance.new("TextButton")
-        xb.Size = UDim2.new(0,120,0,40)
-        xb.Position = UDim2.new(1,-130,1,-50)
-        xb.BackgroundColor3 = Color3.fromRGB(60,30,30)
-        xb.BorderSizePixel = 0
-        xb.Text = "CLOSE"
-        xb.TextColor3 = Color3.new(1,1,1)
-        xb.TextSize = 14
-        xb.Font = Enum.Font.GothamBold
-        xb.Parent = f
-        Instance.new("UICorner",xb).CornerRadius = UDim.new(0,8)
-        cb.MouseButton1Click:Connect(function()
-            pcall(function() if setclipboard then setclipboard(errMsg) end end)
-            cb.Text = "COPIED!"
-            task.wait(1.5)
-            cb.Text = "COPY ERROR"
+    -- Step 1: Create ScreenGui
+    local ok1, sg = pcall(Instance.new, "ScreenGui")
+    if not ok1 then return end
+    sg.Name = "ENQ_ErrorBox"
+    sg.ResetOnSpawn = false
+    sg.IgnoreGuiInset = true
+    pcall(function() sg.Parent = gethui() end)
+    if not sg.Parent then pcall(function() sg.Parent = game:GetService("CoreGui") end) end
+    if not sg.Parent then pcall(function() sg.Parent = LocalPlayer:WaitForChild("PlayerGui", 3) end) end
+    if not sg.Parent then warn("[ENRIQUE] Cannot parent error UI"); return end
+
+    -- Step 2: Background
+    local bg = Instance.new("Frame")
+    bg.Name = "ErrorBg"
+    bg.Size = UDim2.new(1, 0, 1, 0)
+    bg.BackgroundColor3 = Color3.new(0, 0, 0)
+    bg.BackgroundTransparency = 0.3
+    bg.BorderSizePixel = 0
+    bg.Parent = sg
+
+    -- Step 3: Main frame
+    local fr = Instance.new("Frame")
+    fr.Name = "ErrorFrame"
+    fr.Size = UDim2.new(0, 500, 0, 250)
+    fr.Position = UDim2.new(0.5, -250, 0.5, -125)
+    fr.BackgroundColor3 = Color3.fromRGB(30, 15, 15)
+    fr.BorderSizePixel = 2
+    fr.BorderColor3 = Color3.fromRGB(255, 80, 80)
+    fr.Parent = bg
+
+    -- Step 4: Title
+    local tl = Instance.new("TextLabel")
+    tl.Size = UDim2.new(1, -20, 0, 30)
+    tl.Position = UDim2.new(0, 10, 0, 5)
+    tl.BackgroundTransparency = 1
+    tl.Text = tostring(title)
+    tl.TextColor3 = Color3.fromRGB(255, 200, 100)
+    tl.TextSize = 16
+    tl.Font = Enum.Font.GothamBold
+    tl.TextXAlignment = Enum.TextXAlignment.Left
+    tl.Parent = fr
+
+    -- Step 5: Error text
+    local el = Instance.new("TextLabel")
+    el.Size = UDim2.new(1, -20, 0, 120)
+    el.Position = UDim2.new(0, 10, 0, 40)
+    el.BackgroundTransparency = 1
+    el.Text = tostring(errMsg)
+    el.TextColor3 = Color3.fromRGB(255, 100, 100)
+    el.TextSize = 11
+    el.Font = Enum.Font.Code
+    el.TextXAlignment = Enum.TextXAlignment.Left
+    el.TextYAlignment = Enum.TextYAlignment.Top
+    el.TextWrapped = true
+    el.Parent = fr
+
+    -- Step 6: COPY button (purple, bottom-left)
+    local cb = Instance.new("TextButton")
+    cb.Size = UDim2.new(0, 200, 0, 45)
+    cb.Position = UDim2.new(0, 10, 1, -55)
+    cb.BackgroundColor3 = Color3.fromRGB(180, 60, 255)
+    cb.BorderSizePixel = 0
+    cb.Text = "  COPY ERROR"
+    cb.TextColor3 = Color3.new(1, 1, 1)
+    cb.TextSize = 16
+    cb.Font = Enum.Font.GothamBold
+    cb.TextXAlignment = Enum.TextXAlignment.Left
+    cb.Parent = fr
+
+    -- Step 7: CLOSE button (red, bottom-right)
+    local xb = Instance.new("TextButton")
+    xb.Size = UDim2.new(0, 150, 0, 45)
+    xb.Position = UDim2.new(1, -160, 1, -55)
+    xb.BackgroundColor3 = Color3.fromRGB(200, 40, 40)
+    xb.BorderSizePixel = 0
+    xb.Text = "  CLOSE"
+    xb.TextColor3 = Color3.new(1, 1, 1)
+    xb.TextSize = 16
+    xb.Font = Enum.Font.GothamBold
+    xb.TextXAlignment = Enum.TextXAlignment.Left
+    xb.Parent = fr
+
+    -- Step 8: Copy click
+    cb.MouseButton1Click:Connect(function()
+        pcall(function() setclipboard(tostring(errMsg)) end)
+        cb.Text = "  COPIED!"
+        cb.BackgroundColor3 = Color3.fromRGB(40, 180, 80)
+        task.delay(2, function()
+            cb.Text = "  COPY ERROR"
+            cb.BackgroundColor3 = Color3.fromRGB(180, 60, 255)
         end)
-        xb.MouseButton1Click:Connect(function() sg:Destroy() end)
     end)
+
+    -- Step 9: Close click
+    xb.MouseButton1Click:Connect(function()
+        sg:Destroy()
+    end)
+
+    warn("[ENRIQUE] Error box shown: " .. tostring(title))
 end
 
 
