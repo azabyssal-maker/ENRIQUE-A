@@ -1271,9 +1271,9 @@ local T = {
 
 -- Anime image IDs for decoration
 local ANIME_IDS = {
-    "133575691569801",  -- Header banner
-    "105587462408321",  -- Sidebar icon
-    "11642789352",      -- Alt banner
+    "16014323157",  -- Header banner
+    "16014323157",  -- Sidebar icon
+    "16014323157",      -- Alt banner
 }
 
 -- Helpers
@@ -1744,6 +1744,19 @@ function UI.Create()
         Parent = titleBar,
     })
     mk("UICorner", {CornerRadius = UDim.new(0, 6), Parent = closeBtn})
+    
+    -- Circle image button (ANGELI style)
+    local circleBtn = mk("ImageButton", {
+        Size = UDim2.new(0, 26, 0, 26),
+        Position = UDim2.new(0, 14, 0.5, -13),
+        BackgroundColor3 = T.accent,
+        BorderSizePixel = 0,
+        Image = "rbxassetid://16014323157",
+        ImageColor3 = Color3.new(1, 1, 1),
+        AutoButtonColor = false,
+        Parent = titleBar,
+    })
+    mk("UICorner", {CornerRadius = UDim.new(1, 0), Parent = circleBtn})
     
     -- Anime banner
     local banner = mk("ImageLabel", {
