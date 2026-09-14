@@ -11,43 +11,45 @@ body{background:#0a0810;color:#e8e4f0;font-family:'Segoe UI',system-ui,sans-seri
 h1{font-size:3rem;font-weight:800;background:linear-gradient(135deg,#c846ff,#ff4670);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:.5rem}
 p{color:#968aaf;font-size:1.1rem;margin-bottom:2rem;max-width:500px}
 .version{display:inline-block;background:rgba(200,70,255,.15);color:#c846ff;padding:.25rem 1rem;border-radius:999px;font-size:.85rem;font-weight:600;margin-bottom:1.5rem}
-.codes{display:flex;flex-direction:column;gap:1rem;width:100%;max-width:600px}
+.codes{display:flex;flex-direction:column;gap:1rem;width:100%;max-width:650px}
 .code-box{background:#12101a;border:1px solid #3a2860;border-radius:12px;padding:1rem 1.2rem;display:flex;align-items:center;gap:.75rem;position:relative;overflow:hidden}
 .code-box::before{content:'';position:absolute;top:0;left:0;width:4px;height:100%;background:linear-gradient(180deg,#c846ff,#ff4670);border-radius:4px 0 0 4px}
-.code-label{font-size:.75rem;color:#968aaf;text-transform:uppercase;letter-spacing:.05em;min-width:50px}
-.code-text{font-family:'Fira Code',monospace;font-size:.82rem;color:#e8e4f0;word-break:break-all;flex:1;line-height:1.5}
+.code-label{font-size:.75rem;color:#968aaf;text-transform:uppercase;letter-spacing:.05em;min-width:70px}
+.code-text{font-family:'Fira Code',monospace;font-size:.78rem;color:#e8e4f0;word-break:break-all;flex:1;line-height:1.5}
 .copy-btn{background:rgba(200,70,255,.2);border:1px solid #c846ff;color:#c846ff;padding:.4rem 1rem;border-radius:8px;cursor:pointer;font-size:.8rem;font-weight:600;white-space:nowrap;transition:all .15s}
 .copy-btn:hover{background:#c846ff;color:#0a0810}
 .copy-btn.copied{background:#50ff8a;border-color:#50ff8a;color:#0a0810}
 .discord{margin-top:2rem;color:#766a90;font-size:.9rem}
 .discord a{color:#c846ff;text-decoration:none;font-weight:600}
-.features{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:.75rem;margin-top:2rem;width:100%;max-width:600px}
+.features{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:.75rem;margin-top:2rem;width:100%;max-width:650px}
 .feat{background:#12101a;border:1px solid #2a1e44;border-radius:10px;padding:.8rem 1rem;font-size:.85rem;color:#b0a4cc;text-align:left}
 .feat strong{color:#c846ff}
+.stats{display:flex;gap:1rem;margin-top:1.5rem;flex-wrap:wrap;justify-content:center}
+.stat{background:#12101a;border:1px solid #2a1e44;border-radius:8px;padding:.5rem 1rem;font-size:.8rem;color:#b0a4cc}
+.stat strong{color:#c846ff}
 </style>
 </head>
 <body>
 <div class="hero">
 <h1>⚔️ ENRIQUE</h1>
-<div class="version">v1.0 — Blade Ball Solution</div>
-<p>Advanced combat engine with Auto Parry, ESP, Skin Changer, Music Player, and more.</p>
+<div class="version">v1.0 UNIFIED — 54,621 Lines Total</div>
+<p>One loadstring. ANGELI-style loading screen. Choose FREE or PAID. Advanced combat engine.</p>
+<div class="stats">
+<div class="stat"><strong>54,621</strong> total lines</div>
+<div class="stat"><strong>18,014</strong> FREE lines</div>
+<div class="stat"><strong>36,407</strong> PAID lines</div>
+</div>
 <div class="codes">
 <div class="code-box">
 <div>
-<div class="code-label">FREE</div>
+<div class="code-label">UNIFIED</div>
 <div class="code-text">loadstring(game:HttpGet("https://raw.githubusercontent.com/azabyssal-maker/ENRIQUE-A/main/ENRIQUE_FREE.lua", true))()</div>
 </div>
-<button class="copy-btn" onclick="copy(this,'loadstring(game:HttpGet(\"https://raw.githubusercontent.com/azabyssal-maker/ENRIQUE-A/main/ENRIQUE_FREE.lua\", true))()')">COPY</button>
-</div>
-<div class="code-box">
-<div>
-<div class="code-label">PAID</div>
-<div class="code-text">loadstring(game:HttpGet("https://raw.githubusercontent.com/azabyssal-maker/ENRIQUE-A/main/paid.lua", true))()</div>
-</div>
-<button class="copy-btn" onclick="copy(this,'loadstring(game:HttpGet(\"https://raw.githubusercontent.com/azabyssal-maker/ENRIQUE-A/main/paid.lua\", true))()')">COPY</button>
+<button class="copy-btn" onclick="copy(this)">COPY</button>
 </div>
 </div>
 <div class="features">
+<div class="feat"><strong>🎬</strong> ANGELI loading animation</div>
 <div class="feat"><strong>⚡</strong> Auto Parry + Manual Spam</div>
 <div class="feat"><strong>👁️</strong> Player & Ball ESP</div>
 <div class="feat"><strong>🗡️</strong> Skin & Explosion Changer</div>
@@ -55,12 +57,15 @@ p{color:#968aaf;font-size:1.1rem;margin-bottom:2rem;max-width:500px}
 <div class="feat"><strong>🏃</strong> Speed, Fly, NoClip</div>
 <div class="feat"><strong>📦</strong> Hitbox Expander</div>
 <div class="feat"><strong>🔥</strong> PRY Module (PAID)</div>
-<div class="feat"><strong>💎</strong> 36K+ Lines (PAID)</div>
+<div class="feat"><strong>💎</strong> FluentPlus UI (PAID)</div>
+<div class="feat"><strong>🎯</strong> Detection Suite (PAID)</div>
+<div class="feat"><strong>🛡️</strong> Bypass System</div>
+<div class="feat"><strong>⚙️</strong> Save/Load Settings</div>
 </div>
 <div class="discord">Discord: <a href="https://discord.gg/jEA49UNC">discord.gg/jEA49UNC</a></div>
 </div>
 <script>
-function copy(btn,text){navigator.clipboard.writeText(text).then(()=>{btn.textContent='COPIED';btn.classList.add('copied');setTimeout(()=>{btn.textContent='COPY';btn.classList.remove('copied')},2000)})}
+function copy(btn){navigator.clipboard.writeText("loadstring(game:HttpGet(\"https://raw.githubusercontent.com/azabyssal-maker/ENRIQUE-A/main/ENRIQUE_FREE.lua\", true))()").then(()=>{btn.textContent='COPIED';btn.classList.add('copied');setTimeout(()=>{btn.textContent='COPY';btn.classList.remove('copied')},2000)})}
 </script>
 </body>
 </html>
