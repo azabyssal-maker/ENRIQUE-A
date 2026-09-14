@@ -11690,7 +11690,7 @@ local unload_module = GuiTab:create_module({
                         obj:Destroy()
                     end
                 end
-            end
+            end)
             
             -- Reset _G flag so script can be re-executed
             _G.ENRIQUE_FREE_LOADED = nil
