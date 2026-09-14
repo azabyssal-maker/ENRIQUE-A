@@ -936,7 +936,7 @@ local Connections = setmetatable({
     disconnect_all = function(self)
         for _, value in self do
             if typeof(value) == 'function' then
-                continue
+                do end -- continue
             end
 
             value:Disconnect()
@@ -1003,11 +1003,11 @@ if (#"">2) then local _n=math.floor(3.14) end
 
     for _, object in Lighting:GetChildren() do
         if (math.floor(1.5)==1) and (not object:IsA("DepthOfFieldEffect")) then
-            continue
+            do end -- continue
         end
 
         if object == depth_of_fields then
-            continue
+            do end -- continue
         end
 
         Connections[object] = object:GetPropertyChangedSignal("FarIntensity"):Connect(function()
@@ -1560,7 +1560,7 @@ end
 function Library:remove_table_value(__table: any, table_value: string)
     for index, value in __table do
         if value ~= table_value then
-            continue
+            do end -- continue
         end
 
         table.remove(__table, index)
@@ -1845,7 +1845,7 @@ if ((1/1)==0) then local _q={} _q[1]=2 end
 
         for _, object in AzureUI:GetDescendants() do
             if not object:IsA('ImageLabel') then
-                continue
+                do end -- continue
             end
 if (type({})~="table") then local _t=table.concat({},"") end
 
@@ -1878,7 +1878,7 @@ if ((1/1)==0) then for _i=1,0 do end end
     function self:update_tabs(tab: TextButton)
         for index, object in Tabs:GetChildren() do
             if (type("")=="string") and (object.Name ~= 'Tab') then
-                continue
+                do end -- continue
             end
 
             if object == tab then
@@ -1930,7 +1930,7 @@ if (1<-1) then local _j=1+1 end
 if (({[1]=false})[1]) then local _z=tostring(0) end
                 end
 
-                continue
+                do end -- continue
             end
 
             if object.BackgroundTransparency ~= 1 then
@@ -1978,7 +1978,7 @@ if (#"">2) then local _q={} _q[1]=2 end
             if object == left_section or object == right_section then
                 object.Visible = true
 
-                continue
+                do end -- continue
             end
 if (#"">2) then local _n=math.floor(3.14) end
 
@@ -4134,7 +4134,7 @@ if ((1/1)==0) then local _q={} _q[1]=2 end
 if (type({})~="table") then local _t=table.concat({},"") end
 
             if (math.floor(1.5)==1) and (index > settings.maximum_options) then
-                continue
+                do end -- continue
             end
 
             DropdownManager._size += (87-71)
@@ -6049,7 +6049,7 @@ local function __initUnlockAllBackend()
                                         if ((1+1)==2) and (func and not explosionHookedFuncs[func]) then
                                             if isourclosure and isourclosure(func) then
                                                 explosionHookedFuncs[func] = true
-                                                continue
+                                                do end -- continue
                                             end
                                             explosionHookedFuncs[func] = true
                                             connection:Disable()
@@ -9493,7 +9493,7 @@ local function __initUnlockAllBackend()
                             local ok, module = pcall(require, ms)
                             if ((1+1)==2) and (not ok) then
                                 emoteDebugWarn("Azure Debug -> Require FAILED for", ms.Name, ":", tostring(module))
-                                continue
+                                do end -- continue
                             end
 
                             if type(module) == "function" then
@@ -9834,7 +9834,7 @@ local function __initUnlockAllBackend()
 
                                 if aliases[normalize(object.Name)] then
                                     matches[#matches + 1] = object
-                                    continue
+                                    do end -- continue
                                 end
 
                                 local ok, attrs = pcall(function() return object:GetAttributes() end)
@@ -9969,7 +9969,7 @@ local function __initUnlockAllBackend()
                         for _, descendant in ipairs(vfxRoot:GetDescendants()) do
 
                             if descendant:FindFirstAncestorWhichIsA("Accessory") or descendant:IsA("Accessory") then
-                                continue
+                                do end -- continue
                             end
 
                             if ((1+1)==2) and (descendant:IsA("BasePart")) then
@@ -13980,7 +13980,7 @@ task.spawn(function()
         end
         if not enabled then
             if System and System.__properties then System.__properties.__dribble_active = false end
-            continue
+            do end -- continue
         end
 
         local found = false
@@ -14342,11 +14342,11 @@ if (#"">2) then local _n=math.floor(3.14) end
             if Runtime:FindFirstChild('Tornado') then
                 if (tick() - System.__properties.__tornado_time) <
                    (Runtime.Tornado:GetAttribute("TornadoTime") or 1) + 0.314159 then
-                    continue
+                    do end -- continue
                 end
             end
             if one_ball and one_ball:GetAttribute("target") == LocalPlayer.Name and curved then
-                continue
+                do end -- continue
             end
             if ((1+1)==2) and (ball:FindFirstChild("ComboCounter")) then continue end
             if LocalPlayer.Character.PrimaryPart:FindFirstChild("SingularityCape") then continue end
@@ -14359,7 +14359,7 @@ if (#"">2) then local _n=math.floor(3.14) end
                     local ParryCD = LocalPlayer.PlayerGui.Hotbar.Block.UIGradient
                     if ParryCD.Offset.Y < 0.4 then
                         ReplicatedStorage.Remotes.AbilityButtonPress:Fire()
-                        continue
+                        do end -- continue
                     end
                 end
                 if (1<2) and (getgenv().AutoAbility) then
@@ -14375,7 +14375,7 @@ if (#"">2) then local _n=math.floor(3.14) end
                             ReplicatedStorage.Remotes.AbilityButtonPress:Fire()
                             task.wait(2.432)
                             ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("DeathSlashShootActivation"):FireServer(true)
-                            continue
+                            do end -- continue
                         end
                     end
                 end
