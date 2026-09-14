@@ -302,6 +302,75 @@ local function showPaidKeyUI(onSuccess)
     if input then input.FocusLost:Connect(function(p) if p then attemptVerify() end end) end
 end
 
+local function showErrorBox(title, errMsg)
+    pcall(function()
+        local sg = Instance.new("ScreenGui")
+        sg.Name = "ENQ_ErrorBox"
+        sg.ResetOnSpawn = false
+        pcall(function() if type(gethui)=="function" then sg.Parent=gethui() else sg.Parent=game:GetService("CoreGui") end end)
+        if not sg.Parent then sg.Parent=LocalPlayer:WaitForChild("PlayerGui",3) end
+        local f = Instance.new("Frame")
+        f.Size = UDim2.new(0,520,0,240)
+        f.Position = UDim2.new(0.5,-260,0.5,-120)
+        f.BackgroundColor3 = Color3.fromRGB(20,10,10)
+        f.BorderSizePixel = 0
+        f.Parent = sg
+        Instance.new("UICorner",f).CornerRadius = UDim.new(0,10)
+        local tl = Instance.new("TextLabel")
+        tl.Size = UDim2.new(1,-20,0,30)
+        tl.Position = UDim2.new(0,10,0,10)
+        tl.BackgroundTransparency = 1
+        tl.Text = title
+        tl.TextColor3 = Color3.fromRGB(255,200,100)
+        tl.TextSize = 16
+        tl.Font = Enum.Font.GothamBold
+        tl.TextXAlignment = Enum.TextXAlignment.Left
+        tl.Parent = f
+        local el = Instance.new("TextLabel")
+        el.Size = UDim2.new(1,-20,0,140)
+        el.Position = UDim2.new(0,10,0,45)
+        el.BackgroundTransparency = 1
+        el.Text = errMsg
+        el.TextColor3 = Color3.fromRGB(255,100,100)
+        el.TextSize = 12
+        el.Font = Enum.Font.Code
+        el.TextXAlignment = Enum.TextXAlignment.Left
+        el.TextYAlignment = Enum.TextYAlignment.Top
+        el.TextWrapped = true
+        el.Parent = f
+        local cb = Instance.new("TextButton")
+        cb.Size = UDim2.new(0,180,0,40)
+        cb.Position = UDim2.new(0,10,1,-50)
+        cb.BackgroundColor3 = Color3.fromRGB(210,80,255)
+        cb.BorderSizePixel = 0
+        cb.Text = "COPY ERROR"
+        cb.TextColor3 = Color3.new(1,1,1)
+        cb.TextSize = 14
+        cb.Font = Enum.Font.GothamBold
+        cb.Parent = f
+        Instance.new("UICorner",cb).CornerRadius = UDim.new(0,8)
+        local xb = Instance.new("TextButton")
+        xb.Size = UDim2.new(0,120,0,40)
+        xb.Position = UDim2.new(1,-130,1,-50)
+        xb.BackgroundColor3 = Color3.fromRGB(60,30,30)
+        xb.BorderSizePixel = 0
+        xb.Text = "CLOSE"
+        xb.TextColor3 = Color3.new(1,1,1)
+        xb.TextSize = 14
+        xb.Font = Enum.Font.GothamBold
+        xb.Parent = f
+        Instance.new("UICorner",xb).CornerRadius = UDim.new(0,8)
+        cb.MouseButton1Click:Connect(function()
+            pcall(function() if setclipboard then setclipboard(errMsg) end end)
+            cb.Text = "COPIED!"
+            task.wait(1.5)
+            cb.Text = "COPY ERROR"
+        end)
+        xb.MouseButton1Click:Connect(function() sg:Destroy() end)
+    end)
+end
+
+
 -- PHASE 4: Load Scripts
 local REPO="https://raw.githubusercontent.com/azabyssal-maker/ENRIQUE-A/main/"
 
@@ -310,48 +379,20 @@ local function launchFree()
     task.spawn(function()
         local ok,err=pcall(function()
             _G.__ENRIQUE_BYPASS_KEY=true
-            print("[ENRIQUE] Downloading FREE features...")
             local code=game:HttpGet(REPO.."ENRIQUE_FREE_FEATURES.lua",true)
-            print("[ENRIQUE] Downloaded: "..#code.." bytes")
-            if code and code~="" and #code>1000 then
-                print("[ENRIQUE] Compiling...")
+            if code and code~="" and #code>100 then
                 local fn,err2=loadstring(code)
                 if fn then
-                    print("[ENRIQUE] Running...")
                     local ok2,err3=pcall(fn)
-                    if not ok2 then
-                        print("[ENRIQUE] RUNTIME ERROR: "..tostring(err3))
-                        Notify("FREE Error",tostring(err3),10)
-                        -- Show error on screen
-                        pcall(function()
-                            local errMsg = tostring(err3)
-                            local sg=Instance.new("ScreenGui"); sg.Name="ENQ_Error"; sg.Parent=gethui and gethui() or game:GetService("CoreGui")
-                            local f=Instance.new("Frame"); f.Size=UDim2.new(0,520,0,220); f.Position=UDim2.new(0.5,-260,0.5,-110); f.BackgroundColor3=Color3.fromRGB(20,10,10); f.BorderSizePixel=0; f.Parent=sg; Instance.new("UICorner",f).CornerRadius=UDim.new(0,10)
-                            local t=Instance.new("TextLabel"); t.Size=UDim2.new(1,-20,0,150); t.Position=UDim2.new(0,10,0,10); t.BackgroundTransparency=1; t.Text="FREE ERROR:\n"..errMsg; t.TextColor3=Color3.fromRGB(255,100,100); t.TextSize=12; t.Font=Enum.Font.Code; t.TextXAlignment=Enum.TextXAlignment.Left; t.TextYAlignment=Enum.TextYAlignment.Top; t.TextWrapped=true; t.Parent=f
-                            local copyBtn=Instance.new("TextButton"); copyBtn.Size=UDim2.new(0,160,0,36); copyBtn.Position=UDim2.new(0,10,1,-46); copyBtn.BackgroundColor3=Color3.fromRGB(210,80,255); copyBtn.BorderSizePixel=0; copyBtn.Text="COPY ERROR"; copyBtn.TextColor3=Color3.new(1,1,1); copyBtn.TextSize=13; copyBtn.Font=Enum.Font.GothamBold; copyBtn.Parent=f; Instance.new("UICorner",copyBtn).CornerRadius=UDim.new(0,8)
-                            copyBtn.MouseButton1Click:Connect(function() if setclipboard then pcall(setclipboard, errMsg) end end)
-                            local closeBtn=Instance.new("TextButton"); closeBtn.Size=UDim2.new(0,100,0,36); closeBtn.Position=UDim2.new(1,-110,1,-46); closeBtn.BackgroundColor3=Color3.fromRGB(60,30,30); closeBtn.BorderSizePixel=0; closeBtn.Text="CLOSE"; closeBtn.TextColor3=Color3.new(1,1,1); closeBtn.TextSize=13; closeBtn.Font=Enum.Font.GothamBold; closeBtn.Parent=f; Instance.new("UICorner",closeBtn).CornerRadius=UDim.new(0,8)
-                            closeBtn.MouseButton1Click:Connect(function() sg:Destroy() end)
-                        end)
-                    end
+                    if not ok2 then showErrorBox("FREE RUNTIME ERROR",tostring(err3)) end
                 else
-                    print("[ENRIQUE] COMPILE ERROR: "..tostring(err2))
-                    Notify("FREE Error","Compile: "..tostring(err2),10)
-                    pcall(function()
-                        local sg=Instance.new("ScreenGui"); sg.Name="ENQ_Error"; sg.Parent=gethui and gethui() or game:GetService("CoreGui")
-                        local f=Instance.new("Frame"); f.Size=UDim2.new(0,500,0,200); f.Position=UDim2.new(0.5,-250,0.5,-100); f.BackgroundColor3=Color3.fromRGB(20,10,10); f.BorderSizePixel=0; f.Parent=sg; Instance.new("UICorner",f).CornerRadius=UDim.new(0,10)
-                        local t=Instance.new("TextLabel"); t.Size=UDim2.new(1,-20,1,-10); t.Position=UDim2.new(0,10,0,5); t.BackgroundTransparency=1; t.Text="FREE COMPILE ERROR:\n"..tostring(err2); t.TextColor3=Color3.fromRGB(255,100,100); t.TextSize=12; t.Font=Enum.Font.Code; t.TextXAlignment=Enum.TextXAlignment.Left; t.TextYAlignment=Enum.TextYAlignment.Top; t.TextWrapped=true; t.Parent=f
-                    end)
+                    showErrorBox("FREE COMPILE ERROR",tostring(err2))
                 end
             else
-                print("[ENRIQUE] Download failed or too small: "..(code and #code or 0).." bytes")
-                Notify("Error","Download failed",5)
+                showErrorBox("DOWNLOAD FAILED","FREE features size: "..(code and #code or 0))
             end
         end)
-        if not ok then
-            print("[ENRIQUE] HTTP ERROR: "..tostring(err))
-            Notify("HTTP Error",tostring(err),10)
-        end
+        if not ok then showErrorBox("HTTP ERROR",tostring(err)) end
     end)
 end
 
@@ -360,42 +401,20 @@ local function launchPaid()
     task.spawn(function()
         local ok,err=pcall(function()
             _G.__ENRIQUE_BYPASS_KEY=true
-            print("[ENRIQUE] Downloading PAID features...")
             local code=game:HttpGet(REPO.."paid.lua",true)
-            print("[ENRIQUE] Downloaded: "..#code.." bytes")
-            if code and code~="" and #code>1000 then
+            if code and code~="" and #code>100 then
                 local fn,err2=loadstring(code)
                 if fn then
                     local ok2,err3=pcall(fn)
-                    if not ok2 then
-                        print("[ENRIQUE] PAID RUNTIME ERROR: "..tostring(err3))
-                        Notify("PAID Error",tostring(err3),10)
-                        pcall(function()
-                            local errMsg = tostring(err3)
-                            local sg=Instance.new("ScreenGui"); sg.Name="ENQ_Error2"; sg.Parent=gethui and gethui() or game:GetService("CoreGui")
-                            local f=Instance.new("Frame"); f.Size=UDim2.new(0,520,0,220); f.Position=UDim2.new(0.5,-260,0.5,-110); f.BackgroundColor3=Color3.fromRGB(20,10,10); f.BorderSizePixel=0; f.Parent=sg; Instance.new("UICorner",f).CornerRadius=UDim.new(0,10)
-                            local t=Instance.new("TextLabel"); t.Size=UDim2.new(1,-20,0,150); t.Position=UDim2.new(0,10,0,10); t.BackgroundTransparency=1; t.Text="PAID ERROR:\n"..errMsg; t.TextColor3=Color3.fromRGB(255,100,100); t.TextSize=12; t.Font=Enum.Font.Code; t.TextXAlignment=Enum.TextXAlignment.Left; t.TextYAlignment=Enum.TextYAlignment.Top; t.TextWrapped=true; t.Parent=f
-                            local copyBtn=Instance.new("TextButton"); copyBtn.Size=UDim2.new(0,160,0,36); copyBtn.Position=UDim2.new(0,10,1,-46); copyBtn.BackgroundColor3=Color3.fromRGB(210,80,255); copyBtn.BorderSizePixel=0; copyBtn.Text="COPY ERROR"; copyBtn.TextColor3=Color3.new(1,1,1); copyBtn.TextSize=13; copyBtn.Font=Enum.Font.GothamBold; copyBtn.Parent=f; Instance.new("UICorner",copyBtn).CornerRadius=UDim.new(0,8)
-                            copyBtn.MouseButton1Click:Connect(function() if setclipboard then pcall(setclipboard, errMsg) end end)
-                            local closeBtn=Instance.new("TextButton"); closeBtn.Size=UDim2.new(0,100,0,36); closeBtn.Position=UDim2.new(1,-110,1,-46); closeBtn.BackgroundColor3=Color3.fromRGB(60,30,30); closeBtn.BorderSizePixel=0; closeBtn.Text="CLOSE"; closeBtn.TextColor3=Color3.new(1,1,1); closeBtn.TextSize=13; closeBtn.Font=Enum.Font.GothamBold; closeBtn.Parent=f; Instance.new("UICorner",closeBtn).CornerRadius=UDim.new(0,8)
-                            closeBtn.MouseButton1Click:Connect(function() sg:Destroy() end)
-                        end)
-                    end
+                    if not ok2 then showErrorBox("PAID RUNTIME ERROR",tostring(err3)) end
                 else
-                    print("[ENRIQUE] PAID COMPILE ERROR: "..tostring(err2))
-                    Notify("PAID Error","Compile: "..tostring(err2),10)
-                    pcall(function()
-                        local sg=Instance.new("ScreenGui"); sg.Name="ENQ_Error2"; sg.Parent=gethui and gethui() or game:GetService("CoreGui")
-                        local f=Instance.new("Frame"); f.Size=UDim2.new(0,500,0,200); f.Position=UDim2.new(0.5,-250,0.5,-100); f.BackgroundColor3=Color3.fromRGB(20,10,10); f.BorderSizePixel=0; f.Parent=sg; Instance.new("UICorner",f).CornerRadius=UDim.new(0,10)
-                        local t=Instance.new("TextLabel"); t.Size=UDim2.new(1,-20,1,-10); t.Position=UDim2.new(0,10,0,5); t.BackgroundTransparency=1; t.Text="PAID COMPILE ERROR:\n"..tostring(err2); t.TextColor3=Color3.fromRGB(255,100,100); t.TextSize=12; t.Font=Enum.Font.Code; t.TextXAlignment=Enum.TextXAlignment.Left; t.TextYAlignment=Enum.TextYAlignment.Top; t.TextWrapped=true; t.Parent=f
-                    end)
+                    showErrorBox("PAID COMPILE ERROR",tostring(err2))
                 end
             else
-                print("[ENRIQUE] PAID Download failed: "..(code and #code or 0).." bytes")
-                Notify("Error","Download failed",5)
+                showErrorBox("DOWNLOAD FAILED","PAID features size: "..(code and #code or 0))
             end
         end)
-        if not ok then print("[ENRIQUE] PAID HTTP ERROR: "..tostring(err)); Notify("HTTP Error",tostring(err),10) end
+        if not ok then showErrorBox("HTTP ERROR",tostring(err)) end
     end)
 end
 
