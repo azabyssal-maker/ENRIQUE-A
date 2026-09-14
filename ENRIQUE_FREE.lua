@@ -310,13 +310,43 @@ local function launchFree()
     task.spawn(function()
         local ok,err=pcall(function()
             _G.__ENRIQUE_BYPASS_KEY=true
+            print("[ENRIQUE] Downloading FREE features...")
             local code=game:HttpGet(REPO.."ENRIQUE_FREE_FEATURES.lua",true)
+            print("[ENRIQUE] Downloaded: "..#code.." bytes")
             if code and code~="" and #code>1000 then
-                local fn=loadstring(code)
-                if fn then fn() else Notify("Error","FREE compile error",5) end
-            else Notify("Error","Download failed",5) end
+                print("[ENRIQUE] Compiling...")
+                local fn,err2=loadstring(code)
+                if fn then
+                    print("[ENRIQUE] Running...")
+                    local ok2,err3=pcall(fn)
+                    if not ok2 then
+                        print("[ENRIQUE] RUNTIME ERROR: "..tostring(err3))
+                        Notify("FREE Error",tostring(err3),10)
+                        -- Show error on screen
+                        pcall(function()
+                            local sg=Instance.new("ScreenGui"); sg.Name="ENQ_Error"; sg.Parent=gethui and gethui() or game:GetService("CoreGui")
+                            local f=Instance.new("Frame"); f.Size=UDim2.new(0,500,0,200); f.Position=UDim2.new(0.5,-250,0.5,-100); f.BackgroundColor3=Color3.fromRGB(20,10,10); f.BorderSizePixel=0; f.Parent=sg; Instance.new("UICorner",f).CornerRadius=UDim.new(0,10)
+                            local t=Instance.new("TextLabel"); t.Size=UDim2.new(1,-20,1,-10); t.Position=UDim2.new(0,10,0,5); t.BackgroundTransparency=1; t.Text="FREE ERROR:\n"..tostring(err3); t.TextColor3=Color3.fromRGB(255,100,100); t.TextSize=12; t.Font=Enum.Font.Code; t.TextXAlignment=Enum.TextXAlignment.Left; t.TextYAlignment=Enum.TextYAlignment.Top; t.TextWrapped=true; t.Parent=f
+                        end)
+                    end
+                else
+                    print("[ENRIQUE] COMPILE ERROR: "..tostring(err2))
+                    Notify("FREE Error","Compile: "..tostring(err2),10)
+                    pcall(function()
+                        local sg=Instance.new("ScreenGui"); sg.Name="ENQ_Error"; sg.Parent=gethui and gethui() or game:GetService("CoreGui")
+                        local f=Instance.new("Frame"); f.Size=UDim2.new(0,500,0,200); f.Position=UDim2.new(0.5,-250,0.5,-100); f.BackgroundColor3=Color3.fromRGB(20,10,10); f.BorderSizePixel=0; f.Parent=sg; Instance.new("UICorner",f).CornerRadius=UDim.new(0,10)
+                        local t=Instance.new("TextLabel"); t.Size=UDim2.new(1,-20,1,-10); t.Position=UDim2.new(0,10,0,5); t.BackgroundTransparency=1; t.Text="FREE COMPILE ERROR:\n"..tostring(err2); t.TextColor3=Color3.fromRGB(255,100,100); t.TextSize=12; t.Font=Enum.Font.Code; t.TextXAlignment=Enum.TextXAlignment.Left; t.TextYAlignment=Enum.TextYAlignment.Top; t.TextWrapped=true; t.Parent=f
+                    end)
+                end
+            else
+                print("[ENRIQUE] Download failed or too small: "..(code and #code or 0).." bytes")
+                Notify("Error","Download failed",5)
+            end
         end)
-        if not ok then Notify("Error",tostring(err),5) end
+        if not ok then
+            print("[ENRIQUE] HTTP ERROR: "..tostring(err))
+            Notify("HTTP Error",tostring(err),10)
+        end
     end)
 end
 
@@ -325,13 +355,37 @@ local function launchPaid()
     task.spawn(function()
         local ok,err=pcall(function()
             _G.__ENRIQUE_BYPASS_KEY=true
+            print("[ENRIQUE] Downloading PAID features...")
             local code=game:HttpGet(REPO.."paid.lua",true)
+            print("[ENRIQUE] Downloaded: "..#code.." bytes")
             if code and code~="" and #code>1000 then
-                local fn=loadstring(code)
-                if fn then fn() else Notify("Error","PAID compile error",5) end
-            else Notify("Error","Download failed",5) end
+                local fn,err2=loadstring(code)
+                if fn then
+                    local ok2,err3=pcall(fn)
+                    if not ok2 then
+                        print("[ENRIQUE] PAID RUNTIME ERROR: "..tostring(err3))
+                        Notify("PAID Error",tostring(err3),10)
+                        pcall(function()
+                            local sg=Instance.new("ScreenGui"); sg.Name="ENQ_Error2"; sg.Parent=gethui and gethui() or game:GetService("CoreGui")
+                            local f=Instance.new("Frame"); f.Size=UDim2.new(0,500,0,200); f.Position=UDim2.new(0.5,-250,0.5,-100); f.BackgroundColor3=Color3.fromRGB(20,10,10); f.BorderSizePixel=0; f.Parent=sg; Instance.new("UICorner",f).CornerRadius=UDim.new(0,10)
+                            local t=Instance.new("TextLabel"); t.Size=UDim2.new(1,-20,1,-10); t.Position=UDim2.new(0,10,0,5); t.BackgroundTransparency=1; t.Text="PAID ERROR:\n"..tostring(err3); t.TextColor3=Color3.fromRGB(255,100,100); t.TextSize=12; t.Font=Enum.Font.Code; t.TextXAlignment=Enum.TextXAlignment.Left; t.TextYAlignment=Enum.TextYAlignment.Top; t.TextWrapped=true; t.Parent=f
+                        end)
+                    end
+                else
+                    print("[ENRIQUE] PAID COMPILE ERROR: "..tostring(err2))
+                    Notify("PAID Error","Compile: "..tostring(err2),10)
+                    pcall(function()
+                        local sg=Instance.new("ScreenGui"); sg.Name="ENQ_Error2"; sg.Parent=gethui and gethui() or game:GetService("CoreGui")
+                        local f=Instance.new("Frame"); f.Size=UDim2.new(0,500,0,200); f.Position=UDim2.new(0.5,-250,0.5,-100); f.BackgroundColor3=Color3.fromRGB(20,10,10); f.BorderSizePixel=0; f.Parent=sg; Instance.new("UICorner",f).CornerRadius=UDim.new(0,10)
+                        local t=Instance.new("TextLabel"); t.Size=UDim2.new(1,-20,1,-10); t.Position=UDim2.new(0,10,0,5); t.BackgroundTransparency=1; t.Text="PAID COMPILE ERROR:\n"..tostring(err2); t.TextColor3=Color3.fromRGB(255,100,100); t.TextSize=12; t.Font=Enum.Font.Code; t.TextXAlignment=Enum.TextXAlignment.Left; t.TextYAlignment=Enum.TextYAlignment.Top; t.TextWrapped=true; t.Parent=f
+                    end)
+                end
+            else
+                print("[ENRIQUE] PAID Download failed: "..(code and #code or 0).." bytes")
+                Notify("Error","Download failed",5)
+            end
         end)
-        if not ok then Notify("Error",tostring(err),5) end
+        if not ok then print("[ENRIQUE] PAID HTTP ERROR: "..tostring(err)); Notify("HTTP Error",tostring(err),10) end
     end)
 end
 
