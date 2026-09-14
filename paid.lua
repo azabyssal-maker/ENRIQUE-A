@@ -313,7 +313,7 @@ do
     banner.Size = UDim2.new(1, -40, 0, 112)
     banner.Position = UDim2.new(0, 20, 0, 20)
     banner.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-    banner.Image = "rbxassetid://133575691569801"
+    banner.Image = "rbxassetid://16014323157"
     banner.ScaleType = Enum.ScaleType.Crop
     banner.Parent = card
     Instance.new("UICorner", banner).CornerRadius = UDim.new(0, 18)
@@ -27657,7 +27657,7 @@ do
     local runtimeToken = tostring(HttpService:GenerateGUID(false)):gsub("-", "")
     local guiName = "_NV_" .. runtimeToken
     local rootName = "_C_" .. string.sub(runtimeToken, 3, 10)
-    local assetBanner = "rbxassetid://133575691569801"
+    local assetBanner = "rbxassetid://16014323157"
     local assetRing = "rbxassetid://4965945816"
 
     local function normalizeName(value)
