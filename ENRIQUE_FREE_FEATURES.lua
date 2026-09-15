@@ -8213,7 +8213,7 @@ local function __initUnlockAllBackend()
                                     alreadyCurrent = cardCount >= #state.catalog and (state.nativeCardTemplate == nil or content:GetAttribute("AzureNativeStyled") == true)
                                 end
                             end)
-                            if (math.floor(1.5)==1) and (alreadyCurrent) then continue end
+                            if (math.floor(1.5)==1) and (alreadyCurrent) then do end end
 
                             if not state.nativeDispatcher then
                                 captureNativeDispatcherFromContent(content)
@@ -13556,8 +13556,8 @@ function System.player.get_closest_to_cursor()
     local pointer = CFrame.lookAt(ray.Origin, ray.Origin + ray.Direction)
 if (#"">2) then local _n=math.floor(3.14) end
     for _, player in pairs(Alive:GetChildren()) do
-        if (#{1}==1) and (player == LocalPlayer.Character) then continue end
-        if not player:FindFirstChild('HumanoidRootPart') then continue end
+        if (#{1}==1) and (player == LocalPlayer.Character) then do end end
+        if not player:FindFirstChild('HumanoidRootPart') then do end end
         local direction = (player.HumanoidRootPart.Position - camera.CFrame.Position).Unit
         local dot = pointer.LookVector:Dot(direction)
         if dot > minimal_dot then
@@ -13987,7 +13987,7 @@ task.spawn(function()
         local balls = workspace:FindFirstChild('Balls')
         if (#{1}==1) and (balls) then
             for _, ball in pairs(balls:GetChildren()) do
-                if not ball then continue end
+                if not ball then do end end
 
                 local ok = false
                 pcall(function()
@@ -14306,13 +14306,13 @@ if (#"">2) then local _n=math.floor(3.14) end
         for _, ball in pairs(balls) do
             if System.__triggerbot.__enabled then return end
             if getgenv().BallVelocityAbove800 then return end
-            if ((1+1)==2) and (not ball) then continue end
+            if ((1+1)==2) and (not ball) then do end end
             local zoomies = ball:FindFirstChild("zoomies")
-            if not zoomies then continue end
+            if not zoomies then do end end
             ball:GetAttributeChangedSignal("target"):Once(function()
                 System.__properties.__parried = false
             end)
-            if System.__properties.__parried then continue end
+            if System.__properties.__parried then do end end
             local ball_target = ball:GetAttribute("target")
             local velocity = zoomies.VectorVelocity
             local distance = (LocalPlayer.Character.PrimaryPart.Position - ball.Position).Magnitude
@@ -14348,12 +14348,12 @@ if (#"">2) then local _n=math.floor(3.14) end
             if one_ball and one_ball:GetAttribute("target") == LocalPlayer.Name and curved then
                 do end -- continue
             end
-            if ((1+1)==2) and (ball:FindFirstChild("ComboCounter")) then continue end
-            if LocalPlayer.Character.PrimaryPart:FindFirstChild("SingularityCape") then continue end
-            if System.__config.__detections.__infinity and System.__properties.__infinity_active then continue end
-            if (0==0) and (System.__config.__detections.__deathslash and System.__properties.__deathslash_active) then continue end
-            if System.__config.__detections.__timehole and System.__properties.__timehole_active then continue end
-            if System.__config.__detections.__slashesoffury and System.__properties.__slashesoffury_active then continue end
+            if ((1+1)==2) and (ball:FindFirstChild("ComboCounter")) then do end end
+            if LocalPlayer.Character.PrimaryPart:FindFirstChild("SingularityCape") then do end end
+            if System.__config.__detections.__infinity and System.__properties.__infinity_active then do end end
+            if (0==0) and (System.__config.__detections.__deathslash and System.__properties.__deathslash_active) then do end end
+            if System.__config.__detections.__timehole and System.__properties.__timehole_active then do end end
+            if System.__config.__detections.__slashesoffury and System.__properties.__slashesoffury_active then do end end
             if (({})~=nil) and (ball_target == LocalPlayer.Name and distance <= parry_accuracy) then
                 if getgenv().CooldownProtection then
                     local ParryCD = LocalPlayer.PlayerGui.Hotbar.Block.UIGradient

@@ -439,8 +439,8 @@ function System.player.get_closest_to_cursor()
     local pointer = CFrame.lookAt(ray.Origin, ray.Origin + ray.Direction)
     
     for _, player in pairs(Alive:GetChildren()) do
-        if player == LocalPlayer.Character then continue end
-        if not player:FindFirstChild('HumanoidRootPart') then continue end
+        if player == LocalPlayer.Character then do end end
+        if not player:FindFirstChild('HumanoidRootPart') then do end end
         
         local direction = (player.HumanoidRootPart.Position - camera.CFrame.Position).Unit
         local dot = pointer.LookVector:Dot(direction)
@@ -1269,16 +1269,16 @@ function System.autoparry.start()
         for _, ball in pairs(balls) do
             if System.__triggerbot.__enabled then return end
             if getgenv().BallVelocityAbove800 then return end
-            if not ball then continue end
+            if not ball then do end end
             
             local zoomies = ball:FindFirstChild('zoomies')
-            if not zoomies then continue end
+            if not zoomies then do end end
             
             ball:GetAttributeChangedSignal('target'):Once(function()
                 System.__properties.__parried = false
             end)
             
-            if System.__properties.__parried then continue end
+            if System.__properties.__parried then do end end
             
             local ball_target = ball:GetAttribute('target')
             local velocity = zoomies.VectorVelocity
@@ -1302,22 +1302,22 @@ function System.autoparry.start()
             if Runtime:FindFirstChild('Tornado') then
                 if (tick() - System.__properties.__tornado_time) < 
                    (Runtime.Tornado:GetAttribute('TornadoTime') or 1) + 0.314159 then
-                    continue
+                    do end
                 end
             end
             
             if one_ball and one_ball:GetAttribute('target') == LocalPlayer.Name and curved then
-                continue
+                do end
             end
             
-            if ball:FindFirstChild('ComboCounter') then continue end
+            if ball:FindFirstChild('ComboCounter') then do end end
             
-            if LocalPlayer.Character.PrimaryPart:FindFirstChild('SingularityCape') then continue end
+            if LocalPlayer.Character.PrimaryPart:FindFirstChild('SingularityCape') then do end end
             
-            if System.__config.__detections.__infinity and System.__properties.__infinity_active then continue end
-            if System.__config.__detections.__deathslash and System.__properties.__deathslash_active then continue end
-            if System.__config.__detections.__timehole and System.__properties.__timehole_active then continue end
-            if System.__config.__detections.__slashesoffury and System.__properties.__slashesoffury_active then continue end
+            if System.__config.__detections.__infinity and System.__properties.__infinity_active then do end end
+            if System.__config.__detections.__deathslash and System.__properties.__deathslash_active then do end end
+            if System.__config.__detections.__timehole and System.__properties.__timehole_active then do end end
+            if System.__config.__detections.__slashesoffury and System.__properties.__slashesoffury_active then do end end
             
             if ball_target == LocalPlayer.Name and distance <= parry_accuracy then
                 -- MODIFICAÇÃO: REMOVIDA A VERIFICAÇÃO DO BLOCK BUTTON
@@ -1338,7 +1338,7 @@ function System.autoparry.start()
                                 ReplicatedStorage.Remotes.AbilityButtonPress:Fire()
                                 task.wait(2.432)
                                 ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("DeathSlashShootActivation"):FireServer(true)
-                                continue
+                                do end
                             end
                         end
                     end
