@@ -3559,13 +3559,12 @@ end)
 
 
 -- ============================================
--- ENRIQUE FEATURES (additional tabs)
+-- ENRIQUE FEATURES (merged into KITTYLOL)
 -- ============================================
 task.spawn(function()
-    -- Wait for main UI to load
     task.wait(2)
-
-    local Library = {
+    pcall(function()
+local Library = {
     _config = Config:load(game.GameId),
 
     _choosing_keybind = false,
@@ -22091,5 +22090,39 @@ return Library
                 Time = 5
             })
         end)
+    end)
+end)
+
+    end)
+end)
+
+-- ENRIQUE FREE IMAGE
+task.delay(1, function()
+    pcall(function()
+        local coreGui = (gethui and gethui()) or game:GetService("CoreGui")
+        for _, gui in pairs(coreGui:GetChildren()) do
+            if gui:IsA("ScreenGui") then
+                local mf = gui:FindFirstChild("Main", true)
+                if mf then
+                    local img = Instance.new("ImageLabel")
+                    img.Name = "ENRIQUEImage"
+                    img.Size = UDim2.new(0, 36, 0, 36)
+                    img.Position = UDim2.new(1, -46, 0, 6)
+                    img.BackgroundTransparency = 1
+                    img.Image = "rbxassetid://16014323157"
+                    img.ScaleType = Enum.ScaleType.Fit
+                    img.Parent = mf
+                    Instance.new("UICorner", img).CornerRadius = UDim.new(0, 8)
+                end
+                break
+            end
+        end
+    end)
+end)
+
+-- ENRIQUE FREE DISCORD
+task.delay(3, function()
+    pcall(function()
+        Library:Notify({Title = "ENRIQUE FREE", Description = "Discord: discord.gg/jEA49UNC", Time = 5})
     end)
 end)
