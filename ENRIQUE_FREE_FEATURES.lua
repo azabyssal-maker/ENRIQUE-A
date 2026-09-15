@@ -18299,10 +18299,10 @@ do
     local Tab = library:create_tab("Player+")
 
     Tab:create_slider({title = "WalkSpeed V2", flag = "ENQ_WS2", minimum_value = 16, maximum_value = 1000, value = 50, round_number = true,
-        callback = function(v) getgenv()."ENQ_WS2" = v end,})
+        callback = function(v) getgenv()["ENQ_WS2"] = v end,})
 
     Tab:create_slider({title = "JumpPower V2", flag = "ENQ_JP2", minimum_value = 50, maximum_value = 2000, value = 100, round_number = true,
-        callback = function(v) getgenv()."ENQ_JP2" = v end,})
+        callback = function(v) getgenv()["ENQ_JP2"] = v end,})
 
     Tab:create_module({title = "NoClip V2", description = "Enhanced noclip", flag = "ENQ_NC2",
         callback = function(state) getgenv().ENQ_NC2 = state end,})
