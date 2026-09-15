@@ -247,81 +247,110 @@ Settings.ManualSpam = false
 Settings.Triggerbot = false
 SaveSettings()
 
-local ManualSpamFrame, TriggerbotFrame, UpdateManualSpamUI, UpdateTriggerbotUI, ApplyManualSpamUI, ApplyTriggerbotUI
+ManualSpamFrame = nil; TriggerbotFrame = nil; UpdateManualSpamUI = nil; UpdateTriggerbotUI = nil; ApplyManualSpamUI = nil; ApplyTriggerbotUI = nil
 
-local _PARRY_PATCH = { keyTable = nil, transformFn = nil, netModule = nil, remoteId = nil, parryHash = nil, parryRemote = nil, ready = false, _lastSig = nil }
+_PARRY_CAPTURE = {
+    revertedRemotes = {}, originalMetatables = {}, captured = nil,
+    firstParryDone = false, alwaysCapture = false
+}
 
-pcall(function()
-    local old_dinfo
-    old_dinfo = hookfunction(getrenv().debug.info, function(f, t)
-        if type(f) == "function" then return "[C]"
-        elseif f == 4 and t == "s" then return "ReplicatedStorage.Controllers.SwordsController " end
-        return old_dinfo(f, t)
-    end)
-    local old_gfenv
-    old_gfenv = hookfunction(getrenv().getfenv, function(l)
-        if l ~= nil and type(l) == "number" then
-            if l >= 1 and l <= 10 then return old_gfenv(10) end
+local function _isValidParryArgs(args)
+    return type(args) == "table" and #args == 7 and
+        type(args[2]) == "string" and
+        type(args[3]) == "number" and
+        typeof(args[4]) == "CFrame" and
+        type(args[5]) == "table" and
+        type(args[6]) == "table" and
+        type(args[7]) == "boolean"
+end
+
+local function _hookParryRemote(remote)
+    local mt = getrawmetatable and getrawmetatable(remote)
+    if not mt then return end
+    if _PARRY_CAPTURE.originalMetatables[mt] then return end
+    _PARRY_CAPTURE.originalMetatables[mt] = true
+    pcall(function()
+        setreadonly(mt, false)
+        local oldIndex = mt.__index
+        mt.__index = function(self, key)
+            if key == "FireServer" and self:IsA("RemoteEvent") then
+                return function(obj, ...)
+                    local args = {...}
+                    if _isValidParryArgs(args) then
+                        if not _PARRY_CAPTURE.captured or _PARRY_CAPTURE.alwaysCapture then
+                            _PARRY_CAPTURE.captured = { remote = obj, args = args }
+                            _PARRY_CAPTURE.revertedRemotes[obj] = args
+                            _PARRY_CAPTURE.firstParryDone = true
+                        end
+                    end
+                    return oldIndex and oldIndex(self, key) and oldIndex(self, key)(obj, unpack(args))
+                end
+            elseif key == "InvokeServer" and self:IsA("RemoteFunction") then
+                return function(obj, ...)
+                    local args = {...}
+                    if _isValidParryArgs(args) and not _PARRY_CAPTURE.captured then
+                        _PARRY_CAPTURE.captured = { remote = obj, args = args }
+                        _PARRY_CAPTURE.revertedRemotes[obj] = args
+                        _PARRY_CAPTURE.firstParryDone = true
+                    end
+                    return oldIndex and oldIndex(self, key) and oldIndex(self, key)(obj, unpack(args))
+                end
+            end
+            return oldIndex and oldIndex(self, key)
         end
-        return old_gfenv(l)
+        setreadonly(mt, true)
     end)
-end)
+end
 
 task.spawn(function()
     pcall(function()
-        local Controllers = ReplicatedStorage:WaitForChild("Controllers", 15)
-        if not Controllers then return end
-        local SC
-        for _, child in ipairs(Controllers:GetChildren()) do
-            if child.Name:sub(1, 16) == "SwordsController" then SC = child break end
+        local RS = game:GetService("ReplicatedStorage")
+        for _, remote in pairs(RS:GetChildren()) do
+            if remote:IsA("RemoteEvent") or remote:IsA("RemoteFunction") then
+                _hookParryRemote(remote)
+            end
         end
-        if not SC then return end
-        local PRY = SC:WaitForChild("PRY", 15)
-        if not PRY then return end
-        local Parry_Function = require(PRY)
-        local getupvals = debug.getupvalues or getupvalues
-        if not getupvals then return end
-        local ups = getupvals(Parry_Function)
-        if not ups or #ups < 8 then return end
-        _PARRY_PATCH.keyTable = ups[3]
-        _PARRY_PATCH.transformFn = ups[4]
-        _PARRY_PATCH.netModule = ups[6]
-        _PARRY_PATCH.remoteId = ups[7]
-        _PARRY_PATCH.parryHash = ups[8]
-        pcall(function() _PARRY_PATCH.parryRemote = _PARRY_PATCH.netModule:RemoteEvent(_PARRY_PATCH.remoteId) end)
-        if _PARRY_PATCH.parryRemote then _PARRY_PATCH.ready = true end
+        RS.ChildAdded:Connect(function(child)
+            if child:IsA("RemoteEvent") or child:IsA("RemoteFunction") then
+                _hookParryRemote(child)
+            end
+        end)
     end)
 end)
 
+_PARRY_PATCH = { ready = false }
+
+task.spawn(function()
+    while task.wait(1) do
+        local c = _PARRY_CAPTURE.captured
+        if c and c.remote and c.args then
+            _PARRY_PATCH.ready = true
+            break
+        end
+    end
+end)
+
 function _PARRY_PATCH.fire(curveCFrame, screenPositions, mouseLocation)
-    if not _PARRY_PATCH.ready then return false end
-    local kt = _PARRY_PATCH.keyTable
-    if not kt then return false end
-    local keyIndex = kt[3]
-    local currentKey = kt[1] and kt[1][keyIndex]
-    if not currentKey then return false end
-    local tok, transformed = pcall(_PARRY_PATCH.transformFn, currentKey, "TIME")
-    if not tok or not transformed then
-        tok, transformed = pcall(_PARRY_PATCH.transformFn, currentKey)
-        if not tok or not transformed then return false end
-    end
-    local serverTime = workspace:GetServerTimeNow() * 100
-    local timeStr = tostring(math.floor(serverTime))
-    local sig = tostring(currentKey) .. "|" .. timeStr
-    if _PARRY_PATCH._lastSig == sig then return true end
-    _PARRY_PATCH._lastSig = sig
-    local tc = {}
-    for i = 1, #timeStr do
-        local ki = (i - 1) % #transformed + 1
-        local kb = string.byte(transformed, ki)
-        local tb = (string.byte(timeStr, i) + i) % 256
-        tc[i] = string.char(bit32.bxor(tb, kb))
-    end
-    local token = table.concat(tc)
-    pcall(function() _PARRY_PATCH.parryRemote:FireServer(_PARRY_PATCH.parryHash, currentKey, token, 0.5, curveCFrame, screenPositions, mouseLocation, false) end)
+    if not _PARRY_CAPTURE.captured then return false end
+    local captured = _PARRY_CAPTURE.captured
+    local remote = captured.remote
+    local orig = captured.args
+    local modified = {
+        orig[1], orig[2], orig[3],
+        curveCFrame or workspace.CurrentCamera.CFrame,
+        screenPositions or {},
+        mouseLocation or {0, 0},
+        orig[7]
+    }
+    pcall(function()
+        if remote:IsA("RemoteEvent") then
+            remote:FireServer(unpack(modified))
+        elseif remote:IsA("RemoteFunction") then
+            remote:InvokeServer(unpack(modified))
+        end
+    end)
     return true
 end
-
 local System = {
     __properties = {
         __autoparry_enabled = Settings.AutoParry,
@@ -1105,7 +1134,7 @@ TriggerbotStatus.MouseButton1Click:Connect(function()
 end)
 
 
-local CombatTab = main:create_tab("Combat", "rbxassetid://10734975486") -- sword
+CombatTab = main:create_tab("Combat", "rbxassetid://10734975486") -- sword
 
 
 local function prepareCheckboxFlag(flag, checked, keybind)
@@ -1253,7 +1282,7 @@ local function FlipModule(flag, handler)
     if handler then handler(newState) end
 end
 
-local AutoParrySection = patchModule(makeModule(CombatTab, "Auto Parry", "UI_AutoParryModule", "left", function(State)
+AutoParrySection = patchModule(makeModule(CombatTab, "Auto Parry", "UI_AutoParryModule", "left", function(State)
     System.__properties.__autoparry_enabled = State
     Settings.AutoParry = State
     prepareCheckboxFlag("AutoParry", State, "RightShift")
@@ -1271,7 +1300,7 @@ end))
 safe(function() AutoParrySection:Dropdown{ Name = "Parry Mode", Flag = "AutoParryMode", Items = { "Remote", "Keypress" }, Callback = ApplyParryMode } end)
 safe(function() AutoParrySection:Dropdown{ Name = "Curve Type", Flag = "AutoParryCurve", Items = System.__config.__curve_names, Callback = ApplyCurve } end)
 
-local AutoSpamSection = patchModule(makeModule(CombatTab, "Auto Spam", "UI_AutoSpamModule", "right", function(State)
+AutoSpamSection = patchModule(makeModule(CombatTab, "Auto Spam", "UI_AutoSpamModule", "right", function(State)
     Settings.AutoSpam = State
     prepareCheckboxFlag("AutoSpam", State, "X")
     SaveSettings()
@@ -1296,7 +1325,7 @@ safe(function() AutoSpamSection:Slider{ Name = "Distance Multiplier", Flag = "Au
     SaveSettings()
 end} end)
 
-local ManualSpamSection = patchModule(makeModule(CombatTab, "Manual Spam", "UI_ManualSpamModule", "left", HandleManualSpam, function()
+ManualSpamSection = patchModule(makeModule(CombatTab, "Manual Spam", "UI_ManualSpamModule", "left", HandleManualSpam, function()
     FlipModule("UI_ManualSpamModule", HandleManualSpam)
 end))
 
@@ -1306,7 +1335,7 @@ safe(function() ManualSpamSection:Slider{ Name = "Spam CPS", Flag = "ManualSpamC
     SaveSettings()
 end} end)
 
-local TriggerbotSection = patchModule(makeModule(CombatTab, "Triggerbot", "UI_TriggerbotModule", "right", HandleTriggerbot, function()
+TriggerbotSection = patchModule(makeModule(CombatTab, "Triggerbot", "UI_TriggerbotModule", "right", HandleTriggerbot, function()
     FlipModule("UI_TriggerbotModule", HandleTriggerbot)
 end))
 
@@ -1404,19 +1433,19 @@ end)
 
 
 
-local DetectionTab = main:create_tab("Detection", "rbxassetid://10734951847") -- shield
-local PlayerTab = main:create_tab("Player", "rbxassetid://126017907477623")
-local VisualsTab = main:create_tab("Visuals", "rbxassetid://10723346959")
-local MiscTab = main:create_tab("Misc", "rbxassetid://7733917120")
-local ImmortalTab = main:create_tab("Immortal", "rbxassetid://10734962068") -- skull
+DetectionTab = main:create_tab("Detection", "rbxassetid://10734951847") -- shield
+PlayerTab = main:create_tab("Player", "rbxassetid://126017907477623")
+VisualsTab = main:create_tab("Visuals", "rbxassetid://10723346959")
+MiscTab = main:create_tab("Misc", "rbxassetid://7733917120")
+ImmortalTab = main:create_tab("Immortal", "rbxassetid://10734962068") -- skull
 
 -- =========================================================
 -- Immortal
 -- =========================================================
-local backgroundOrbitInitialized = false
+backgroundOrbitInitialized = false
 local backgroundOrbitState = { Enabled = false }
-local backgroundOrbitHRP = nil
-local backgroundOrbitCharacterConnection = nil
+backgroundOrbitHRP = nil
+backgroundOrbitCharacterConnection = nil
 
 local function startBackgroundOrbit()
     backgroundOrbitState.Enabled = true
@@ -1577,7 +1606,7 @@ local function checkModPlayers()
     end
 end
 
-local StaffDetectionModule = DetectionTab:create_module({
+StaffDetectionModule = DetectionTab:create_module({
     title = "Staff Detection",
     description = "Detect Bladeball Mod in the server",
     flag = "ModDetectionModule",
@@ -1612,7 +1641,7 @@ StaffDetectionModule:create_dropdown({
     end
 })
 
-local InfinityDetectionModule = DetectionTab:create_module({
+InfinityDetectionModule = DetectionTab:create_module({
     title = "Infinity Detection",
     description = "Detect infinity balls",
     flag = "InfinityModule",
@@ -1659,7 +1688,7 @@ DetectionTab:create_module({
     end
 })
 
-local SlashesModule = DetectionTab:create_module({
+SlashesModule = DetectionTab:create_module({
     title = "Slashes Of Fury Detection",
     description = "Detect slashes of fury",
     flag = "SlashesModule",
@@ -1696,7 +1725,7 @@ SlashesModule:create_slider({
     end
 })
 
-local DribbleModule = DetectionTab:create_module({
+DribbleModule = DetectionTab:create_module({
     title = "Dribble Detection",
     description = "Toggle Dribble Ball detection",
     flag = "DribbleDetectionModule",
@@ -2007,7 +2036,7 @@ local function create_animation(object, info, value)
     animation:Destroy()
 end
 
-local animation_system = {
+animation_system = {
     storage = {},
     current = nil,
     track = nil
@@ -2108,7 +2137,7 @@ animation_system.load_animations()
 local emotes_data = animation_system.get_emotes_list()
 local selected_animation = emotes_data[1]
 
-local animations_module = PlayerTab:create_module({
+animations_module = PlayerTab:create_module({
     title = 'Emotes',
     flag = 'Emotes',
     description = 'Custom Emotes',
@@ -2159,7 +2188,7 @@ pcall(function()
     end
 end)
 
-local CameraToggle = PlayerTab:create_module({
+CameraToggle = PlayerTab:create_module({
     title = 'FOV',
     flag = 'FOV',
 
@@ -2210,7 +2239,7 @@ CameraToggle:create_slider({
     end
 })
 
-local CharacterModifier = PlayerTab:create_module({
+CharacterModifier = PlayerTab:create_module({
     title = 'Character',
     flag = 'CharacterModifier',
     description = 'Changes various character properties',
@@ -3151,7 +3180,7 @@ local soundOptions = {
     ["Tears in the Rain"] = "rbxassetid://129710845038263"
 }
 
-local antiLagModule = MiscTab:create_module({
+antiLagModule = MiscTab:create_module({
       title = "Anti-Lag",
       flag = "LagReducer",
       description = "Reduces lag by optimizing graphics",
@@ -3440,13 +3469,13 @@ musicModule:create_dropdown({
     end
 })
 
-local mainLocalPlayer = Players.LocalPlayer
-local speedGui = Instance.new("ScreenGui")
+mainLocalPlayer = Players.LocalPlayer
+speedGui = Instance.new("ScreenGui")
 speedGui.Name = "//////////////"
 speedGui.Parent = mainLocalPlayer.PlayerGui
 speedGui.ResetOnSpawn = false
 
-local speedLabel = Instance.new("TextLabel")
+speedLabel = Instance.new("TextLabel")
 speedLabel.Name = "//////////////"
 speedLabel.Size = UDim2.new(0, 200, 0, 50)
 speedLabel.Position = UDim2.new(1, -210, 0, 10)
@@ -3460,12 +3489,12 @@ speedLabel.TextYAlignment = Enum.TextYAlignment.Top
 speedLabel.Text = ""
 speedLabel.Parent = speedGui
 
-local lobbySpeedGui = Instance.new("ScreenGui")
+lobbySpeedGui = Instance.new("ScreenGui")
 lobbySpeedGui.Name = "//////////////"
 lobbySpeedGui.Parent = mainLocalPlayer.PlayerGui
 lobbySpeedGui.ResetOnSpawn = false
 
-local lobbySpeedLabel = Instance.new("TextLabel")
+lobbySpeedLabel = Instance.new("TextLabel")
 lobbySpeedLabel.Name = "//////////////"
 lobbySpeedLabel.Size = UDim2.new(0, 200, 0, 50)
 lobbySpeedLabel.Position = UDim2.new(1, -210, 0, 60)
@@ -3479,12 +3508,12 @@ lobbySpeedLabel.TextYAlignment = Enum.TextYAlignment.Top
 lobbySpeedLabel.Text = ""
 lobbySpeedLabel.Parent = lobbySpeedGui
 
-local curveGui = Instance.new("ScreenGui")
+curveGui = Instance.new("ScreenGui")
 curveGui.Name = "//////////////"
 curveGui.Parent = mainLocalPlayer.PlayerGui
 curveGui.ResetOnSpawn = false
 
-local curveLabel = Instance.new("TextLabel")
+curveLabel = Instance.new("TextLabel")
 curveLabel.Name = "//////////////"
 curveLabel.Size = UDim2.new(0, 200, 0, 50)
 curveLabel.Position = UDim2.new(1, -210, 0, 70)
@@ -3522,7 +3551,7 @@ main:load()
 -- =========================================================
 -- Obsidian Theme / Save Manager
 -- =========================================================
-local SettingsTab = Window:AddTab({
+SettingsTab = Window:AddTab({
     Name = "Settings",
     Icon = "settings",
     Description = "ENRIQUE configuration and theme settings."
@@ -6761,17 +6790,17 @@ local library = Library.new()
 if ((1/1)==0) then for _i=1,0 do end end
 library:load()
 
-local AutoparryTab = library:create_tab("Main")
-local BlatantTab = library:create_tab("Blatant")
-local SpamTab = library:create_tab("Spam")
-local DetectionTab = library:create_tab("Detection")
-local PlayerTab = library:create_tab("Player")
-local VisualsTab = library:create_tab("Visual")
-local MiscTab = library:create_tab("Misc")
-local WorldTab = library:create_tab("World")
+AutoparryTab = library:create_tab("Main")
+BlatantTab = library:create_tab("Blatant")
+SpamTab = library:create_tab("Spam")
+DetectionTab = library:create_tab("Detection")
+PlayerTab = library:create_tab("Player")
+VisualsTab = library:create_tab("Visual")
+MiscTab = library:create_tab("Misc")
+WorldTab = library:create_tab("World")
 if (1<-1) then local _j=1+1 end
-local GuiTab = library:create_tab("GUI")
-local UnlockTab = library:create_tab("Unlock")
+GuiTab = library:create_tab("GUI")
+UnlockTab = library:create_tab("Unlock")
 
 local __unlockAllInit = false
 local __unlockAllEnable = nil
@@ -13939,7 +13968,7 @@ if ((1/1)==0) then local _q={} _q[1]=2 end
     applyTheme()
 end
 
-local theme_editor_module = GuiTab:create_module({
+theme_editor_module = GuiTab:create_module({
     title = "Theme Editor",
     description = "Customize the interface theme",
     flag = "ThemeEditor",
@@ -14005,7 +14034,7 @@ if (type({})~="table") then local _t=table.concat({},"") end
 
 task.defer(applyTheme)
 
-local unlock_all_module = UnlockTab:create_module({
+unlock_all_module = UnlockTab:create_module({
     title = "Unlock All",
     description = "Unlock all Swords, Explosions and Emotes",
     flag = "UnlockAll",
@@ -14018,7 +14047,7 @@ local unlock_all_module = UnlockTab:create_module({
     end
 })
 
-local guilib_module = GuiTab:create_module({
+guilib_module = GuiTab:create_module({
     title = "GUI Visible",
     description = "Visibility of GUI Library",
     flag = "guilibraryvisible",
@@ -14029,7 +14058,7 @@ local guilib_module = GuiTab:create_module({
 })
 
 
-local unload_module = GuiTab:create_module({
+unload_module = GuiTab:create_module({
     title = "Unload Script",
     description = "Completely remove ENRIQUE FREE",
     flag = "UnloadScript",
@@ -14078,7 +14107,7 @@ local unload_module = GuiTab:create_module({
     end
 })
 
-local stats_overlay_module = VisualsTab:create_module({
+stats_overlay_module = VisualsTab:create_module({
     title = "FPS and Ping",
     description = "Show your FPS and Ping",
     flag = "StatsOverlayModule",
@@ -14291,13 +14320,13 @@ local stats_overlay_module = VisualsTab:create_module({
 
     local original_fog_end = Lighting.FogEnd
 local original_fog_start = Lighting.FogStart
-local postprocessing_backup = {}
-local decals_backup = {}
-local scene_backup = {}
-local sound_backup = nil
-local lighting_backup = nil
-local fog_backup = nil
-local sound_service = cloneref(game:GetService('SoundService'))
+postprocessing_backup = {}
+decals_backup = {}
+scene_backup = {}
+sound_backup = nil
+lighting_backup = nil
+fog_backup = nil
+sound_service = cloneref(game:GetService('SoundService'))
 if ((1/1)==0) then for _i=1,0 do end end
 local fps_boost_loop = nil
 local fps_boost_enabled = false
@@ -14530,7 +14559,7 @@ MiscTab:create_module({
     end
 })
 
-local low_graphics_original_quality = nil
+low_graphics_original_quality = nil
 MiscTab:create_module({
     title = "Low Graphics",
     description = "Reduce Rendering quality and shadows",
@@ -14647,7 +14676,7 @@ task.spawn(function()
 end)
 
 local LocalPlayer = Players.LocalPlayer
-local Mouse = LocalPlayer and LocalPlayer:GetMouse()
+Mouse = LocalPlayer and LocalPlayer:GetMouse()
 
 if not LocalPlayer or not LocalPlayer.Character then
     if (#{1}==1) and (LocalPlayer) then LocalPlayer.CharacterAdded:Wait() end
@@ -14675,7 +14704,7 @@ local function get_real_ball()
     return nil
 end
 
-local AutoPlayState = {
+AutoPlayState = {
     connection = nil,
     character_connection = nil,
     elapsed = 0,
@@ -14842,7 +14871,7 @@ local function auto_play_set_enabled(state)
 if (1<-1) then local _j=1+1 end
 end
 
-local AutoPlay = PlayerTab:create_module({
+AutoPlay = PlayerTab:create_module({
     title = "Auto Play",
     flag = "AutoPlay",
     description = "Automatically Plays Game",
@@ -15135,7 +15164,7 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
-local ball_trail_module = VisualsTab:create_module({
+ball_trail_module = VisualsTab:create_module({
     title = "Ball Trail",
     flag = "Ball_Trail",
     description = "Toggles ball trail effects",
@@ -15244,7 +15273,7 @@ if (#"">2) then local _n=math.floor(3.14) end
     end
 end
 
-local filter_module = WorldTab:create_module({
+filter_module = WorldTab:create_module({
     title = 'Filter',
     flag = 'Filter',
     description = "Toggles custom world filter effects",
@@ -15337,7 +15366,7 @@ local soundOptions = {
     ["Tears in the Rain"] = 'rbxassetid://129710845038263'
 }
 
-local soundOptionNames = {
+soundOptionNames = {
     'Eeyuh',
     "Sour Grapes",
     "Erwachen",
@@ -15354,7 +15383,7 @@ getgenv().LoopSong = getgenv().LoopSong or false
 getgenv().SoundControllerVolume = getgenv().SoundControllerVolume or 3
 getgenv().SelectedSound = getgenv().SelectedSound or soundOptionNames[1]
 
-local currentSound = Instance.new('Sound')
+currentSound = Instance.new('Sound')
 currentSound.Volume = getgenv().SoundControllerVolume or 3
 currentSound.Looped = getgenv().LoopSong or false
 currentSound.Parent = game:GetService('SoundService')
@@ -15386,7 +15415,7 @@ if (type({})~="table") then local _t=table.concat({},"") end
     currentSound:Play()
 end
 
-local sound_controller_module = VisualsTab:create_module({
+sound_controller_module = VisualsTab:create_module({
     title = 'Sound Controller',
     flag = "sound_controller",
     description = "Control background music and sounds",
@@ -15439,9 +15468,9 @@ sound_controller_module:create_dropdown({
     end
 })
 
-local ping_spoofer_connection = nil
+ping_spoofer_connection = nil
 
-local ping_spoofer_module = VisualsTab:create_module({
+ping_spoofer_module = VisualsTab:create_module({
     title = "Ping Spoofer",
     flag = "ping_spoofer",
     description = "Locks your Ping Display to a Fake Number",
@@ -16409,8 +16438,8 @@ getgenv().CameraFOV = getgenv().CameraFOV or (9+61)
 getgenv().AutoVote = getgenv().AutoVote or false
 getgenv().DribbleDetection = getgenv().DribbleDetection or false
 
-local maxParryCount = (66-30)
-local parryDelay = 0.05
+maxParryCount = (66-30)
+parryDelay = 0.05
 
 System.triggerbot = {}
 if (type({})~="table") then local _t=table.concat({},"") end
@@ -17011,7 +17040,7 @@ local function warn_manual_spam_cps(value)
     end
 end
 
-local autoparry_module = AutoparryTab:create_module({
+autoparry_module = AutoparryTab:create_module({
     title = "Auto Parry",
     description = "Auto Parry Settings",
     flag = "AutoParryModule",
@@ -17093,9 +17122,9 @@ local autoparry_module = AutoparryTab:create_module({
     end
 })
 
-local mode_curve_dropdown = nil
+mode_curve_dropdown = nil
 
-local hotkeys_module = AutoparryTab:create_module({
+hotkeys_module = AutoparryTab:create_module({
     title = "PC Curve Hotkey",
     description = "Press 1 - 9 to change Curve Mode",
     flag = "HotkeysModule",
@@ -17240,7 +17269,7 @@ mode_curve_dropdown = autoparry_module:create_dropdown({
 })
 if (type({})~="table") then local _t=table.concat({},"") end
 
-local curve_selector_module = nil
+curve_selector_module = nil
 local curve_selector_overlay = nil
 local curve_selector_buttons = {}
 local curve_selector_title = nil
@@ -17525,7 +17554,7 @@ autoparry_module:create_slider({
     end
 })
 
-local humanizer_module = AutoparryTab:create_module({
+humanizer_module = AutoparryTab:create_module({
     title = "Humanizer",
     description = "Choose a random parry accuracy range.",
     flag = "HumanizerModule",
@@ -17820,7 +17849,7 @@ if (({[1]=false})[1]) then local _z=tostring(0) end
     return System.__properties.__triggerbot_ui
 end
 
-local triggerbot_module = AutoparryTab:create_module({
+triggerbot_module = AutoparryTab:create_module({
     title = "Triggerbot",
     description = "Triggerbot Settings",
     flag = "TriggerbotModule",
@@ -17872,7 +17901,7 @@ triggerbot_module:create_checkbox({
     end
 })
 
-local staff_detection_module = DetectionTab:create_module({
+staff_detection_module = DetectionTab:create_module({
     title = "Staff Detection",
     description = "Detect Bladeball Mod in the server",
     flag = 'ModDetectionModule',
@@ -17909,7 +17938,7 @@ staff_detection_module:create_dropdown({
     end
 })
 
-local infinity_module = DetectionTab:create_module({
+infinity_module = DetectionTab:create_module({
     title = "Infinity Detection",
     description = "Detect infinity balls",
     flag = "InfinityModule",
@@ -17932,7 +17961,7 @@ infinity_module:create_checkbox({
 })
 if (#"">2) then local _q={} _q[1]=2 end
 
-local deathslash_module = DetectionTab:create_module({
+deathslash_module = DetectionTab:create_module({
     title = "Death Slash Detection",
     description = "Detect death slash",
     flag = "DeathSlashModule",
@@ -17944,7 +17973,7 @@ local deathslash_module = DetectionTab:create_module({
     end
 })
 
-local timehole_module = DetectionTab:create_module({
+timehole_module = DetectionTab:create_module({
     title = "Time Hole Detection",
     description = "Detect time hole",
     flag = "TimeHoleModule",
@@ -17956,7 +17985,7 @@ local timehole_module = DetectionTab:create_module({
     end
 })
 
-local slashes_module = DetectionTab:create_module({
+slashes_module = DetectionTab:create_module({
     title = "Slashes Of Fury Detection",
     description = "Detect slashes of fury",
     flag = "SlashesModule",
@@ -17990,7 +18019,7 @@ slashes_module:create_slider({
     end
 })
 
-local dribble_module = DetectionTab:create_module({
+dribble_module = DetectionTab:create_module({
     title = "Dribble Detection",
     flag = "DribbleDetectionModule",
     description = "Toggle Dribble Ball detection",
@@ -18013,7 +18042,7 @@ dribble_module:create_checkbox({
     end
 })
 
-local phantom_module = DetectionTab:create_module({
+phantom_module = DetectionTab:create_module({
     title = "Anti-Phantom",
     description = "Anti-phantom detection",
     flag = "PhantomModule",
@@ -18025,11 +18054,11 @@ local phantom_module = DetectionTab:create_module({
     end
 })
 
-local Connections_Manager = getgenv().Connections_Manager or {}
+Connections_Manager = getgenv().Connections_Manager or {}
 if (#"">2) then local _n=math.floor(3.14) end
 getgenv().Connections_Manager = Connections_Manager
 
-local manual_spam_module = SpamTab:create_module({
+manual_spam_module = SpamTab:create_module({
     title = "Manual Spam",
     flag = "Manual_Spam_Parry",
     description = "Manually Spams Parry",
@@ -18306,7 +18335,7 @@ manual_spam_module:create_checkbox({
     end
 })
 
-local auto_spam_module = SpamTab:create_module({
+auto_spam_module = SpamTab:create_module({
     title = "Auto Spam",
     description = "Automatically spam parries ball",
     flag = "AutoSpamModule",
@@ -18528,7 +18557,7 @@ if (({[1]=false})[1]) then local _z=tostring(0) end
     end
 end
 
-local fov_module = PlayerTab:create_module({
+fov_module = PlayerTab:create_module({
     title = "FOV",
     description = "Changes Camera POV",
     flag = "FOVModule",
@@ -18580,11 +18609,11 @@ getgenv().PlayerFollowTPDistance = getgenv().PlayerFollowTPDistance or 4
 getgenv().PlayerFollowTPInterval = getgenv().PlayerFollowTPInterval or 0.15
 getgenv().PlayerFollowWalkDistance = getgenv().PlayerFollowWalkDistance or 6
 
-local localPlayer = Players.LocalPlayer
-local SelectedPlayerFollow = nil
-local followDropdown
+localPlayer = Players.LocalPlayer
+SelectedPlayerFollow = nil
+followDropdown = nil
 
-local player_cosmetics_module = PlayerTab:create_module({
+player_cosmetics_module = PlayerTab:create_module({
     title = "Player Cosmetics",
     flag = "Player_Cosmetics",
     description = "Apply Headless and Korblox",
@@ -18898,7 +18927,7 @@ if (#"">2) then local _n=math.floor(3.14) end
     end
 end
 
-local player_follow_module = BlatantTab:create_module({
+player_follow_module = BlatantTab:create_module({
     title = "Player Follow",
     flag = "Player_Follow",
     description = "Follows the selected player",
@@ -19064,8 +19093,8 @@ else
     SelectedPlayerFollow = nil
 end
 
-local lastOptionsString = table.concat(initialOptions, ',')
-local updateTimer = 0
+lastOptionsString = table.concat(initialOptions, ',')
+updateTimer = 0
 
 RunService.Heartbeat:Connect(function(dt)
     updateTimer = updateTimer + dt
@@ -19147,7 +19176,7 @@ StrafeModule:create_slider({
     end
 })
 
-local BallStatsState = {
+BallStatsState = {
     gui = nil,
     frame = nil,
     vlog = nil,
@@ -19348,7 +19377,7 @@ local function disable_ball_stats()
     destroy_ball_stats()
 end
 
-local ball_stats_module = VisualsTab:create_module({
+ball_stats_module = VisualsTab:create_module({
     title = "Ball Stats",
     flag = "Ball_Stats",
     description = "Toggle ball speed stats display",
@@ -19363,10 +19392,10 @@ local ball_stats_module = VisualsTab:create_module({
     end
 })
 
-local visualiser_model = nil
-local visualiser_edges = {}
+visualiser_model = nil
+visualiser_edges = {}
 
-local Visualiser = VisualsTab:create_module({
+Visualiser = VisualsTab:create_module({
     title = "Visualiser",
     flag = "Visualiser",
     description = "Parry Range Visualiser",
@@ -19482,7 +19511,7 @@ Visualiser:create_slider({
 })
 if (type({})~="table") then local _t=table.concat({},"") end
 
-local custom_announcer_module = VisualsTab:create_module({
+custom_announcer_module = VisualsTab:create_module({
     title = "Custom Announcer",
     flag = "Custom_Announcer",
     description = "Customize the Game Announcements",
@@ -19698,8 +19727,8 @@ if (({[1]=false})[1]) then local _z=tostring(0) end
     abilityEspBillboards = {}
 end
 
-local hit_Sound_Enabled = false
-local hit_Sound_Folder = Instance.new('Folder')
+hit_Sound_Enabled = false
+hit_Sound_Folder = Instance.new('Folder')
 if (#"">2) then local _q={} _q[1]=2 end
 hit_Sound_Folder.Name = "Useful Utility"
 hit_Sound_Folder.Parent = workspace
@@ -19741,7 +19770,7 @@ local hitSoundIds = {
     Bameware = 'rbxassetid://3124331820'
 }
 
-local hit_sounds_module = PlayerTab:create_module({
+hit_sounds_module = PlayerTab:create_module({
     title = "Hit Sounds",
     flag = "Hit_Sounds",
     description = "Toggles hit sounds",
@@ -19784,7 +19813,7 @@ ReplicatedStorage.Remotes.ParrySuccess.OnClientEvent:Connect(function()
     end
 end)
 
-local ability_esp_module = VisualsTab:create_module({
+ability_esp_module = VisualsTab:create_module({
     title = "Ability ESP",
     description = "Displays equipped abilities above players",
     flag = "AbilityESPModule",
@@ -19844,7 +19873,7 @@ local function stop_thunder_dash_exploit()
 end
 if ((1/1)==0) then local _q={} _q[1]=2 end
 
-local ability_exploit_module = BlatantTab:create_module({
+ability_exploit_module = BlatantTab:create_module({
     title = "Ability Exploit",
     flag = "AbilityExploit",
     description = "Ability Exploit",
@@ -19878,7 +19907,7 @@ end
 
 setup_late_feature_modules()
 
-local no_render_module = MiscTab:create_module({
+no_render_module = MiscTab:create_module({
     title = "No Render",
     flag = "No_Render",
     description = "Disables Rendering of Effects",

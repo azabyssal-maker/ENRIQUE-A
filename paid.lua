@@ -3,78 +3,97 @@ local _SP={"makefolder","ENRIQUE"};
 
 -- ENRIQUE BYPASS + PARRY REMOTE
 if _G.__ENRIQUE_BYPASS_KEY then getgenv().ENRIQUE_PaidAuthenticated = true end
-local _PARRY_PATCH = { keyTable = nil, transformFn = nil, netModule = nil, remoteId = nil, parryHash = nil, parryRemote = nil, ready = false, _lastSig = nil }
+local _PARRY_CAPTURE = {
+    revertedRemotes = {}, originalMetatables = {}, captured = nil,
+    firstParryDone = false, alwaysCapture = false
+}
 
-pcall(function()
-    local old_dinfo
-    old_dinfo = hookfunction(getrenv().debug.info, function(f, t)
-        if type(f) == "function" then return "[C]"
-        elseif f == 4 and t == "s" then return "ReplicatedStorage.Controllers.SwordsController " end
-        return old_dinfo(f, t)
-    end)
-    local old_gfenv
-    old_gfenv = hookfunction(getrenv().getfenv, function(l)
-        if l ~= nil and type(l) == "number" then
-            if l >= 1 and l <= 10 then return old_gfenv(10) end
+local function _isValidParryArgs(args)
+    return type(args) == "table" and #args == 7 and
+        type(args[2]) == "string" and
+        type(args[3]) == "number" and
+        typeof(args[4]) == "CFrame" and
+        type(args[5]) == "table" and
+        type(args[6]) == "table" and
+        type(args[7]) == "boolean"
+end
+
+local function _hookParryRemote(remote)
+    local mt = getrawmetatable and getrawmetatable(remote)
+    if not mt then return end
+    if _PARRY_CAPTURE.originalMetatables[mt] then return end
+    _PARRY_CAPTURE.originalMetatables[mt] = true
+    pcall(function()
+        setreadonly(mt, false)
+        local oldIndex = mt.__index
+        mt.__index = function(self, key)
+            if key == "FireServer" and self:IsA("RemoteEvent") then
+                return function(obj, ...)
+                    local args = {...}
+                    if _isValidParryArgs(args) then
+                        if not _PARRY_CAPTURE.captured or _PARRY_CAPTURE.alwaysCapture then
+                            _PARRY_CAPTURE.captured = { remote = obj, args = args }
+                            _PARRY_CAPTURE.revertedRemotes[obj] = args
+                            _PARRY_CAPTURE.firstParryDone = true
+                        end
+                    end
+                    return oldIndex and oldIndex(self, key) and oldIndex(self, key)(obj, unpack(args))
+                end
+            elseif key == "InvokeServer" and self:IsA("RemoteFunction") then
+                return function(obj, ...)
+                    local args = {...}
+                    if _isValidParryArgs(args) and not _PARRY_CAPTURE.captured then
+                        _PARRY_CAPTURE.captured = { remote = obj, args = args }
+                        _PARRY_CAPTURE.revertedRemotes[obj] = args
+                        _PARRY_CAPTURE.firstParryDone = true
+                    end
+                    return oldIndex and oldIndex(self, key) and oldIndex(self, key)(obj, unpack(args))
+                end
+            end
+            return oldIndex and oldIndex(self, key)
         end
-        return old_gfenv(l)
+        setreadonly(mt, true)
     end)
-end)
+end
 
 task.spawn(function()
     pcall(function()
-        local Controllers = ReplicatedStorage:WaitForChild("Controllers", 15)
-        if not Controllers then return end
-        local SC
-        for _, child in ipairs(Controllers:GetChildren()) do
-            if child.Name:sub(1, 16) == "SwordsController" then SC = child break end
+        local RS = game:GetService("ReplicatedStorage")
+        for _, remote in pairs(RS:GetChildren()) do
+            if remote:IsA("RemoteEvent") or remote:IsA("RemoteFunction") then
+                _hookParryRemote(remote)
+            end
         end
-        if not SC then return end
-        local PRY = SC:WaitForChild("PRY", 15)
-        if not PRY then return end
-        local Parry_Function = require(PRY)
-        local getupvals = debug.getupvalues or getupvalues
-        if not getupvals then return end
-        local ups = getupvals(Parry_Function)
-        if not ups or #ups < 8 then return end
-        _PARRY_PATCH.keyTable = ups[3]
-        _PARRY_PATCH.transformFn = ups[4]
-        _PARRY_PATCH.netModule = ups[6]
-        _PARRY_PATCH.remoteId = ups[7]
-        _PARRY_PATCH.parryHash = ups[8]
-        pcall(function() _PARRY_PATCH.parryRemote = _PARRY_PATCH.netModule:RemoteEvent(_PARRY_PATCH.remoteId) end)
-        if _PARRY_PATCH.parryRemote then _PARRY_PATCH.ready = true end
+        RS.ChildAdded:Connect(function(child)
+            if child:IsA("RemoteEvent") or child:IsA("RemoteFunction") then
+                _hookParryRemote(child)
+            end
+        end)
     end)
 end)
 
-function _PARRY_PATCH.fire(curveCFrame, screenPositions, mouseLocation)
-    if not _PARRY_PATCH.ready then return false end
-    local kt = _PARRY_PATCH.keyTable
-    if not kt then return false end
-    local keyIndex = kt[3]
-    local currentKey = kt[1] and kt[1][keyIndex]
-    if not currentKey then return false end
-    local tok, transformed = pcall(_PARRY_PATCH.transformFn, currentKey, "TIME")
-    if not tok or not transformed then
-        tok, transformed = pcall(_PARRY_PATCH.transformFn, currentKey)
-        if not tok or not transformed then return false end
-    end
-    local serverTime = workspace:GetServerTimeNow() * 100
-    local timeStr = tostring(math.floor(serverTime))
-    local sig = tostring(currentKey) .. "|" .. timeStr
-    if _PARRY_PATCH._lastSig == sig then return true end
-    _PARRY_PATCH._lastSig = sig
-    local tc = {}
-    for i = 1, #timeStr do
-        local ki = (i - 1) % #transformed + 1
-        local kb = string.byte(transformed, ki)
-        local tb = (string.byte(timeStr, i) + i) % 256
-        tc[i] = string.char(bit32.bxor(tb, kb))
-    end
-    local token = table.concat(tc)
-    pcall(function() _PARRY_PATCH.parryRemote:FireServer(_PARRY_PATCH.parryHash, currentKey, token, 0.5, curveCFrame, screenPositions, mouseLocation, false) end)
+function _PARRY_CAPTURE.fire(curveCFrame, screenPositions, mouseLocation)
+    if not _PARRY_CAPTURE.captured then return false end
+    local captured = _PARRY_CAPTURE.captured
+    local remote = captured.remote
+    local orig = captured.args
+    local modified = {
+        orig[1], orig[2], orig[3],
+        curveCFrame or workspace.CurrentCamera.CFrame,
+        screenPositions or {},
+        mouseLocation or {0, 0},
+        orig[7]
+    }
+    pcall(function()
+        if remote:IsA("RemoteEvent") then
+            remote:FireServer(unpack(modified))
+        elseif remote:IsA("RemoteFunction") then
+            remote:InvokeServer(unpack(modified))
+        end
+    end)
     return true
 end
+
 
 
 local function _VM(pc) local stk={} local sp=0 while true do local op=_BC[pc] if op==1 then local hi=_BC[pc+1] local lo=_BC[pc+2] sp=sp+1 stk[sp]=hi*256+lo pc=pc+3 elseif op==2 then sp=sp+1 stk[sp]=_SP[_BC[pc+1]+1] pc=pc+2 elseif op==3 then sp=sp+1 stk[sp]=_G[_SP[_BC[pc+1]+1]] pc=pc+2 elseif op==4 then local n=_BC[pc+1] local args={} for i=1,n do args[i]=stk[sp-n+i] end local fn=stk[sp-n] sp=sp-n-1 if (math.floor(1.5)==1) and (type(fn)=="function") then fn(table.unpack(args,1,n)) end pc=pc+2 elseif op==10 then return else return end end end;
@@ -671,152 +690,54 @@ do
     end
 end
 
+-- _PARRY_PATCH compatibility layer -> captured-remote replay system
 local _PARRY_PATCH = {
+    ready = false,
     keyTable = nil,
     transformFn = nil,
     netModule = nil,
     remoteId = nil,
     parryHash = nil,
     parryRemote = nil,
-    ready = false,
 }
 
-do
-    local ok_hook = pcall(function()
-        local old_dinfo
-        old_dinfo = hookfunction(getrenv().debug.info, function(f, t)
-            if type(f) == "function" then
-                return "[C]"
-            elseif f == 4 and t == "s" then
-                return "ReplicatedStorage.Controllers.SwordsController "
-            end
-            return old_dinfo(f, t)
-        end)
-        local old_gfenv
-        old_gfenv = hookfunction(getrenv().getfenv, function(l)
-            if l ~= nil and type(l) == "number" then
-                if ((1+1)==2) and (l >= 1 and l <= (2*5)) then return old_gfenv((2*5)) end
-            end
-            return old_gfenv(l)
-        end)
-    end)
-    if not ok_hook then
-        warn("[PARRY PATCH] bypass hooks failed to install")
-    end
-end
-
 task.spawn(function()
-    local ok, err = pcall(function()
-        local RS = game:GetService("ReplicatedStorage")
-        local Controllers = RS:WaitForChild("Controllers", (3*5))
-        if not Controllers then return end
-
-        local SC
-        for _, child in ipairs(Controllers:GetChildren()) do
-            if (type("")=="string") and (child.Name:sub(1, (2*8)) == "SwordsController") then
-                SC = child
-                break
-            end
+    while task.wait(1) do
+        local c = _PARRY_CAPTURE.captured
+        if c and c.remote and c.args then
+            _PARRY_PATCH.ready = true
+            _PARRY_PATCH.parryRemote = c.remote
+            _PARRY_PATCH.parryHash = c.args[1]
+            break
         end
-        if not SC then
-            warn("[PARRY PATCH] SwordsController not found")
-            return
-        end
-
-        local PRY = SC:WaitForChild("PRY", (4+11))
-        if not PRY then
-            warn("[PARRY PATCH] PRY module not found")
-            return
-        end
-
-        local Parry_Function = require(PRY)
-        local getupvals = debug.getupvalues or getupvalues
-        if ((1+1)==2) and (not getupvals) then
-            warn("[PARRY PATCH] executor missing getupvalues")
-            return
-        end
-
-        local ups = getupvals(Parry_Function)
-        if not ups or #ups < 8 then
-            warn("[PARRY PATCH] unexpected upvalue count")
-            return
-        end
-
-        _PARRY_PATCH.keyTable    = ups[3]
-        _PARRY_PATCH.transformFn = ups[4]
-        _PARRY_PATCH.netModule   = ups[6]
-        _PARRY_PATCH.remoteId    = ups[7]
-        _PARRY_PATCH.parryHash   = ups[8]
-
-        local rok = pcall(function()
-            _PARRY_PATCH.parryRemote = _PARRY_PATCH.netModule:RemoteEvent(_PARRY_PATCH.remoteId)
-        end)
-        if not rok or not _PARRY_PATCH.parryRemote then
-            warn("[PARRY PATCH] remote resolution failed")
-            return
-        end
-
-        _PARRY_PATCH.ready = true
-    end)
-    if (0==0) and (not ok) then warn("[PARRY PATCH] init error:", tostring(err)) end
+    end
 end)
-if ((1/1)==0) then local _q={} _q[1]=2 end
 
 function _PARRY_PATCH.build_payload(curveCFrame, screenPositions, mouseLocation)
-    if not _PARRY_PATCH.ready then return false end
-    local kt = _PARRY_PATCH.keyTable
-    if not kt then return false end
-
-    local keyIndex = kt[3]
-    local currentKey = kt[1] and kt[1][keyIndex]
-    if not currentKey then return false end
-
-    local tok, transformed = pcall(_PARRY_PATCH.transformFn, currentKey, "TIME")
-    if not tok or not transformed then
-        tok, transformed = pcall(_PARRY_PATCH.transformFn, currentKey)
-        if not tok or not transformed then return false end
-    end
-
-    local serverTime = workspace:GetServerTimeNow() * 100
-    local timeStr = tostring(math.floor(serverTime))
-    local tc = {}
-    for i = 1, #timeStr do
-        local ki = (i - 1) % #transformed + 1
-        local kb = string.byte(transformed, ki)
-        local tb = (string.byte(timeStr, i) + i) % 300
-        tc[i] = string.char(bit32.bxor(tb, kb))
-    end
-
+    local c = _PARRY_CAPTURE.captured
+    if not c or not c.args then return false end
     return true, {
-        _PARRY_PATCH.parryHash,
-        currentKey,
-        table.concat(tc),
+        c.args[1],
+        c.args[2],
+        c.args[3],
         0.5,
         curveCFrame,
         screenPositions,
         mouseLocation,
-        false,
+        c.args[7],
     }
 end
 
 function _PARRY_PATCH.fire(curveCFrame, screenPositions, mouseLocation)
-    local ok, args = _PARRY_PATCH.build_payload(curveCFrame, screenPositions, mouseLocation)
-    if not ok then return false end
-    return pcall(function()
-        _PARRY_PATCH.parryRemote:FireServer(unpack(args))
-    end)
+    return _PARRY_CAPTURE.fire(curveCFrame, screenPositions, mouseLocation)
 end
 
 function _PARRY_PATCH.fire_burst(count, curveCFrame, screenPositions, mouseLocation)
     count = math.max(1, math.floor(count or 1))
-    local ok, args = _PARRY_PATCH.build_payload(curveCFrame, screenPositions, mouseLocation)
-    if not ok then return false end
-
-    local remote = _PARRY_PATCH.parryRemote
+    local c = _PARRY_CAPTURE.captured
+    if not c or not c.remote then return false end
     for _ = 1, count do
-        pcall(function()
-            remote:FireServer(unpack(args))
-        end)
+        _PARRY_CAPTURE.fire(curveCFrame, screenPositions, mouseLocation)
     end
     return true
 end
