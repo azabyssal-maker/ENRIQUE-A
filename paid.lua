@@ -1,216 +1,41 @@
--- Load the Obsidian UI Library
-local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/kittylol-hub/Kittylol-hub/refs/heads/main/Library.lua"))()
-local ThemeManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/kittylol-hub/Kittylol-hub/refs/heads/main/ThemeManager.lua"))()
-local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/deividcomsono/Obsidian/main/addons/SaveManager.lua"))()
+-- Script corrigido para carregamento assíncrono da UI (FluentPlus)
+-- O carregamento da biblioteca de UI é a principal causa do congelamento.
+-- Envolver o script em task.spawn() permite que o jogo permaneça responsivo enquanto a UI carrega em segundo plano.
+task.spawn(function()
+--return Library
 
--- Create the main window
-local Window = Library:CreateWindow({
+-- Script refatorado para usar a Fluent UI Library (FluentPlus)
+local Fluent = loadstring(game:HttpGet("https://raw.githubusercontent.com/discoart/FluentPlus/refs/heads/main/Beta.lua"))()
+local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/SaveManager.lua"))()
+local InterfaceManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/InterfaceManager.lua"))()
+
+-- Criar a janela principal
+local Window = Fluent:CreateWindow({
     Title = "ENRIQUE PAID",
-    Footer = "v1.0 • by ENRIQUE",
-    Icon = 16014323157,
-    CornerElements = false,
-    NotifySide = "Right",
-    ShowCustomCursor = true,
-    Size = UDim2.fromOffset(720, 600),
+    SubTitle = "by ENRIQUE • v1.0",
+    TabWidth = 100,
+    Size = UDim2.fromOffset(440, 315),
+    Acrylic = false,
+    Theme = "Darker",
+    MinimizeKey = Enum.KeyCode.LeftControl
 })
-
--- Keep the original feature code intact while translating its old UI calls
--- to the Obsidian API.
-local main = {}
-
-Library._config = Library._config or {}
-Library._config._flags = Library._config._flags or {}
-
--- Compatibility for the notification calls already present in the feature code.
-Library.SendNotification = Library.SendNotification or function(info)
-    if typeof(info) == "table" then
-        return Library:Notify({
-            Title = info.title or info.Title or "Kittylol",
-            Description = info.text or info.Description or "",
-            Time = info.duration or info.Time or 5,
-        })
-    end
-    return Library:Notify(tostring(info))
-end
-
-local function _obsidianTab(tab)
-    local proxy = tab
-
-    function proxy:create_module(info)
-        local title = info.title or "Module"
-        local flag = info.flag or title:gsub("%s+", "_")
-        local section = info.section == "right" and "right" or "left"
-        local defaultKey = info.default
-
-        local box
-        if section == "right" then
-            box = tab:AddRightGroupbox(title)
-        else
-            box = tab:AddLeftGroupbox(title)
-        end
-
-        local oldFlag = Library._config._flags[flag]
-        local defaultState = oldFlag and oldFlag.checked == true or false
-        local callback = info.callback or function() end
-
-        local toggle = box:AddToggle(flag, {
-            Text = title,
-            Default = defaultState,
-            Callback = function(value)
-                Library._config._flags[flag] = Library._config._flags[flag] or {}
-                Library._config._flags[flag].checked = value == true
-                Library._config._flags[flag].BIND = defaultKey or Library._config._flags[flag].BIND or "Unknown"
-                callback(value == true)
-            end
-        })
-
-        if defaultKey and defaultKey ~= "Unknown" and defaultKey ~= "None" then
-            pcall(function()
-                toggle:AddKeyPicker(flag .. "_Key", {
-                    Default = defaultKey,
-                    Mode = "Toggle",
-                    SyncToggleState = true,
-                    Callback = function(value)
-                        Library._config._flags[flag] = Library._config._flags[flag] or {}
-                        Library._config._flags[flag].checked = value == true
-                    end
-                })
-            end)
-        end
-
-        local module = {
-            _box = box,
-            _toggle = toggle,
-            _flag = flag,
-            _callback = callback,
-        }
-
-        function module:create_checkbox(settings)
-            local cbFlag = settings.flag or settings.title or settings.Name or ("Checkbox_" .. tostring(math.random(100000, 999999)))
-            local cb = box:AddToggle(cbFlag, {
-                Text = settings.title or settings.Name or "Checkbox",
-                Default = settings.default == true,
-                Callback = settings.callback or settings.Callback or function() end
-            })
-            return cb
-        end
-
-        function module:create_dropdown(settings)
-            local values = settings.options or settings.Items or {}
-            local default = settings.default
-            if default == nil or not table.find(values, default) then
-                default = values[1]
-            end
-            local dropdown = box:AddDropdown(settings.flag or settings.title or settings.Name, {
-                Text = settings.title or settings.Name or "Dropdown",
-                Values = values,
-                Multi = settings.multi_dropdown == true,
-                Default = default,
-                Callback = settings.callback or settings.Callback or function() end
-            })
-            -- Compatibility with the original UI library API.
-            if dropdown and not dropdown.update then
-                function dropdown:update(value)
-                    if self.SetValue then
-                        return self:SetValue(value)
-                    elseif self.Set then
-                        return self:Set(value)
-                    end
-                end
-            end
-            return dropdown
-        end
-
-        function module:create_slider(settings)
-            local min = settings.minimum_value or settings.Min or 0
-            local max = settings.maximum_value or settings.Max or 100
-            local value = settings.value
-            if value == nil then value = settings.Default end
-            if value == nil then value = min end
-
-            local rounding = settings.round_number == false and 2 or 0
-            return box:AddSlider(settings.flag or settings.title or settings.Name, {
-                Text = settings.title or settings.Name or "Slider",
-                Default = value,
-                Min = min,
-                Max = max,
-                Rounding = rounding,
-                Callback = settings.callback or settings.Callback or function() end
-            })
-        end
-
-        function module:create_divider(settings)
-            return pcall(function() box:AddDivider(settings and settings.Text or nil) end)
-        end
-
-        -- Compatibility aliases used by the original source.
-        function module:Toggle(settings)
-            return self:create_checkbox({
-                title = settings.Name,
-                flag = settings.Flag,
-                default = settings.Default,
-                callback = settings.Callback
-            })
-        end
-
-        function module:Dropdown(settings)
-            return self:create_dropdown({
-                title = settings.Name,
-                flag = settings.Flag,
-                options = settings.Items,
-                callback = settings.Callback
-            })
-        end
-
-        function module:Slider(settings)
-            return self:create_slider({
-                title = settings.Name,
-                flag = settings.Flag,
-                minimum_value = settings.Min,
-                maximum_value = settings.Max,
-                value = settings.Default,
-                round_number = settings.Round ~= false,
-                callback = settings.Callback
-            })
-        end
-
-        return module
-    end
-
-    return proxy
-end
-
-function main:create_tab(name, icon)
-    return _obsidianTab(Window:AddTab(name, icon))
-end
-
-function main:load()
-    -- CreateWindow defaults to AutoShow=true, so there is no second UI load step.
-    if Window and Window.Toggle and Library and Library.Toggled == false then
-        pcall(function() Window:Toggle(true) end)
-    end
-    return Window
-end
-
--- Obsidian uses Window directly for its UI lifecycle.
-
 -- ENRIQUE PAID IMAGE
-task.delay(0.5, function()
+task.delay(1, function()
     pcall(function()
         local coreGui = (gethui and gethui()) or game:GetService("CoreGui")
         for _, gui in pairs(coreGui:GetChildren()) do
-            if gui:IsA("ScreenGui") and gui.Name:lower():find("obsidian") then
+            if gui:IsA("ScreenGui") and gui.Name:lower():find("fluent") then
                 local mainFrame = gui:FindFirstChild("Main", true)
                 if mainFrame then
                     local img = Instance.new("ImageLabel")
                     img.Name = "ENRIQUEImage"
-                    img.Size = UDim2.new(0, 32, 0, 32)
-                    img.Position = UDim2.new(1, -42, 0, 6)
+                    img.Size = UDim2.new(0, 36, 0, 36)
+                    img.Position = UDim2.new(1, -46, 0, 8)
                     img.BackgroundTransparency = 1
                     img.Image = "rbxassetid://16014323157"
                     img.ScaleType = Enum.ScaleType.Fit
                     img.Parent = mainFrame
-                    Instance.new("UICorner", img).CornerRadius = UDim.new(0, 6)
+                    Instance.new("UICorner", img).CornerRadius = UDim.new(0, 8)
                 end
                 break
             end
@@ -218,96 +43,163 @@ task.delay(0.5, function()
     end)
 end)
 
--- The original source below continues to use `main:create_tab(...)`.
+-- Mapeamento das abas para a nova sintaxe da Fluent UI
+local Tabs = {
+    Rage = Window:AddTab({Title = "Autoparry", Icon = "sword"}),
+    Detection = Window:AddTab({Title = "Detection", Icon = "eye"}),
+    Spam = Window:AddTab({Title = "Spam", Icon = "skull"}),
+    Player = Window:AddTab({Title = "Player", Icon = "user"}),
+    Visuals = Window:AddTab({Title = "Visuals", Icon = "monitor"}),
+    Misc = Window:AddTab({Title = "Misc", Icon = "settings"}),
+    Settings = Window:AddTab({Title = "Settings", Icon = "sliders"})
+}
 
-local Players = cloneref and cloneref(game:GetService('Players')) or game:GetService('Players')
-local ReplicatedStorage = cloneref and cloneref(game:GetService('ReplicatedStorage')) or game:GetService('ReplicatedStorage')
-local UserInputService = cloneref and cloneref(game:GetService('UserInputService')) or game:GetService('UserInputService')
-local RunService = cloneref and cloneref(game:GetService('RunService')) or game:GetService('RunService')
-local Stats = cloneref and cloneref(game:GetService('Stats')) or game:GetService('Stats')
-local HttpService = cloneref and cloneref(game:GetService('HttpService')) or game:GetService('HttpService')
-local TweenService = game:GetService('TweenService')
-local Debris = cloneref and cloneref(game:GetService('Debris')) or game:GetService('Debris')
+local Options = Fluent.Options
+
+-- O restante do código original começa aqui
+
+repeat task.wait(0.5) until game:IsLoaded()
+
+local Players = cloneref(game:GetService('Players'))
+local ReplicatedStorage = cloneref(game:GetService('ReplicatedStorage'))
+local UserInputService = cloneref(game:GetService('UserInputService'))
+local RunService = cloneref(game:GetService('RunService'))
+local TweenService = cloneref(game:GetService('TweenService'))
+local Stats = cloneref(game:GetService('Stats'))
+local Debris = cloneref(game:GetService('Debris'))
+local CoreGui = cloneref(game:GetService('CoreGui'))
 
 local LocalPlayer = Players.LocalPlayer
+local Mouse = LocalPlayer:GetMouse()
+
+if not LocalPlayer.Character then
+    LocalPlayer.CharacterAdded:Wait()
+end
+
 local Alive = workspace:FindFirstChild("Alive") or workspace:WaitForChild("Alive")
-local Runtime = workspace:FindFirstChild("Runtime") or Instance.new("Folder")
+local Runtime = workspace.Runtime
 
-local ConfigFile = "Kittylol_Config.json"
-local Settings = {}
+local System = {
+    __properties = {
+        __autoparry_enabled = false,
+        __triggerbot_enabled = false,
+        __manual_spam_enabled = false,
+        __auto_spam_enabled = false,
+        __play_animation = false,
+        __curve_mode = 1,
+        __accuracy = 1,
+        __divisor_multiplier = 1.1,
+        __parried = false,
+        __training_parried = false,
+        __spam_threshold = 1.5,
+        __parries = 0,
+        __parry_key = nil,
+        __grab_animation = nil,
+        __tornado_time = tick(),
+        __first_parry_done = false,
+        __connections = {},
+        __reverted_remotes = {},
+        __spam_accumulator = 0,
+        __spam_rate = 240,
+        __infinity_active = false,
+        __deathslash_active = false,
+        __timehole_active = false,
+        __slashesoffury_active = false,
+        __slashesoffury_count = 0,
+        __is_mobile = UserInputService.TouchEnabled and not UserInputService.MouseEnabled,
+        __mobile_guis = {}
+    },
+    
+    __config = {
+        __curve_names = {'Camera', 'Random', 'Accelerated', 'Backwards', 'Slow', 'High'},
+        __detections = {
+            __infinity = false,
+            __deathslash = false,
+            __timehole = false,
+            __slashesoffury = false,
+            __phantom = false
+        }
+    },
+    
+    __triggerbot = {
+        __enabled = false,
+        __is_parrying = false,
+        __parries = 0,
+        __max_parries = 10000,
+        __parry_delay = 0.5
+    }
+}
 
-local function ApplyDefaults()
-    Settings.AutoParry = Settings.AutoParry or false
-    Settings.ParryMode = Settings.ParryMode or "Remote"
-    Settings.CurveType = Settings.CurveType or 1
-    Settings.ParryAccuracy = 1
-    Settings.AutoSpam = Settings.AutoSpam or false
-    Settings.AutoSpamMode = Settings.AutoSpamMode or "Remote"
-    Settings.ParryThreshold = Settings.ParryThreshold or 1
-    Settings.DistanceMultiplier = Settings.DistanceMultiplier or 0.3
-    Settings.ManualSpam = Settings.ManualSpam or false
-    Settings.ManualSpamCPS = Settings.ManualSpamCPS or 200
-    Settings.Triggerbot = Settings.Triggerbot or false
-end
+local revertedRemotes = {} -- replaced by _PARRY_PATCH
+local originalMetatables = {}
+-- Parry_Key replaced by _PARRY_PATCH
+local PF = nil
+local SC = nil
 
-local function LoadSettings()
-    pcall(function()
-        if isfile and isfile(ConfigFile) then
-            local data = readfile(ConfigFile)
-            if data and data ~= "" then Settings = HttpService:JSONDecode(data) end
+if ReplicatedStorage:FindFirstChild("Controllers") then
+    for _, child in ipairs(ReplicatedStorage.Controllers:GetChildren()) do
+        if child.Name:match("^SwordsController%s*$") then
+            SC = child
         end
-    end)
-    ApplyDefaults()
+    end
 end
 
-local function SaveSettings()
-    pcall(function()
-        if writefile then writefile(ConfigFile, HttpService:JSONEncode(Settings)) end
-    end)
+local function update_divisor()
+    System.__properties.__divisor_multiplier = 0.59 + (System.__properties.__accuracy - 1) * (3 / 99)
 end
 
-LoadSettings()
-
-Settings.ManualSpam = false
-Settings.Triggerbot = false
-SaveSettings()
-
-local ManualSpamFrame, TriggerbotFrame, UpdateManualSpamUI, UpdateTriggerbotUI, ApplyManualSpamUI, ApplyTriggerbotUI
-
-local _PARRY_PATCH = { keyTable = nil, transformFn = nil, netModule = nil, remoteId = nil, parryHash = nil, parryRemote = nil, ready = false, _lastSig = nil }
-
-pcall(function()
-    local old_dinfo
-    old_dinfo = hookfunction(getrenv().debug.info, function(f, t)
-        if type(f) == "function" then return "[C]"
-        elseif f == 4 and t == "s" then return "ReplicatedStorage.Controllers.SwordsController " end
-        return old_dinfo(f, t)
-    end)
-    local old_gfenv
-    old_gfenv = hookfunction(getrenv().getfenv, function(l)
-        if l ~= nil and type(l) == "number" then
-            if l >= 1 and l <= 10 then return old_gfenv(10) end
-        end
-        return old_gfenv(l)
-    end)
-end)
+local function update_randomized_accuracy()
+    if not System.__properties.__randomized_accuracy_enabled then return end
+    
+    local ping_str = Stats.Network.ServerStatsItem["Data Ping"]:GetValueString()
+    local ping = tonumber(ping_str:match("%d+")) or 0
+    
+    local new_accuracy
+    if ping >= 90 then
+        new_accuracy = 4
+    elseif ping <= 50 then
+        new_accuracy = math.random(70, 100)
+    else
+        new_accuracy = System.__properties.__accuracy
+    end
+    
+    if new_accuracy then
+        System.__properties.__accuracy = new_accuracy
+        update_divisor()
+    end
+end
 
 task.spawn(function()
-    pcall(function()
-        local Controllers = ReplicatedStorage:WaitForChild("Controllers", 15)
+    while task.wait(1) do
+        if System.__properties.__randomized_accuracy_enabled then
+            update_randomized_accuracy()
+        end
+    end
+end)
+
+-- KITTYLOL REMOTE SYSTEM (_PARRY_PATCH)
+local _PARRY_PATCH = {
+    keyTable = nil, transformFn = nil, netModule = nil,
+    remoteId = nil, parryHash = nil, parryRemote = nil, ready = false,
+}
+
+task.spawn(function()
+    local ok, err = pcall(function()
+        local RS = game:GetService("ReplicatedStorage")
+        local Controllers = RS:WaitForChild("Controllers", 15)
         if not Controllers then return end
         local SC
         for _, child in ipairs(Controllers:GetChildren()) do
-            if child.Name:sub(1, 16) == "SwordsController" then SC = child break end
+            if type("")=="string" and child.Name:sub(1, 16) == "SwordsController" then SC = child break end
         end
-        if not SC then return end
+        if not SC then warn("[PARRY PATCH] SwordsController not found") return end
         local PRY = SC:WaitForChild("PRY", 15)
-        if not PRY then return end
+        if not PRY then warn("[PARRY PATCH] PRY module not found") return end
         local Parry_Function = require(PRY)
         local getupvals = debug.getupvalues or getupvalues
-        if not getupvals then return end
+        if not getupvals then warn("[PARRY PATCH] executor missing getupvalues") return end
         local ups = getupvals(Parry_Function)
-        if not ups or #ups < 8 then return end
+        if not ups or #ups < 8 then warn("[PARRY PATCH] unexpected upvalue count") return end
         _PARRY_PATCH.keyTable = ups[3]
         _PARRY_PATCH.transformFn = ups[4]
         _PARRY_PATCH.netModule = ups[6]
@@ -316,6 +208,7 @@ task.spawn(function()
         pcall(function() _PARRY_PATCH.parryRemote = _PARRY_PATCH.netModule:RemoteEvent(_PARRY_PATCH.remoteId) end)
         if _PARRY_PATCH.parryRemote then _PARRY_PATCH.ready = true end
     end)
+    if not ok then warn("[PARRY PATCH] init error:", tostring(err)) end
 end)
 
 function _PARRY_PATCH.fire(curveCFrame, screenPositions, mouseLocation)
@@ -332,114 +225,78 @@ function _PARRY_PATCH.fire(curveCFrame, screenPositions, mouseLocation)
     end
     local serverTime = workspace:GetServerTimeNow() * 100
     local timeStr = tostring(math.floor(serverTime))
-    local sig = tostring(currentKey) .. "|" .. timeStr
-    if _PARRY_PATCH._lastSig == sig then return true end
-    _PARRY_PATCH._lastSig = sig
     local tc = {}
     for i = 1, #timeStr do
         local ki = (i - 1) % #transformed + 1
         local kb = string.byte(transformed, ki)
-        local tb = (string.byte(timeStr, i) + i) % 256
+        local tb = (string.byte(timeStr, i) + i) % 300
         tc[i] = string.char(bit32.bxor(tb, kb))
     end
-    local token = table.concat(tc)
-    pcall(function() _PARRY_PATCH.parryRemote:FireServer(_PARRY_PATCH.parryHash, currentKey, token, 0.5, curveCFrame, screenPositions, mouseLocation, false) end)
+    pcall(function()
+        _PARRY_PATCH.parryRemote:FireServer(_PARRY_PATCH.parryHash, currentKey, table.concat(tc), 0.5, curveCFrame, screenPositions, mouseLocation, false)
+    end)
     return true
 end
 
-local System = {
-    __properties = {
-        __autoparry_enabled = Settings.AutoParry,
-        __animation_fix = true,
-        __curve_mode = Settings.CurveType,
-        __accuracy = 1,
-        __divisor_multiplier = 1.1,
-        __parried = false,
-        __training_parried = false,
-        __tornado_time = tick(),
-        __tornado_active = false,
-        __parries = 0,
-        __first_parry_done = false,
-        __close_contact = false,
-        __last_close_contact = 0,
-        __spam_threshold = Settings.ParryThreshold,
-        __auto_spam_distance_multiplier = Settings.DistanceMultiplier,
-        __manual_spam_enabled = false,
-        __manual_spam_running = false,
-        __manual_spam_cps = Settings.ManualSpamCPS,
-        __last_spam_time = 0,
-        __triggerbot_enabled = false,
-        __triggerbot_running = false,
-        __triggered_balls = {},
-        __infinity_active = false,
-        __deathslash_active = false,
-        __timehole_active = false,
-        __slashesoffury_active = false,
-        __slashesoffury_count = 0,
-        __dribble_active = false,
-        __phantom_active = false,
-        __pull_active = false,
-        __singularity_active = false,
-        __plr_forc = false,
-        __humanizer_enabled = false,
-        __humanizer_min_accuracy = 1,
-        __humanizer_max_accuracy = 50,
-        __humanizer_last_update = 0,
-        __humanizer_next_change = 0.8,
-        __connections = {}
-    },
-    __config = {
-        __curve_names = {'Camera', 'Random', 'Accelerated', 'Backwards', 'Slow', 'High'},
-        __detections = {
-            __infinity = false,
-            __deathslash = false,
-            __timehole = false,
-            __slashesoffury = false,
-            __dribble = false,
-            __phantom = false,
-            __pull = false,
-            __singularity = false,
-            __forcefield = false
-        }
-    },
-    __triggerbot = {
-        __enabled = false,
-        __is_parrying = false,
-        __parries = 0,
-        __max_parries = 10000,
-        __parry_delay = 0.5
-    },
-    ball = {}, player = {}, curve = {}, parry = {}, detection = {
-        __ball_properties = { __aerodynamic_time = tick(), __last_warping = tick(), __lerp_radians = 0, __curving = tick() }
-    }, autoparry = {}
-}
+System.animation = {}
+System.animation = {}
 
-local PF = nil
-local SC = nil
-
-pcall(function()
-    if ReplicatedStorage:FindFirstChild("Controllers") then
-        for _, child in ipairs(ReplicatedStorage.Controllers:GetChildren()) do
-            if child.Name:match("^SwordsController%s*$") then SC = child end
+function System.animation.play_grab_parry()
+    if not System.__properties.__play_animation then
+        return
+    end
+    
+    local character = LocalPlayer.Character
+    if not character then return end
+    
+    local humanoid = character:FindFirstChildOfClass('Humanoid')
+    local animator = humanoid and humanoid:FindFirstChildOfClass('Animator')
+    if not humanoid or not animator then return end
+    
+    local sword_name
+    if getgenv().skinChangerEnabled then
+        sword_name = getgenv().swordAnimations
+    else
+        sword_name = character:GetAttribute('CurrentlyEquippedSword')
+    end
+    if not sword_name then return end
+    
+    local sword_api = ReplicatedStorage.Shared.SwordAPI.Collection
+    local parry_animation = sword_api.Default:FindFirstChild('GrabParry')
+    if not parry_animation then return end
+    
+    local sword_data = ReplicatedStorage.Shared.ReplicatedInstances.Swords.GetSword:Invoke(sword_name)
+    if not sword_data or not sword_data['AnimationType'] then return end
+    
+    for _, object in pairs(sword_api:GetChildren()) do
+        if object.Name == sword_data['AnimationType'] then
+            if object:FindFirstChild('GrabParry') or object:FindFirstChild('Grab') then
+                local animation_type = object:FindFirstChild('GrabParry') and 'GrabParry' or 'Grab'
+                parry_animation = object[animation_type]
+            end
         end
     end
-    if LocalPlayer.PlayerGui:FindFirstChild("Hotbar") and LocalPlayer.PlayerGui.Hotbar:FindFirstChild("Block") then
-        for _, v in next, getconnections(LocalPlayer.PlayerGui.Hotbar.Block.Activated) do
-            if SC and getfenv(v.Function).script == SC then PF = v.Function break end
-        end
+    
+    if System.__properties.__grab_animation and System.__properties.__grab_animation.IsPlaying then
+        System.__properties.__grab_animation:Stop()
     end
-end)
-
-local function update_divisor()
-    System.__properties.__divisor_multiplier = 0.75 + (System.__properties.__accuracy - 1) * (3 / 99)
+    
+    System.__properties.__grab_animation = animator:LoadAnimation(parry_animation)
+    System.__properties.__grab_animation.Priority = Enum.AnimationPriority.Action4
+    System.__properties.__grab_animation:Play()
 end
-update_divisor()
+
+System.ball = {}
 
 function System.ball.get()
     local balls = workspace:FindFirstChild('Balls')
     if not balls then return nil end
+    
     for _, ball in pairs(balls:GetChildren()) do
-        if ball:GetAttribute('realBall') then ball.CanCollide = false return ball end
+        if ball:GetAttribute('realBall') then
+            ball.CanCollide = false
+            return ball
+        end
     end
     return nil
 end
@@ -448,103 +305,193 @@ function System.ball.get_all()
     local balls_table = {}
     local balls = workspace:FindFirstChild('Balls')
     if not balls then return balls_table end
+    
     for _, ball in pairs(balls:GetChildren()) do
-        if ball:GetAttribute('realBall') then ball.CanCollide = false table.insert(balls_table, ball) end
+        if ball:GetAttribute('realBall') then
+            ball.CanCollide = false
+            table.insert(balls_table, ball)
+        end
     end
     return balls_table
 end
 
-function System.player.get_closest_to_cursor()
-    if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild('HumanoidRootPart') then return nil end
-    local closest_player, minimal_dot = nil, -math.huge
-    local camera = workspace.CurrentCamera
-    local success, mouse_location = pcall(function() return UserInputService:GetMouseLocation() end)
-    if not success then return nil end
-    local ray = camera:ScreenPointToRay(mouse_location.X, mouse_location.Y)
-    local pointer = CFrame.lookAt(ray.Origin, ray.Origin + ray.Direction)
-    for _, player in pairs(Alive:GetChildren()) do
-        if player ~= LocalPlayer.Character and player:FindFirstChild('HumanoidRootPart') then
-            local direction = (player.HumanoidRootPart.Position - camera.CFrame.Position).Unit
-            local dot = pointer.LookVector:Dot(direction)
-            if dot > minimal_dot then minimal_dot = dot closest_player = player end
+System.player = {}
+
+local Closest_Entity = nil
+
+local last_closest_check = 0
+function System.player.get_closest()
+    local now = tick()
+    if now - last_closest_check < 0.1 then
+        return Closest_Entity
+    end
+    last_closest_check = now
+
+    local max_distance = math.huge
+    local closest_entity = nil
+    
+    if not Alive then return nil end
+    
+    for _, entity in pairs(Alive:GetChildren()) do
+        if entity ~= LocalPlayer.Character then
+            if entity.PrimaryPart then
+                local distance = LocalPlayer:DistanceFromCharacter(entity.PrimaryPart.Position)
+                if distance < max_distance then
+                    max_distance = distance
+                    closest_entity = entity
+                end
+            end
         end
     end
+    
+    Closest_Entity = closest_entity
+    return closest_entity
+end
+
+function System.player.get_closest_to_cursor()
+    if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild('HumanoidRootPart') then
+        return nil
+    end
+    
+    local closest_player = nil
+    local minimal_dot = -math.huge
+    local camera = workspace.CurrentCamera
+    
+    if not Alive then return nil end
+    
+    local success, mouse_location = pcall(function()
+        return UserInputService:GetMouseLocation()
+    end)
+    
+    if not success then return nil end
+    
+    local ray = camera:ScreenPointToRay(mouse_location.X, mouse_location.Y)
+    local pointer = CFrame.lookAt(ray.Origin, ray.Origin + ray.Direction)
+    
+    for _, player in pairs(Alive:GetChildren()) do
+        if player == LocalPlayer.Character then continue end
+        if not player:FindFirstChild('HumanoidRootPart') then continue end
+        
+        local direction = (player.HumanoidRootPart.Position - camera.CFrame.Position).Unit
+        local dot = pointer.LookVector:Dot(direction)
+        
+        if dot > minimal_dot then
+            minimal_dot = dot
+            closest_player = player
+        end
+    end
+    
     return closest_player
 end
 
-local Closest_Entity = nil
-function System.player.get_closest()
-    Closest_Entity = nil
-    if not LocalPlayer.Character or not LocalPlayer.Character.PrimaryPart then return nil end
-    local myPos = LocalPlayer.Character.PrimaryPart.Position
-    local best = math.huge
-    for _, entity in pairs(Alive:GetChildren()) do
-        if entity ~= LocalPlayer.Character and entity:FindFirstChild("HumanoidRootPart") then
-            local d = (entity.HumanoidRootPart.Position - myPos).Magnitude
-            if d < best then best = d Closest_Entity = entity end
-        end
-    end
-    return Closest_Entity
-end
+System.curve = {}
 
 function System.curve.get_cframe()
     local camera = workspace.CurrentCamera
     local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild('HumanoidRootPart')
     if not root then return camera.CFrame end
-    local targetPart = System.player.get_closest_to_cursor()
-    if targetPart and targetPart:FindFirstChild('HumanoidRootPart') then targetPart = targetPart.HumanoidRootPart end
+    
+    local targetPart
+    local closest = System.player.get_closest_to_cursor()
+    if closest and closest:FindFirstChild('HumanoidRootPart') then
+        targetPart = closest.HumanoidRootPart
+    end
+    
     local target_pos = targetPart and targetPart.Position or (root.Position + camera.CFrame.LookVector * 100)
+    
     local curve_functions = {
         function() return camera.CFrame end,
-        function() return CFrame.new(root.Position, target_pos + Vector3.new(math.random(-4000, 4000), math.random(-4000, 4000), math.random(-4000, 4000))) end,
-        function() return CFrame.new(root.Position, target_pos + Vector3.new(0, 5, 0)) end,
-        function() return CFrame.new(camera.CFrame.Position, root.Position + (root.Position - target_pos).Unit * 10000 + Vector3.new(0, 1000, 0)) end,
-        function() return CFrame.new(root.Position, target_pos + Vector3.new(0, -9e18, 0)) end,
-        function() return CFrame.new(root.Position, target_pos + Vector3.new(0, 9e18, 0)) end
+        
+        function()
+            local direction = (target_pos - root.Position).Unit
+            local random_offset
+            local attempts = 0
+            repeat
+                random_offset = Vector3.new(
+                    math.random(-4000, 4000),
+                    math.random(-4000, 4000),
+                    math.random(-4000, 4000)
+                )
+                local curve_direction = (target_pos + random_offset - root.Position).Unit
+                local dot = direction:Dot(curve_direction)
+                attempts = attempts + 1
+            until dot < 0.95 or attempts > 10
+            return CFrame.new(root.Position, target_pos + random_offset)
+        end,
+        
+        function()
+            return CFrame.new(root.Position, target_pos + Vector3.new(0, 5, 0))
+        end,
+        
+        function()
+            local direction = (root.Position - target_pos).Unit
+            local backwards_pos = root.Position + direction * 10000 + Vector3.new(0, 1000, 0)
+            return CFrame.new(camera.CFrame.Position, backwards_pos)
+        end,
+        
+        function()
+            return CFrame.new(root.Position, target_pos + Vector3.new(0, -9e18, 0))
+        end,
+        
+        function()
+            return CFrame.new(root.Position, target_pos + Vector3.new(0, 9e18, 0))
+        end
     }
+    
     return curve_functions[System.__properties.__curve_mode]()
 end
 
+System.parry = {}
+
 function System.parry.execute()
-    if System.__properties.__parries > (255+9745) or not LocalPlayer.Character then
+    if System.__properties.__parries > 10000 or not LocalPlayer.Character then
         return
     end
-if (type({})~="table") then local _t=table.concat({},"") end
-    if not _PARRY_PATCH or not _PARRY_PATCH.ready then
-        return
-    end
+    
+    -- USAR VIRTUAL INPUT APENAS PARA O PRIMEIRO PARRY (SEM BLOCK BUTTON)
+    -- (virtual input removed — using _PARRY_PATCH)
+
     local camera = workspace.CurrentCamera
     local success, mouse = pcall(function()
         return UserInputService:GetMouseLocation()
     end)
+    
     if not success then return end
+    
+    local vec2_mouse = {mouse.X, mouse.Y}
     local is_mobile = System.__properties.__is_mobile
-    local screenPositions = {}
+    
+    local event_data = {}
     if Alive then
         for _, entity in pairs(Alive:GetChildren()) do
-            if (math.floor(1.5)==1) and (entity.PrimaryPart) then
-                local ok2, sp = pcall(function()
+            if entity.PrimaryPart then
+                local success2, screen_point = pcall(function()
                     return camera:WorldToScreenPoint(entity.PrimaryPart.Position)
                 end)
-                if ok2 then
-                    screenPositions[entity.Name] = sp
+                if success2 then
+                    event_data[entity.Name] = screen_point
                 end
             end
         end
     end
-if ((1/1)==0) then for _i=1,0 do end end
-    local curveCF = (System.curve and System.curve.get_cframe and System.curve.get_cframe()) or camera.CFrame
-    local mouseLocation
+    
+    local curve_cframe = System.curve.get_cframe()
+
+    local final_aim_target
     if is_mobile then
-        local vp = camera.ViewportSize
-        mouseLocation = {vp.X / 2, vp.Y / 2}
+        local viewport = camera.ViewportSize
+        final_aim_target = {viewport.X / 2, viewport.Y / 2}
     else
-        mouseLocation = {mouse.X, mouse.Y}
+        final_aim_target = vec2_mouse
     end
 
-    _PARRY_PATCH.fire(curveCF, screenPositions, mouseLocation)
-
-    if ((1+1)==2) and (System.__properties.__parries > (10019-19)) then return end
+    _PARRY_PATCH.fire(curve_cframe, event_data, final_aim_target)
+    
+    -- EXECUTAR BYPASS DO TEST (ENVIAR BOLA PARA CÂMERA)
+    -- (DualBypassSystem removed)
+    
+    if System.__properties.__parries > 10000 then return end
+    
     System.__properties.__parries = System.__properties.__parries + 1
     task.delay(0.5, function()
         if System.__properties.__parries > 0 then
@@ -554,12 +501,48 @@ if ((1/1)==0) then for _i=1,0 do end end
 end
 
 function System.parry.keypress()
-    if System.__properties.__parries > (2*5000) or not LocalPlayer.Character then
+    if System.__properties.__parries > 10000 or not LocalPlayer.Character then
         return
     end
-    if (type("")=="string") and (PF) then pcall(PF) end
-if (1<-1) then local _j=1+1 end
-    if System.__properties.__parries > (2*5000) then return end
+
+    local camera = workspace.CurrentCamera
+    local curve_cframe = System.curve.get_cframe()
+    local event_data = {}
+    
+    if Alive then
+        for _, entity in pairs(Alive:GetChildren()) do
+            if entity.PrimaryPart then
+                local success2, screen_point = pcall(function()
+                    return camera:WorldToScreenPoint(entity.PrimaryPart.Position)
+                end)
+                if success2 then
+                    event_data[entity.Name] = screen_point
+                end
+            end
+        end
+    end
+    
+    local is_mobile = System.__properties.__is_mobile
+    local final_aim_target
+    
+    if is_mobile then
+        local viewport = camera.ViewportSize
+        final_aim_target = {viewport.X / 2, viewport.Y / 2}
+    else
+        local success, mouse = pcall(function()
+            return UserInputService:GetMouseLocation()
+        end)
+        if success then
+            final_aim_target = {mouse.X, mouse.Y}
+        else
+            final_aim_target = {0, 0}
+        end
+    end
+    
+    _PARRY_PATCH.fire(curve_cframe, event_data, final_aim_target)
+    
+    if System.__properties.__parries > 10000 then return end
+    
     System.__properties.__parries = System.__properties.__parries + 1
     task.delay(0.5, function()
         if System.__properties.__parries > 0 then
@@ -569,179 +552,783 @@ if (1<-1) then local _j=1+1 end
 end
 
 function System.parry.execute_action()
-    if System.animation and System.animation.play_grab_parry then
-        pcall(System.animation.play_grab_parry)
-    end
+    System.animation.play_grab_parry()
     System.parry.execute()
 end
 
-local function linear_predict(a, b, t) return a + (b - a) * t end
+local function linear_predict(a, b, t)
+    return a + (b - a) * t
+end
+
+System.detection = {
+    __ball_properties = {
+        __aerodynamic_time = tick(),
+        __last_warping = tick(),
+        __lerp_radians = 0,
+        __curving = tick()
+    }
+}
 
 function System.detection.is_curved()
+    local props = System.detection.__ball_properties
     local ball = System.ball.get()
     if not ball then return false end
-    if not LocalPlayer.Character or not LocalPlayer.Character.PrimaryPart then return false end
+
     local zoomies = ball:FindFirstChild("zoomies")
     if not zoomies then return false end
-    local ping = getgenv()._ZX_PingCache or 50
+
     local velocity = zoomies.VectorVelocity
     local speed = velocity.Magnitude
-    if speed == 0 then return false end
-    local ball_direction = velocity.Unit
-    local playerPos = LocalPlayer.Character.PrimaryPart.Position
-    local ballPos = ball.Position
-    local direction = (playerPos - ballPos).Unit
-    local dot = direction:Dot(ball_direction)
-    local speed_threshold = math.min(speed / 100, 40)
-    local distance = (playerPos - ballPos).Magnitude
-    local reach_time = distance / speed - (ping / 1000)
+    if speed < 1 then return false end
+
+    local ball_dir = velocity.Unit
+    local char = LocalPlayer.Character
+    if not char or not char.PrimaryPart then return false end
+
+    local pos = char.PrimaryPart.Position
+    local direction = (pos - ball.Position).Unit
+    local dot = direction:Dot(ball_dir)
+
+    local ping = Stats.Network.ServerStatsItem["Data Ping"]:GetValue() / 1000
+    local distance = (pos - ball.Position).Magnitude
+    local reach_time = distance / speed - ping
+
+    local dot_threshold = 0.55 - (ping * 0.75)
+    dot_threshold = math.clamp(dot_threshold, -1, 0.45)
+
+    local speed_threshold = math.min(speed / 100, 45)
     local ball_distance_threshold = 15 - math.min(distance / 1000, 15) + speed_threshold
-    if not System.detection._ZX_PrevVel then System.detection._ZX_PrevVel = {} end
-    local Previous_Velocity = System.detection._ZX_PrevVel
-    table.insert(Previous_Velocity, velocity)
-    if #Previous_Velocity > 4 then table.remove(Previous_Velocity, 1) end
-    if not System.detection._ZX_CurveState then
-        System.detection._ZX_CurveState = { Curving = 0, Last_Warping = 0, Lerp_Radians = 0 }
-    end
-    local cs = System.detection._ZX_CurveState
-    if ball:FindFirstChild("AeroDynamicSlashVFX") then
-        ball.AeroDynamicSlashVFX:Destroy()
-        cs.Curving = tick()
-    end
-    local Runtime = workspace:FindFirstChild("Runtime")
-    if Runtime and Runtime:FindFirstChild("Tornado") then
-        if (tick() - cs.Curving) < ((Runtime.Tornado:GetAttribute("TornadoTime") or 1) + 0.314159) then return true end
-    end
-    local enough_speed = speed > 160
-    if enough_speed and reach_time > (ping / 10 + 0.03) then
-        if speed < 300 then ball_distance_threshold = math.max(ball_distance_threshold - 15, 15)
-        elseif speed <= 600 then ball_distance_threshold = math.max(ball_distance_threshold - 16, 16)
-        elseif speed <= 1000 then ball_distance_threshold = math.max(ball_distance_threshold - 17, 17)
-        elseif speed <= 1500 then ball_distance_threshold = math.max(ball_distance_threshold - 19, 19)
-        else ball_distance_threshold = math.max(ball_distance_threshold - 20, 20) end
-    end
-    if distance < ball_distance_threshold then return false end
-    local adjusted_reach_time = reach_time + 0.03
-    if speed < 300 then
-        if (tick() - cs.Curving) < (adjusted_reach_time / 1.2) then return true end
-    elseif speed < 450 then
-        if (tick() - cs.Curving) < (adjusted_reach_time / 1.21) then return true end
-    elseif speed < 600 then
-        if (tick() - cs.Curving) < (adjusted_reach_time / 1.335) then return true end
-    elseif speed < 1500 then
-        if (tick() - cs.Curving) < (adjusted_reach_time / 1.5) then return true end
-    else
-        if (tick() - cs.Curving) < (adjusted_reach_time / 1.5) then return true end
-    end
-    local dot_threshold = (0 - ping / 1000)
-    local direction_difference = (ball_direction - velocity.Unit)
-    local direction_similarity = 0
-    if direction_difference.Magnitude > 0 then direction_similarity = direction:Dot(direction_difference.Unit) end
-    local dot_difference = dot - direction_similarity
-    if dot_difference < dot_threshold then return true end
+
     local clamped_dot = math.clamp(dot, -1, 1)
-    local radians = math.deg(math.asin(clamped_dot))
-    cs.Lerp_Radians = cs.Lerp_Radians + (radians - cs.Lerp_Radians) * 0.8
-    if speed < 300 then
-        if cs.Lerp_Radians < 0.02 and dot < 0 then cs.Last_Warping = tick() end
-        if (tick() - cs.Last_Warping) < (adjusted_reach_time / 1.19) then return true end
-    else
-        if cs.Lerp_Radians < 0.018 and dot < 0 then cs.Last_Warping = tick() end
-        if (tick() - cs.Last_Warping) < (adjusted_reach_time / 1.5) then return true end
+    local radians = math.asin(clamped_dot)
+    props.__lerp_radians = linear_predict(props.__lerp_radians, radians, 0.85)
+
+    if props.__lerp_radians < 0.016 then
+        props.__last_warping = tick()
     end
-    if #Previous_Velocity == 4 then
-        for i = 1, 2 do
-            local prev_dir = (ball_direction - Previous_Velocity[i].Unit)
-            if prev_dir.Magnitude > 0 then
-                prev_dir = prev_dir.Unit
-                local prev_dot = direction:Dot(prev_dir)
-                if (dot - prev_dot) < dot_threshold and dot < 0 then return true end
+
+    if distance < (ball_distance_threshold * 0.85) then
+        return false
+    end
+
+    local sudden_curve = (tick() - props.__last_warping) < (reach_time / 1.4)
+    if sudden_curve then
+        return true
+    end
+
+    local sustained_curve = (tick() - props.__curving) < (reach_time / 1.1)
+    if sustained_curve then
+        return true
+    end
+
+    return dot < dot_threshold
+end
+
+ReplicatedStorage.Remotes.DeathBall.OnClientEvent:Connect(function(c, d)
+    System.__properties.__deathslash_active = d or false
+end)
+
+ReplicatedStorage.Remotes.InfinityBall.OnClientEvent:Connect(function(a, b)
+    System.__properties.__infinity_active = b or false
+end)
+
+ReplicatedStorage.Packages._Index["sleitnick_net@0.1.0"].net["RE/TimeHoleActivate"].OnClientEvent:Connect(function(...)
+    local args = {...}
+    local player = args[1]
+    
+    if player == LocalPlayer or player == LocalPlayer.Name or (player and player.Name == LocalPlayer.Name) then
+        System.__properties.__timehole_active = true
+    end
+end)
+
+ReplicatedStorage.Packages._Index["sleitnick_net@0.1.0"].net["RE/TimeHoleDeactivate"].OnClientEvent:Connect(function()
+    System.__properties.__timehole_active = false
+end)
+
+local maxParryCount = 36
+local parryDelay = 0.05
+
+ReplicatedStorage.Packages._Index["sleitnick_net@0.1.0"].net["RE/SlashesOfFuryActivate"].OnClientEvent:Connect(function(...)
+    local args = {...}
+    local player = args[1]
+    
+    if player == LocalPlayer or player == LocalPlayer.Name or (player and player.Name == LocalPlayer.Name) then
+        System.__properties.__slashesoffury_active = true
+        System.__properties.__slashesoffury_count = 0
+    end
+end)
+
+ReplicatedStorage.Packages._Index["sleitnick_net@0.1.0"].net["RE/SlashesOfFuryEnd"].OnClientEvent:Connect(function()
+    System.__properties.__slashesoffury_active = false
+    System.__properties.__slashesoffury_count = 0
+end)
+
+ReplicatedStorage.Packages._Index["sleitnick_net@0.1.0"].net["RE/SlashesOfFuryParry"].OnClientEvent:Connect(function()
+    System.__properties.__slashesoffury_count = System.__properties.__slashesoffury_count + 1
+end)
+
+ReplicatedStorage.Packages._Index["sleitnick_net@0.1.0"].net["RE/SlashesOfFuryCatch"].OnClientEvent:Connect(function()
+    spawn(function()
+        while System.__properties.__slashesoffury_active and System.__properties.__slashesoffury_count < maxParryCount do
+            if System.__config.__detections.__slashesoffury then
+                System.parry.execute()
+                task.wait(parryDelay)
+            else
+                break
+            end
+        end
+    end)
+end)
+
+Runtime.ChildAdded:Connect(function(Object)
+    if System.__config.__detections.__phantom then
+        if Object.Name == "maxTransmission" or Object.Name == "transmissionpart" then
+            local Weld = Object:FindFirstChildWhichIsA("WeldConstraint")
+            if Weld then
+                local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+                if Character and Weld.Part1 == Character.HumanoidRootPart then
+                    local CurrentBall = System.ball.get()
+                    Weld:Destroy()
+                    
+                    if CurrentBall then
+                        local FocusConnection
+                        FocusConnection = RunService.RenderStepped:Connect(function()
+                            local Highlighted = CurrentBall:GetAttribute("highlighted")
+                            
+                            if Highlighted == true then
+                                ReplicatedStorage.Remotes.AbilityButtonPress:Fire()
+                                System.__properties.__parried = true
+                                
+                                task.delay(1, function()
+                                    System.__properties.__parried = false
+                                end)
+                                
+                            elseif Highlighted == false then
+                                FocusConnection:Disconnect()
+                            end
+                        end)
+                        
+                        task.delay(3, function()
+                            if FocusConnection and FocusConnection.Connected then
+                                FocusConnection:Disconnect()
+                            end
+                        end)
+                    end
+                end
             end
         end
     end
-    local backwards_curve_detected = false
-    local backwards_angle_threshold = 85
-    local horiz_direction = Vector3.new(playerPos.X - ballPos.X, 0, playerPos.Z - ballPos.Z)
-    if horiz_direction.Magnitude > 0 then
-        horiz_direction = horiz_direction.Unit
-        local away_from_player = -horiz_direction
-        local horiz_ball_dir = Vector3.new(ball_direction.X, 0, ball_direction.Z)
-        if horiz_ball_dir.Magnitude > 0 then
-            horiz_ball_dir = horiz_ball_dir.Unit
-            local backwards_angle = math.deg(math.acos(math.clamp(away_from_player:Dot(horiz_ball_dir), -1, 1)))
-            if backwards_angle < backwards_angle_threshold then backwards_curve_detected = true end
+end)
+
+ReplicatedStorage.Remotes.ParrySuccessAll.OnClientEvent:Connect(function(_, root)
+    if root.Parent and root.Parent ~= LocalPlayer.Character then
+        if not Alive or root.Parent.Parent ~= Alive then
+            return
         end
     end
-    return (dot < dot_threshold) or backwards_curve_detected
-end
+    
+    local closest = System.player.get_closest()
+    local ball = System.ball.get()
+    
+    if not ball or not closest then return end
+    
+    local target_distance = (LocalPlayer.Character.PrimaryPart.Position - closest.PrimaryPart.Position).Magnitude
+    local distance = (LocalPlayer.Character.PrimaryPart.Position - ball.Position).Magnitude
+    local direction = (LocalPlayer.Character.PrimaryPart.Position - ball.Position).Unit
+    local dot = direction:Dot(ball.AssemblyLinearVelocity.Unit)
+    
+    local curve_detected = System.detection.is_curved()
+    
+    if target_distance < 15 and distance < 15 and dot > -0.25 then
+        if curve_detected then
+            System.parry.execute_action()
+        end
+    end
+    
+    if System.__properties.__grab_animation then
+        System.__properties.__grab_animation:Stop()
+    end
+end)
 
+ReplicatedStorage.Remotes.ParrySuccess.OnClientEvent:Connect(function()
+    if not Alive or LocalPlayer.Character.Parent ~= Alive then
+        return
+    end
+    
+    if System.__properties.__grab_animation then
+        System.__properties.__grab_animation:Stop()
+    end
+end)
 
-getgenv()._ZX_PingCache = getgenv()._ZX_PingCache or 50
-if not getgenv()._ZX_PingUpdater then
-    getgenv()._ZX_PingUpdater = true
+ReplicatedStorage.Remotes.ParrySuccessAll.OnClientEvent:Connect(function(a, b)
+    local Primary_Part = LocalPlayer.Character.PrimaryPart
+    local Ball = System.ball.get()
+
+    if not Ball then
+        return
+    end
+
+    local Zoomies = Ball:FindFirstChild('zoomies')
+
+    if not Zoomies then
+        return
+    end
+
+    local Speed = Zoomies.VectorVelocity.Magnitude
+
+    local Distance = (LocalPlayer.Character.PrimaryPart.Position - Ball.Position).Magnitude
+    local Velocity = Zoomies.VectorVelocity
+
+    local Ball_Direction = Velocity.Unit
+
+    local Direction = (LocalPlayer.Character.PrimaryPart.Position - Ball.Position).Unit
+    local Dot = Direction:Dot(Ball_Direction)
+
+    local Pings = Stats.Network.ServerStatsItem['Data Ping']:GetValue()
+
+    local Speed_Threshold = math.min(Speed / 100, 40)
+    local Reach_Time = Distance / Speed - (Pings / 1000)
+
+    local Enough_Speed = Speed > 1
+    local Ball_Distance_Threshold = 15 - math.min(Distance / 1000, 15) + Speed_Threshold
+
+    if Enough_Speed and Reach_Time > Pings / 10 then
+        Ball_Distance_Threshold = math.max(Ball_Distance_Threshold - 15, 15)
+    end
+
+    if b ~= Primary_Part and Distance > Ball_Distance_Threshold then
+        System.detection.__ball_properties.__curving = tick()
+    end
+end)
+
+System.triggerbot = {}
+
+function System.triggerbot.trigger(ball)
+    if System.__triggerbot.__is_parrying or System.__triggerbot.__parries > System.__triggerbot.__max_parries then
+        return
+    end
+    
+    if LocalPlayer.Character and LocalPlayer.Character.PrimaryPart and 
+       LocalPlayer.Character.PrimaryPart:FindFirstChild('SingularityCape') then
+        return
+    end
+    
+    System.__triggerbot.__is_parrying = true
+    System.__triggerbot.__parries = System.__triggerbot.__parries + 1
+    
+    System.animation.play_grab_parry()
+    System.parry.execute()
+    
+    task.delay(System.__triggerbot.__parry_delay, function()
+        if System.__triggerbot.__parries > 0 then
+            System.__triggerbot.__parries = System.__triggerbot.__parries - 1
+        end
+    end)
+    
+    local connection
+    connection = ball:GetAttributeChangedSignal('target'):Once(function()
+        System.__triggerbot.__is_parrying = false
+        if connection then
+            connection:Disconnect()
+        end
+    end)
+    
     task.spawn(function()
-        local net = Stats:WaitForChild("Network", 30); if not net then return end
-        local ss = net:WaitForChild("ServerStatsItem", 30); if not ss then return end
-        local dp = ss:WaitForChild("Data Ping", 30); if not dp then return end
-        while true do getgenv()._ZX_PingCache = dp:GetValue() task.wait(0.1) end
+        local start_time = tick()
+        repeat
+            RunService.Heartbeat:Wait()
+        until (tick() - start_time >= 1 or not System.__triggerbot.__is_parrying)
+        
+        System.__triggerbot.__is_parrying = false
     end)
 end
 
-getgenv().AutoSpamMode = Settings.AutoSpamMode
-getgenv().AutoSpamAnimationFix = true
-getgenv().AutoParryMode = Settings.ParryMode
-getgenv().AutoParryAnimationFix = true
-getgenv().CooldownProtection = getgenv().CooldownProtection or false
-getgenv().AutoAbility = getgenv().AutoAbility or false
-getgenv().BallVelocityAbove800 = getgenv().BallVelocityAbove800 or false
-getgenv().AutoPreClick = getgenv().AutoPreClick or false
-getgenv()._ZX_PreClickSpeeds = getgenv()._ZX_PreClickSpeeds or {}
+function System.triggerbot.loop()
+    if not System.__triggerbot.__enabled then return end
+    
+    if LocalPlayer.Character and LocalPlayer.Character.PrimaryPart and 
+       LocalPlayer.Character.PrimaryPart:FindFirstChild('SingularityCape') then
+        return
+    end
+    
+    local balls = workspace:FindFirstChild('Balls')
+    if not balls then return end
+    
+    for _, ball in pairs(balls:GetChildren()) do
+        if ball:IsA('BasePart') and ball:GetAttribute('target') == LocalPlayer.Name then
+            System.triggerbot.trigger(ball)
+            break
+        end
+    end
+end
+
+function System.triggerbot.enable(enabled)
+    System.__triggerbot.__enabled = enabled
+    
+    if enabled then
+        if not System.__properties.__connections.__triggerbot then
+            System.__properties.__connections.__triggerbot = RunService.Heartbeat:Connect(System.triggerbot.loop)
+        end
+    else
+        if System.__properties.__connections.__triggerbot then
+            System.__properties.__connections.__triggerbot:Disconnect()
+            System.__properties.__connections.__triggerbot = nil
+        end
+        System.__triggerbot.__is_parrying = false
+        System.__triggerbot.__parries = 0
+    end
+end
+
+System.manual_spam = {}
+
+local manualSpamThread = nil
+
+function System.manual_spam.start()
+    System.manual_spam.stop()
+
+    System.__properties.__manual_spam_enabled = true
+
+    -- Cache de funções (performance extrema)
+    local parry_keypress = System.parry.keypress
+    local parry_execute = System.parry.execute
+    local play_animation = System.animation.play_grab_parry
+
+    local threshold = 0.015
+
+    manualSpamThread = coroutine.create(function()
+        local last_spam = 0
+
+        while System.__properties.__manual_spam_enabled do
+            local now = os.clock()
+
+            if now - last_spam >= threshold then
+                last_spam = now
+
+                if getgenv().ManualSpamMode == "Keypress" then
+                    parry_keypress()
+                else
+                    parry_execute()
+                    if getgenv().ManualSpamAnimationFix then
+                        play_animation()
+                    end
+                end
+            end
+
+            coroutine.yield()
+        end
+    end)
+
+    -- Scheduler simples
+    task.spawn(function()
+        while System.__properties.__manual_spam_enabled
+            and manualSpamThread
+            and coroutine.status(manualSpamThread) ~= "dead" do
+
+            coroutine.resume(manualSpamThread)
+            task.wait()
+        end
+    end)
+end
+
+function System.manual_spam.stop()
+    System.__properties.__manual_spam_enabled = false
+    manualSpamThread = nil
+end
+
+System.auto_spam = {}
+
+local autoSpamThread = nil
+
+function System.auto_spam.start()
+    System.auto_spam.stop()
+
+    System.__properties.__auto_spam_enabled = true
+
+    autoSpamThread = coroutine.create(function()
+        while System.__properties.__auto_spam_enabled do
+            if System.__properties.__spam_target then
+                System.parry.execute()
+            end
+
+            coroutine.yield()
+        end
+    end)
+
+    task.spawn(function()
+        while System.__properties.__auto_spam_enabled
+            and autoSpamThread
+            and coroutine.status(autoSpamThread) ~= "dead" do
+
+            coroutine.resume(autoSpamThread)
+            task.wait()
+        end
+    end)
+end
+
+function System.auto_spam.stop()
+    System.__properties.__auto_spam_enabled = false
+    System.__properties.__spam_target = nil
+    System.__properties.__spam_target_time = 0
+    autoSpamThread = nil
+end
+
+function System.auto_spam:get_entity_properties()
+    local entity = Closest_Entity
+    if not entity or not entity.PrimaryPart then return false end
+    
+    local char = LocalPlayer.Character
+    if not char or not char.PrimaryPart then return false end
+    
+    local root_pos = char.PrimaryPart.Position
+    local entity_pos = entity.PrimaryPart.Position
+    local diff = root_pos - entity_pos
+    
+    return {
+        Velocity = entity.PrimaryPart.Velocity,
+        Direction = diff.Unit,
+        Distance = diff.Magnitude
+    }
+end
+
+function System.auto_spam:get_ball_properties()
+    local ball = System.ball.get()
+    if not ball then return false end
+    
+    local char = LocalPlayer.Character
+    if not char or not char.PrimaryPart then return false end
+    
+    local ball_pos = ball.Position
+    local root_pos = char.PrimaryPart.Position
+    local diff = root_pos - ball_pos
+    
+    local ball_velocity = ball.AssemblyLinearVelocity or Vector3.zero
+    
+    return {
+        Velocity = ball_velocity,
+        Direction = diff.Unit,
+        Distance = diff.Magnitude,
+        Dot = diff.Unit:Dot(ball_velocity.Unit)
+    }
+end
+
+function System.auto_spam.spam_service(self)
+    local ball = System.ball.get()
+    local entity = System.player.get_closest()
+    
+    if not ball or not entity or not entity.PrimaryPart then
+        return false
+    end
+    
+    local spam_accuracy = 0
+    
+    local velocity = ball.AssemblyLinearVelocity or Vector3.zero
+    local speed = velocity.Magnitude
+    
+    local direction = (LocalPlayer.Character.PrimaryPart.Position - ball.Position).Unit
+    local dot = direction:Dot(velocity.Unit)
+    
+    local target_position = entity.PrimaryPart.Position
+    local target_distance = LocalPlayer:DistanceFromCharacter(target_position)
+    
+    local multiplier = System.__properties.__auto_spam_distance_multiplier or 1.0
+    local base_distance = 30 * multiplier
+    local maximum_spam_distance = (self.Ping + math.min(speed / 4, 60)) * multiplier
+    
+    if self.Entity_Properties.Distance > maximum_spam_distance and self.Entity_Properties.Distance > base_distance then
+        return 0
+    end
+    
+    if self.Ball_Properties.Distance > maximum_spam_distance and self.Ball_Properties.Distance > base_distance then
+        return 0
+    end
+    
+    if target_distance > maximum_spam_distance and target_distance > base_distance then
+        return 0
+    end
+    
+    local maximum_speed =  7 - math.min(speed / 5, 5)
+    local maximum_dot = math.clamp(dot, -1, 1) * maximum_speed
+    
+    spam_accuracy = maximum_spam_distance - maximum_dot
+    
+    return spam_accuracy
+end
+
+function System.auto_spam.start()
+    if System.__properties.__connections.__auto_spam_connection then
+        System.__properties.__connections.__auto_spam_connection:Disconnect()
+    end
+    
+    System.__properties.__auto_spam_enabled = true
+    
+    local last_auto_spam = 0
+    local last_target_check = 0
+    local event = RunService.Heartbeat
+    
+    -- Cache de funções e serviços para performance
+    local get_ball = System.ball.get
+    local get_closest = System.player.get_closest
+    local parry_keypress = System.parry.keypress
+    local parry_execute = System.parry.execute
+    local play_animation = System.animation.play_grab_parry
+    
+    System.__properties.__connections.__auto_spam_connection = event:Connect(function()
+        local char = LocalPlayer.Character
+        if not System.__properties.__auto_spam_enabled or not char or char.Parent ~= Alive then
+            return
+        end
+        
+        local now = tick()
+        local threshold = 0.015
+        if now - last_auto_spam < threshold then return end
+        last_auto_spam = now
+            
+        local ball = get_ball()
+        if not ball then return end
+        
+        local zoomies = ball:FindFirstChild('zoomies')
+        if not zoomies then return end
+        
+        -- Otimização: Não busca o player mais próximo a cada frame, apenas a cada 0.1s
+        if now - last_target_check > 0.1 then
+            get_closest()
+            last_target_check = now
+            
+            if System.__properties.__spam_target then
+                local target = System.__properties.__spam_target
+                if not target.Parent or not target:FindFirstChild("Humanoid") or target.Humanoid.Health <= 0 then
+                    System.__properties.__spam_target = nil
+                    System.__properties.__spam_target_time = 0
+                end
+            end
+            
+            if not System.__properties.__spam_target or (now - System.__properties.__spam_target_time > 1) then
+                System.__properties.__spam_target = Closest_Entity
+                System.__properties.__spam_target_time = now
+            end
+        end
+        
+        local ball_target = ball:GetAttribute('target')
+        if not ball_target then return end
+        
+        local ball_properties = System.auto_spam:get_ball_properties()
+        local entity_properties = System.auto_spam:get_entity_properties()
+        
+        if ball_properties and entity_properties then
+            local ping = Stats.Network.ServerStatsItem['Data Ping']:GetValue()
+            local ping_threshold = math.clamp(ping / 5, 1, 16)
+            
+            local spam_accuracy = System.auto_spam.spam_service({
+                Ball_Properties = ball_properties,
+                Entity_Properties = entity_properties,
+                Ping = ping_threshold
+            })
+            
+            if spam_accuracy > 0 then
+                local root = char.PrimaryPart
+                if not root then return end
+                
+                local target_entity = Closest_Entity
+                if not target_entity or not target_entity.PrimaryPart then return end
+                
+                local target_pos = target_entity.PrimaryPart.Position
+                local target_dist = (root.Position - target_pos).Magnitude
+                
+                local ball_pos = ball.Position
+                local dist_to_ball = (root.Position - ball_pos).Magnitude
+                
+                local shouldSpam = false
+                local spam_target = System.__properties.__spam_target
+                if spam_target then
+                    if ball_target == spam_target.Name or ball_target == LocalPlayer.Name then
+                        shouldSpam = true
+                    end
+                end
+                
+                if shouldSpam and not char:GetAttribute('Pulsed') then
+                    if target_dist <= spam_accuracy and dist_to_ball <= spam_accuracy then
+                        local multiplier = System.__properties.__auto_spam_distance_multiplier or 1.0
+                        local max_allowed_dist = 35 * multiplier
+                        
+                        local is_target = (ball_target == LocalPlayer.Name)
+                        local final_max_dist = is_target and max_allowed_dist or (max_allowed_dist * 0.8)
+                        
+                        if target_dist <= final_max_dist and dist_to_ball <= final_max_dist then
+                            if System.__properties.__parries > System.__properties.__spam_threshold then
+                                if getgenv().AutoSpamMode == "Keypress" then
+                                    parry_keypress()
+                                else
+                                    parry_execute()
+                                    if getgenv().AutoSpamAnimationFix then
+                                        play_animation()
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end)
+end
+
+System.autoparry = {}
 
 function System.autoparry.start()
-    if System.__properties.__connections.__autoparry then System.__properties.__connections.__autoparry:Disconnect() end
+    if System.__properties.__connections.__autoparry then
+        System.__properties.__connections.__autoparry:Disconnect()
+    end
+    
     System.__properties.__connections.__autoparry = RunService.PreSimulation:Connect(function()
-        if not System.__properties.__autoparry_enabled or not LocalPlayer.Character or not LocalPlayer.Character.PrimaryPart then return end
-        if System.__properties.__manual_spam_running or System.__properties.__triggerbot_running then return end
+        if not System.__properties.__autoparry_enabled or not LocalPlayer.Character or 
+           not LocalPlayer.Character.PrimaryPart then
+            return
+        end
+        
         local balls = System.ball.get_all()
         local one_ball = System.ball.get()
+        
+        local training_ball = nil
+        if workspace:FindFirstChild("TrainingBalls") then
+            for _, Instance in pairs(workspace.TrainingBalls:GetChildren()) do
+                if Instance:GetAttribute("realBall") then
+                    training_ball = Instance
+                    break
+                end
+            end
+        end
+
         for _, ball in pairs(balls) do
-            if not ball then do end end
+            if System.__triggerbot.__enabled then return end
+            if getgenv().BallVelocityAbove800 then return end
+            if not ball then continue end
+            
             local zoomies = ball:FindFirstChild('zoomies')
-            if not zoomies then do end end
-            ball:GetAttributeChangedSignal('target'):Once(function() System.__properties.__parried = false end)
-            if System.__properties.__parried then do end end
+            if not zoomies then continue end
+            
+            ball:GetAttributeChangedSignal('target'):Once(function()
+                System.__properties.__parried = false
+            end)
+            
+            if System.__properties.__parried then continue end
+            
             local ball_target = ball:GetAttribute('target')
-            local vel = zoomies.VectorVelocity
-            local dist = (LocalPlayer.Character.PrimaryPart.Position - ball.Position).Magnitude
+            local velocity = zoomies.VectorVelocity
+            local distance = (LocalPlayer.Character.PrimaryPart.Position - ball.Position).Magnitude
+            
             local ping = Stats.Network.ServerStatsItem['Data Ping']:GetValue() / 10
-            local ping_thresh = math.clamp(ping / 10, 5, 17)
-            local speed = vel.Magnitude
-            local capped_speed = math.min(math.max(speed - 9.5, 0), 650)
-            local speed_div = (2.4 + capped_speed * 0.002) * System.__properties.__divisor_multiplier
-            local parry_acc = ping_thresh + math.max(speed / speed_div, 9.5)
-            if one_ball and one_ball:GetAttribute('target') == LocalPlayer.Name and System.detection.is_curved() then do end end
-
-            local detections = System.__config.__detections
-            local char = LocalPlayer.Character
-            local root = char and char.PrimaryPart
-
-            if detections.__singularity and root and root:FindFirstChild("SingularityCape") then do end end
-            if detections.__pull and getgenv()._ZX_PullActive then do end end
-            if detections.__infinity and System.__properties.__infinity_active then do end end
-            if detections.__deathslash and System.__properties.__deathslash_active then do end end
-            if detections.__timehole and System.__properties.__timehole_active then do end end
-            if detections.__slashesoffury and System.__properties.__slashesoffury_active then do end end
-            if detections.__dribble and System.__properties.__dribble_active then do end end
-            if detections.__phantom and System.__properties.__phantom_active then do end end
-            if System.__properties.__plr_forc then do end end
-
-            if ball_target == LocalPlayer.Name and dist <= parry_acc then
-                if getgenv().AutoParryMode == "Keypress" then System.parry.keypress() else System.parry.execute_action() end
+            local ping_threshold = math.clamp(ping / 10, 5, 17)
+            local speed = velocity.Magnitude
+            
+            local capped_speed_diff = math.min(math.max(speed - 9.5, 0), 650)
+            local speed_divisor = (2.4 + capped_speed_diff * 0.002) * System.__properties.__divisor_multiplier
+            local parry_accuracy = ping_threshold + math.max(speed / speed_divisor, 9.5)
+            
+            local curved = System.detection.is_curved()
+            
+            if ball:FindFirstChild('AeroDynamicSlashVFX') then
+                ball.AeroDynamicSlashVFX:Destroy()
+                System.__properties.__tornado_time = tick()
+            end
+            
+            if Runtime:FindFirstChild('Tornado') then
+                if (tick() - System.__properties.__tornado_time) < 
+                   (Runtime.Tornado:GetAttribute('TornadoTime') or 1) + 0.314159 then
+                    continue
+                end
+            end
+            
+            if one_ball and one_ball:GetAttribute('target') == LocalPlayer.Name and curved then
+                continue
+            end
+            
+            if ball:FindFirstChild('ComboCounter') then continue end
+            
+            if LocalPlayer.Character.PrimaryPart:FindFirstChild('SingularityCape') then continue end
+            
+            if System.__config.__detections.__infinity and System.__properties.__infinity_active then continue end
+            if System.__config.__detections.__deathslash and System.__properties.__deathslash_active then continue end
+            if System.__config.__detections.__timehole and System.__properties.__timehole_active then continue end
+            if System.__config.__detections.__slashesoffury and System.__properties.__slashesoffury_active then continue end
+            
+            if ball_target == LocalPlayer.Name and distance <= parry_accuracy then
+                -- MODIFICAÇÃO: REMOVIDA A VERIFICAÇÃO DO BLOCK BUTTON
+                -- Apenas executa o bypass normalmente
+                
+                if getgenv().AutoAbility then
+                    local AbilityCD = LocalPlayer.PlayerGui.Hotbar.Ability.UIGradient
+                    if AbilityCD and AbilityCD.Offset.Y == 0.5 then
+                        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Abilities") then
+                            local abilities = LocalPlayer.Character.Abilities
+                            if (abilities:FindFirstChild("Raging Deflection") and abilities["Raging Deflection"].Enabled) or
+                               (abilities:FindFirstChild("Rapture") and abilities["Rapture"].Enabled) or
+                               (abilities:FindFirstChild("Calming Deflection") and abilities["Calming Deflection"].Enabled) or
+                               (abilities:FindFirstChild("Aerodynamic Slash") and abilities["Aerodynamic Slash"].Enabled) or
+                               (abilities:FindFirstChild("Fracture") and abilities["Fracture"].Enabled) or
+                               (abilities:FindFirstChild("Death Slash") and abilities["Death Slash"].Enabled) then
+                                System.__properties.__parried = true
+                                ReplicatedStorage.Remotes.AbilityButtonPress:Fire()
+                                task.wait(2.432)
+                                ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("DeathSlashShootActivation"):FireServer(true)
+                                continue
+                            end
+                        end
+                    end
+                end
+            end
+            
+            if ball_target == LocalPlayer.Name and distance <= parry_accuracy then
+                if getgenv().AutoParryMode == "Keypress" then
+                    System.parry.keypress()
+                else
+                    System.parry.execute_action()
+                end
                 System.__properties.__parried = true
             end
-            local last = tick()
-            repeat RunService.Stepped:Wait() until (tick() - last) >= 1 or not System.__properties.__parried
+            
+            local last_parrys = tick()
+            repeat
+                RunService.Stepped:Wait()
+            until (tick() - last_parrys) >= 1 or not System.__properties.__parried
             System.__properties.__parried = false
+        end
+
+        if training_ball then
+            local zoomies = training_ball:FindFirstChild('zoomies')
+            if zoomies then
+                training_ball:GetAttributeChangedSignal('target'):Once(function()
+                    System.__properties.__training_parried = false
+                end)
+                
+                if not System.__properties.__training_parried then
+                    local ball_target = training_ball:GetAttribute('target')
+                    local velocity = zoomies.VectorVelocity
+                    local distance = LocalPlayer:DistanceFromCharacter(training_ball.Position)
+                    local speed = velocity.Magnitude
+                    
+                    local ping = Stats.Network.ServerStatsItem['Data Ping']:GetValue() / 10
+                    local ping_threshold = math.clamp(ping / 10, 5, 17)
+                    
+                    local capped_speed_diff = math.min(math.max(speed - 9.5, 0), 650)
+                    local speed_divisor = (2.4 + capped_speed_diff * 0.002) * System.__properties.__divisor_multiplier
+                    local parry_accuracy = ping_threshold + math.max(speed / speed_divisor, 9.5)
+                    
+                    if ball_target == LocalPlayer.Name and distance <= parry_accuracy then
+                        if getgenv().AutoParryMode == "Keypress" then
+                            System.parry.keypress()
+                        else
+                            System.parry.execute_action()
+                        end
+                        System.__properties.__training_parried = true
+                        
+                        local last_parrys = tick()
+                        repeat
+                            RunService.Stepped:Wait()
+                        until (tick() - last_parrys) >= 1 or not System.__properties.__training_parried
+                        System.__properties.__training_parried = false
+                    end
+                end
+            end
         end
     end)
 end
@@ -753,1454 +1340,861 @@ function System.autoparry.stop()
     end
 end
 
-System.auto_spam = {}
-
-function System.auto_spam:get_entity_properties()
-    System.player.get_closest()
-    if not Closest_Entity or not Closest_Entity.PrimaryPart then return false end
-if (#"">2) then local _n=math.floor(3.14) end
-    if not LocalPlayer.Character or not LocalPlayer.Character.PrimaryPart then return false end
-    local entity_velocity = Closest_Entity.PrimaryPart.Velocity
-    local entity_direction = (LocalPlayer.Character.PrimaryPart.Position - Closest_Entity.PrimaryPart.Position).Unit
-    local entity_distance = (LocalPlayer.Character.PrimaryPart.Position - Closest_Entity.PrimaryPart.Position).Magnitude
-    return {
-        Velocity = entity_velocity,
-        Direction = entity_direction,
-        Distance = entity_distance
-    }
+local function create_mobile_button(name, position_y, color)
+    local gui = Instance.new('ScreenGui')
+    gui.Name = 'angeli' .. name .. 'Mobile'
+    gui.ResetOnSpawn = false
+    gui.IgnoreGuiInset = true
+    gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    
+    local button = Instance.new('TextButton')
+    button.Size = UDim2.new(0, 140, 0, 50)
+    button.Position = UDim2.new(0.5, -70, position_y, 0)
+    button.BackgroundTransparency = 1
+    button.AnchorPoint = Vector2.new(0.5, 0)
+    button.Draggable = true
+    button.AutoButtonColor = false
+    button.ZIndex = 2
+    
+    local bg = Instance.new('Frame')
+    bg.Size = UDim2.new(1, 0, 1, 0)
+    bg.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    bg.Parent = button
+    
+    local corner = Instance.new('UICorner')
+    corner.CornerRadius = UDim.new(0, 10)
+    corner.Parent = bg
+    
+    local stroke = Instance.new('UIStroke')
+    stroke.Color = color
+    stroke.Thickness = 1
+    stroke.Transparency = 0.3
+    stroke.Parent = bg
+    
+    local text = Instance.new('TextLabel')
+    text.Size = UDim2.new(1, 0, 1, 0)
+    text.BackgroundTransparency = 1
+    text.Text = name
+    text.Font = Enum.Font.GothamBold
+    text.TextSize = 16
+    text.TextColor3 = Color3.fromRGB(255, 255, 255)
+    text.ZIndex = 3
+    text.Parent = button
+    
+    button.Parent = gui
+    gui.Parent = CoreGui
+    
+    return {gui = gui, button = button, text = text, bg = bg}
 end
 
-function System.auto_spam:get_ball_properties()
-    local ball = System.ball.get()
-    if not ball then return false end
-    if not LocalPlayer.Character or not LocalPlayer.Character.PrimaryPart then return false end
-    local ball_velocity = ball.AssemblyLinearVelocity or Vector3.new()
-    local ball_origin = ball
-    local ball_direction_vector = LocalPlayer.Character.PrimaryPart.Position - ball_origin.Position
-    local ball_distance = ball_direction_vector.Magnitude
-    local ball_direction = Vector3.new()
-if ((1/1)==0) then local _q={} _q[1]=2 end
-    local ball_dot = 0
-    if ball_distance > 0 then
-        ball_direction = ball_direction_vector.Unit
-        if ball_velocity.Magnitude > 0 then
-            ball_dot = ball_direction:Dot(ball_velocity.Unit)
-        end
-    end
-    return {
-        Velocity = ball_velocity,
-        Direction = ball_direction,
-        Distance = ball_distance,
-        Dot = ball_dot
-    }
-end
-
-function System.auto_spam.spam_service(self)
-    local ball = System.ball.get()
-    local entity = System.player.get_closest()
-    if not ball or not entity or not entity.PrimaryPart then return false end
-    if not LocalPlayer.Character or not LocalPlayer.Character.PrimaryPart then return false end
-    local velocity = ball.AssemblyLinearVelocity or Vector3.new()
-    local speed = velocity.Magnitude
-    if speed == 0 then return 5 end
-    local to_ball = (LocalPlayer.Character.PrimaryPart.Position - ball.Position)
-    if to_ball.Magnitude == 0 then return 5 end
-    local direction = to_ball.Unit
-    local dot = direction:Dot(velocity.Unit)
-    local target_pos = entity.PrimaryPart.Position
-    local target_distance = LocalPlayer:DistanceFromCharacter(target_pos)
-
-    local speed_multiplier = 1
-    local my_hrp = LocalPlayer.Character.PrimaryPart
-    local my_humanoid = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
-    local target_humanoid = entity:FindFirstChildOfClass("Humanoid")
-    local to_target = (target_pos - my_hrp.Position).Unit
-
-    if not System.__properties.__close_contact then System.__properties.__close_contact = false end
-    if not System.__properties.__last_close_contact then System.__properties.__last_close_contact = 0 end
-
-    if target_distance <= 3 then
-        System.__properties.__close_contact = true
-    end
-    if System.__properties.__close_contact and target_distance > 3.3 then
-        System.__properties.__close_contact = false
-        System.__properties.__last_close_contact = tick()
-    end
-    local retreated = not System.__properties.__close_contact and (tick() - System.__properties.__last_close_contact) >= 1.5
-
-    if retreated and my_humanoid and my_humanoid.MoveDirection.Magnitude > 0.2 and my_humanoid.MoveDirection:Dot(to_target) < -0.4 then
-        speed_multiplier = 10
-    end
-    if retreated and target_humanoid and target_humanoid.MoveDirection.Magnitude > 0.2 and target_humanoid.MoveDirection:Dot(-to_target) < -0.4 then
-        speed_multiplier = 10
-    end
-
-    local Maximum_Spam_Distance = (self.Ping or 25) + math.min(speed / (speed_multiplier * 1.5), 64)
-    if (self.Entity_Properties and self.Entity_Properties.Distance or math.huge) > Maximum_Spam_Distance then return 5 end
-    if (self.Ball_Properties and self.Ball_Properties.Distance or math.huge) > Maximum_Spam_Distance then return 5 end
-    if target_distance > Maximum_Spam_Distance then return 5 end
-    local retreating_dot = math.clamp(-dot, 0, 1)
-    local retreat_bonus = math.clamp(retreating_dot * (speed / 50), 0, 3.2)
-    return Maximum_Spam_Distance - retreat_bonus
-end
-
-
-function System.auto_spam.start()
-    if System.__properties.__connections.__auto_spam then
-        System.__properties.__connections.__auto_spam:Disconnect()
-    end
-    System.__properties.__auto_spam_enabled = true
-    System.__properties.__connections.__auto_spam = RunService.PreSimulation:Connect(function()
-        local ball = System.ball.get()
-        if not ball then return end
-        if (#{1}==1) and (System.__properties.__slashesoffury_active) then return end
-        local zoomies = ball:FindFirstChild("zoomies")
-        if not zoomies then return end
-        System.player.get_closest()
-        local ping = getgenv()._ZX_PingCache
-        local ping_threshold = math.clamp(ping / (40-30), 1, bit32.bxor(31,15))
-        local ball_target = ball:GetAttribute("target")
-        local ball_properties = System.auto_spam:get_ball_properties()
-        local entity_properties = System.auto_spam:get_entity_properties()
-        if not ball_properties or not entity_properties then return end
-        local spam_accuracy = System.auto_spam.spam_service({
-            Ball_Properties = ball_properties,
-            Entity_Properties = entity_properties,
-            Ping = ping_threshold
-        })
-        local target_position = Closest_Entity.PrimaryPart.Position
-        local target_distance = LocalPlayer:DistanceFromCharacter(target_position)
-        if ((1+1)==2) and (zoomies.VectorVelocity.Magnitude == 0) then return end
-        local direction = (LocalPlayer.Character.PrimaryPart.Position - ball.Position).Unit
-        local ball_direction = zoomies.VectorVelocity.Unit
-        local dot = direction:Dot(ball_direction)
-        local distance = LocalPlayer:DistanceFromCharacter(ball.Position)
-        if not ball_target then return end
-        if target_distance > spam_accuracy or distance > spam_accuracy then return end
-        local pulsed = LocalPlayer.Character:GetAttribute('Pulsed')
-        if (math.floor(1.5)==1) and (pulsed) then return end
-        if ball_target == LocalPlayer.Name and target_distance > (101-71) and distance > (15+15) then return end
-        if distance <= spam_accuracy and System.__properties.__parries > System.__properties.__spam_threshold then
-            if (#{1}==1) and (getgenv().AutoSpamMode == "Keypress") then
-                if PF then PF() end
-            else
-                System.parry.execute()
-                if getgenv().AutoSpamAnimationFix and PF then
-                    PF()
-                end
-            end
-        end
-    end)
-if (#"">2) then local _q={} _q[1]=2 end
-end
-
-function System.auto_spam.stop()
-    System.__properties.__auto_spam_enabled = false
-    if (#{1}==1) and (System.__properties.__connections.__auto_spam) then
-        System.__properties.__connections.__auto_spam:Disconnect()
-        System.__properties.__connections.__auto_spam = nil
+local function destroy_mobile_gui(gui_data)
+    if gui_data and gui_data.gui then
+        gui_data.gui:Destroy()
     end
 end
 
-
-local ManualSpamThread = nil
-
-System.manual_spam = {}
-
-function System.manual_spam.loop()
-    while true do
-        if System.__properties.__manual_spam_enabled and System.__properties.__manual_spam_running then
-            local delay = 1 / math.max(System.__properties.__manual_spam_cps, 1)
-            if tick() - System.__properties.__last_spam_time >= delay then
-                if getgenv().AutoParryMode == "Keypress" then System.parry.keypress() else System.parry.execute_action() end
-                System.__properties.__last_spam_time = tick()
-            end
-        end
-        task.wait(0.001)
-    end
-end
-
-function System.manual_spam.start()
-    System.__properties.__manual_spam_enabled = true
-    System.__properties.__manual_spam_running = false
-    if not ManualSpamThread then
-        ManualSpamThread = task.spawn(System.manual_spam.loop)
-    end
-    ApplyManualSpamUI(true)
-end
-
-function System.manual_spam.stop()
-    System.__properties.__manual_spam_enabled = false
-    System.__properties.__manual_spam_running = false
-    ApplyManualSpamUI(false)
-end
-
-System.triggerbot = {}
-
-function System.triggerbot.loop()
-    if not System.__properties.__triggerbot_enabled or not System.__properties.__triggerbot_running then return end
-    if System.__properties.__manual_spam_running then return end
-    local balls = workspace:FindFirstChild('Balls')
-    if not balls then return end
-    for _, ball in pairs(balls:GetChildren()) do
-        if ball:IsA('BasePart') and ball:GetAttribute('realBall') and ball:GetAttribute('target') ~= LocalPlayer.Name then
-            local bID = ball:GetDebugId()
-            if not System.__properties.__triggered_balls[bID] then
-                System.__properties.__triggered_balls[bID] = true
-                if getgenv().AutoParryMode == "Keypress" then System.parry.keypress() else System.parry.execute_action() end
-                ball:GetAttributeChangedSignal('target'):Once(function()
-                    System.__properties.__triggered_balls[bID] = nil
-                end)
-            end
-        end
-    end
-end
-
-function System.triggerbot.enable()
-    System.__properties.__triggerbot_enabled = true
-    System.__properties.__triggerbot_running = false
-    if not System.__properties.__connections.__triggerbot then
-        System.__properties.__connections.__triggerbot = RunService.PreSimulation:Connect(System.triggerbot.loop)
-    end
-    ApplyTriggerbotUI(true)
-end
-
-function System.triggerbot.disable()
-    System.__properties.__triggerbot_enabled = false
-    System.__properties.__triggerbot_running = false
-    if System.__properties.__connections.__triggerbot then
-        System.__properties.__connections.__triggerbot:Disconnect()
-        System.__properties.__connections.__triggerbot = nil
-    end
-    System.__properties.__triggered_balls = {}
-    ApplyTriggerbotUI(false)
-end
-
-local OverlayGui = Instance.new("ScreenGui")
-OverlayGui.Name = "Kittylol_Overlay"
-OverlayGui.ResetOnSpawn = false
-OverlayGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-pcall(function() OverlayGui.Parent = game:GetService("CoreGui") end)
-if not OverlayGui.Parent then
-    OverlayGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
-end
-
-local function MakeDraggable(frame)
-    local dragging, dragInput, dragStart, startPos
-    frame.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            dragging = true
-            dragStart = input.Position
-            startPos = frame.Position
-            input.Changed:Connect(function()
-                if input.UserInputState == Enum.UserInputState.End then dragging = false end
-            end)
-        end
-    end)
-    frame.InputChanged:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-            dragInput = input
-        end
-    end)
-    UserInputService.InputChanged:Connect(function(input)
-        if input == dragInput and dragging then
-            local delta = input.Position - dragStart
-            local x = startPos.X.Offset + delta.X
-            local y = startPos.Y.Offset + delta.Y
-            local vps = workspace.CurrentCamera.ViewportSize
-            x = math.clamp(x, -frame.AbsoluteSize.X + 50, vps.X - 50)
-            y = math.clamp(y, 0, vps.Y - 50)
-            frame.Position = UDim2.new(startPos.X.Scale, x, startPos.Y.Scale, y)
-        end
-    end)
-end
-
-local function ShowPanel(frame)
-    if not frame then return end
-    frame.Visible = true
-    local targetSize = frame:GetAttribute("TargetSize")
-    if typeof(targetSize) ~= "UDim2" then
-        targetSize = frame.Size
-        frame:SetAttribute("TargetSize", targetSize)
-    end
-    frame.Size = UDim2.new(0, math.max(targetSize.X.Offset * 0.5, 1), 0, math.max(targetSize.Y.Offset * 0.5, 1))
-    TweenService:Create(
-        frame,
-        TweenInfo.new(0.2, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
-        { Size = targetSize }
-    ):Play()
-end
-
-ManualSpamFrame = Instance.new("Frame", OverlayGui)
-ManualSpamFrame.Size = UDim2.new(0, 150, 0, 48)
-ManualSpamFrame.Position = UDim2.new(0.5, -250, 0.15, 0)
-ManualSpamFrame.BackgroundColor3 = Color3.fromRGB(245, 245, 245)
-ManualSpamFrame.BackgroundTransparency = 0.05
-ManualSpamFrame.Visible = false
-Instance.new("UICorner", ManualSpamFrame).CornerRadius = UDim.new(0, 7)
-Instance.new("UIStroke", ManualSpamFrame).Color = Color3.fromRGB(0, 0, 0)
-MakeDraggable(ManualSpamFrame)
-
-local ManualSpamStatus = Instance.new("TextButton", ManualSpamFrame)
-ManualSpamStatus.Size = UDim2.new(1, -12, 1, -12)
-ManualSpamStatus.Position = UDim2.new(0, 6, 0, 6)
-ManualSpamStatus.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-ManualSpamStatus.Text = "SPAM"
-ManualSpamStatus.TextColor3 = Color3.fromRGB(255, 105, 180)
-ManualSpamStatus.Font = Enum.Font.GothamBold
-ManualSpamStatus.TextSize = 14
-ManualSpamStatus.BorderSizePixel = 0
-Instance.new("UICorner", ManualSpamStatus).CornerRadius = UDim.new(0, 6)
-
-UpdateManualSpamUI = function()
-    if not ManualSpamStatus then return end
-    if System.__properties.__manual_spam_running then
-        ManualSpamStatus.Text = "OFF"
-        ManualSpamStatus.BackgroundColor3 = Color3.fromRGB(255, 220, 240)
-        ManualSpamStatus.TextColor3 = Color3.fromRGB(255, 105, 180)
-    else
-        ManualSpamStatus.Text = "SPAM"
-        ManualSpamStatus.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-        ManualSpamStatus.TextColor3 = Color3.fromRGB(255, 105, 180)
-    end
-end
-
-ApplyManualSpamUI = function(state)
-    local enabled = state == true
-    if ManualSpamFrame then
-        ManualSpamFrame.Visible = enabled
-        if enabled then ShowPanel(ManualSpamFrame) end
-    end
-    UpdateManualSpamUI()
-end
-
-ManualSpamStatus.MouseButton1Click:Connect(function()
-    if not System.__properties.__manual_spam_enabled then return end
-    System.__properties.__manual_spam_running = not System.__properties.__manual_spam_running
-    UpdateManualSpamUI()
-end)
-
-TriggerbotFrame = Instance.new("Frame", OverlayGui)
-TriggerbotFrame.Size = UDim2.new(0, 150, 0, 48)
-TriggerbotFrame.Position = UDim2.new(0.5, 10, 0.15, 0)
-TriggerbotFrame.BackgroundColor3 = Color3.fromRGB(245, 245, 245)
-TriggerbotFrame.BackgroundTransparency = 0.05
-TriggerbotFrame.Visible = false
-Instance.new("UICorner", TriggerbotFrame).CornerRadius = UDim.new(0, 7)
-Instance.new("UIStroke", TriggerbotFrame).Color = Color3.fromRGB(0, 0, 0)
-MakeDraggable(TriggerbotFrame)
-
-local TriggerbotStatus = Instance.new("TextButton", TriggerbotFrame)
-TriggerbotStatus.Size = UDim2.new(1, -12, 1, -12)
-TriggerbotStatus.Position = UDim2.new(0, 6, 0, 6)
-TriggerbotStatus.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-TriggerbotStatus.Text = "TRIGGER"
-TriggerbotStatus.TextColor3 = Color3.fromRGB(255, 105, 180)
-TriggerbotStatus.Font = Enum.Font.GothamBold
-TriggerbotStatus.TextSize = 14
-TriggerbotStatus.BorderSizePixel = 0
-Instance.new("UICorner", TriggerbotStatus).CornerRadius = UDim.new(0, 6)
-
-UpdateTriggerbotUI = function()
-    if not TriggerbotStatus then return end
-    if System.__properties.__triggerbot_running then
-        TriggerbotStatus.Text = "OFF"
-        TriggerbotStatus.BackgroundColor3 = Color3.fromRGB(255, 220, 240)
-        TriggerbotStatus.TextColor3 = Color3.fromRGB(255, 105, 180)
-    else
-        TriggerbotStatus.Text = "TRIGGER"
-        TriggerbotStatus.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-        TriggerbotStatus.TextColor3 = Color3.fromRGB(255, 105, 180)
-    end
-end
-
-ApplyTriggerbotUI = function(state)
-    local enabled = state == true
-    if TriggerbotFrame then
-        TriggerbotFrame.Visible = enabled
-        if enabled then ShowPanel(TriggerbotFrame) end
-    end
-    UpdateTriggerbotUI()
-end
-
-TriggerbotStatus.MouseButton1Click:Connect(function()
-    if not System.__properties.__triggerbot_enabled then return end
-    System.__properties.__triggerbot_running = not System.__properties.__triggerbot_running
-    UpdateTriggerbotUI()
-end)
-
-
-local CombatTab = main:create_tab("Combat", "rbxassetid://10734975486") -- sword
-
-
-local function prepareCheckboxFlag(flag, checked, keybind)
-    Library._config = Library._config or {}
-    Library._config._flags = Library._config._flags or {}
-    local prev = Library._config._flags[flag]
-    if type(prev) == "table" then
-        prev.checked = checked
-        if not prev.BIND or prev.BIND == "Unknown" then prev.BIND = keybind or "Unknown" end
-    else
-        Library._config._flags[flag] = { checked = checked, BIND = keybind or "Unknown" }
-    end
-end
-
-local function SeedModuleFlag(flag, checked, bind)
-    Library._config = Library._config or {}
-    Library._config._flags = Library._config._flags or {}
-    if type(Library._config._flags[flag]) ~= "table" then
-        Library._config._flags[flag] = { checked = checked, BIND = bind or "Unknown" }
-    end
-end
-
-SeedModuleFlag("UI_AutoParryModule", Settings.AutoParry, "RightShift")
-SeedModuleFlag("UI_AutoSpamModule", Settings.AutoSpam, "X")
-SeedModuleFlag("UI_ManualSpamModule", false, "P")
-SeedModuleFlag("UI_TriggerbotModule", false, "Unknown")
-prepareCheckboxFlag("ManualSpam", false, "P")
-prepareCheckboxFlag("Triggerbot", false, "Unknown")
-if Library._config and Library._config._flags then
-    Library._config._flags["UI_ManualSpamModule"] = { checked = false, BIND = "P" }
-    Library._config._flags["UI_TriggerbotModule"] = { checked = false, BIND = "Unknown" }
-end
-
-local function makeModule(tab, title, moduleFlag, section, moduleCallback, rowCallback)
-    Library._config = Library._config or {}
-    Library._config._flags = Library._config._flags or {}
-    if type(Library._config._flags[moduleFlag]) ~= "table" then
-        Library._config._flags[moduleFlag] = { checked = false, BIND = "Unknown" }
-    end
-    return tab:create_module({
-        title = title,
-        description = "",
-        flag = moduleFlag,
-        section = section or "left",
-        default = Library._config._flags[moduleFlag].BIND,
-        callback = moduleCallback or function() end,
-        button_callback = rowCallback
-    })
-end
-
-local function patchModule(module)
-    function module:Toggle(settings)
-        prepareCheckboxFlag(settings.Flag, settings.Default == true, settings.Keybind)
-        return self:create_checkbox({
-            title = settings.Name,
-            flag = settings.Flag,
-            default = settings.Keybind or "Unknown",
-            callback = settings.Callback
-        })
-    end
-    function module:Dropdown(settings)
-        return self:create_dropdown({
-            title = settings.Name,
-            flag = settings.Flag,
-            options = settings.Items,
-            maximum_options = #settings.Items,
-            callback = settings.Callback
-        })
-    end
-    function module:Slider(settings)
-        return self:create_slider({
-            title = settings.Name,
-            flag = settings.Flag,
-            minimum_value = settings.Min,
-            maximum_value = settings.Max,
-            value = settings.Default,
-            round_number = settings.Round ~= false,
-            callback = settings.Callback
-        })
-    end
-    return module
-end
-
-local function safe(fn)
-    local ok, err = pcall(fn)
-    if not ok then warn("[Kittylol UI] " .. tostring(err)) end
-end
-
-local function ApplyParryMode(val)
-    getgenv().AutoParryMode = val
-    Settings.ParryMode = val
-    SaveSettings()
-end
-
-local function ApplyCurve(val)
-    for i, name in ipairs(System.__config.__curve_names) do
-        if name == val then
-            System.__properties.__curve_mode = i
-            Settings.CurveType = i
-            SaveSettings()
-            break
-        end
-    end
-end
-
-local function ApplySpamMode(val)
-    getgenv().AutoSpamMode = val
-    Settings.AutoSpamMode = val
-    SaveSettings()
-end
-
-local function HandleManualSpam(State)
-    State = State == true
-    Settings.ManualSpam = State
-    System.__properties.__manual_spam_enabled = State
-    prepareCheckboxFlag("ManualSpam", State, "P")
-    SaveSettings()
-    if State then
-        System.manual_spam.start()
-    else
-        System.manual_spam.stop()
-    end
-    if ApplyManualSpamUI then ApplyManualSpamUI(State) end
-end
-
-local function HandleTriggerbot(State)
-    State = State == true
-    Settings.Triggerbot = State
-    System.__properties.__triggerbot_enabled = State
-    prepareCheckboxFlag("Triggerbot", State, "Unknown")
-    SaveSettings()
-    if State then
-        System.triggerbot.enable()
-    else
-        System.triggerbot.disable()
-    end
-    if ApplyTriggerbotUI then ApplyTriggerbotUI(State) end
-end
-
-local function FlipModule(flag, handler)
-    local F = Library._config and Library._config._flags
-    if not (F and F[flag]) then return end
-    local newState = not (F[flag].checked == true)
-    F[flag].checked = newState
-    if handler then handler(newState) end
-end
-
-local AutoParrySection = patchModule(makeModule(CombatTab, "Auto Parry", "UI_AutoParryModule", "left", function(State)
-    System.__properties.__autoparry_enabled = State
-    Settings.AutoParry = State
-    prepareCheckboxFlag("AutoParry", State, "RightShift")
-    SaveSettings()
-    if State then System.autoparry.start() else System.autoparry.stop() end
-end, function()
-    FlipModule("UI_AutoParryModule", function(State)
-        System.__properties.__autoparry_enabled = State
-        Settings.AutoParry = State
-        prepareCheckboxFlag("AutoParry", State, "RightShift")
-        SaveSettings()
-        if State then System.autoparry.start() else System.autoparry.stop() end
-    end)
-end))
-safe(function() AutoParrySection:Dropdown{ Name = "Parry Mode", Flag = "AutoParryMode", Items = { "Remote", "Keypress" }, Callback = ApplyParryMode } end)
-safe(function() AutoParrySection:Dropdown{ Name = "Curve Type", Flag = "AutoParryCurve", Items = System.__config.__curve_names, Callback = ApplyCurve } end)
-
-local AutoSpamSection = patchModule(makeModule(CombatTab, "Auto Spam", "UI_AutoSpamModule", "right", function(State)
-    Settings.AutoSpam = State
-    prepareCheckboxFlag("AutoSpam", State, "X")
-    SaveSettings()
-    if State then System.auto_spam.start() else System.auto_spam.stop() end
-end, function()
-    FlipModule("UI_AutoSpamModule", function(State)
-        Settings.AutoSpam = State
-        prepareCheckboxFlag("AutoSpam", State, "X")
-        SaveSettings()
-        if State then System.auto_spam.start() else System.auto_spam.stop() end
-    end)
-end))
-safe(function() AutoSpamSection:Dropdown{ Name = "Mode", Flag = "AutoSpamMode", Items = { "Remote", "Keypress" }, Callback = ApplySpamMode } end)
-safe(function() AutoSpamSection:Slider{ Name = "Parry Threshold", Flag = "AutoSpamThreshold", Min = 1, Max = 3, Default = Settings.ParryThreshold, Callback = function(val)
-    System.__properties.__spam_threshold = val
-    Settings.ParryThreshold = val
-    SaveSettings()
-end} end)
-safe(function() AutoSpamSection:Slider{ Name = "Distance Multiplier", Flag = "AutoSpamDistance", Min = 0.3, Max = 3, Default = Settings.DistanceMultiplier, Round = false, Callback = function(val)
-    System.__properties.__auto_spam_distance_multiplier = val
-    Settings.DistanceMultiplier = val
-    SaveSettings()
-end} end)
-
-local ManualSpamSection = patchModule(makeModule(CombatTab, "Manual Spam", "UI_ManualSpamModule", "left", HandleManualSpam, function()
-    FlipModule("UI_ManualSpamModule", HandleManualSpam)
-end))
-
-safe(function() ManualSpamSection:Slider{ Name = "Spam CPS", Flag = "ManualSpamCPS", Min = 60, Max = 500, Default = Settings.ManualSpamCPS, Callback = function(val)
-    System.__properties.__manual_spam_cps = val
-    Settings.ManualSpamCPS = val
-    SaveSettings()
-end} end)
-
-local TriggerbotSection = patchModule(makeModule(CombatTab, "Triggerbot", "UI_TriggerbotModule", "right", HandleTriggerbot, function()
-    FlipModule("UI_TriggerbotModule", HandleTriggerbot)
-end))
-
-System.__properties.__manual_spam_enabled = false
-System.__properties.__triggerbot_enabled = false
-System.__properties.__manual_spam_running = false
-System.__properties.__triggerbot_running = false
-ApplyManualSpamUI(false)
-ApplyTriggerbotUI(false)
-
-local function SyncFeatureStates()
-    local F = Library._config and Library._config._flags
-    if not F then return end
-    local function getChecked(name, fallback)
-        local v = F[name]
-        if type(v) == "table" then return v.checked == true end
-        return fallback
-    end
-    local parry = getChecked("AutoParry", Settings.AutoParry)
-    System.__properties.__autoparry_enabled = parry
-    Settings.AutoParry = parry
-    if parry then System.autoparry.start() else System.autoparry.stop() end
-    local spam = getChecked("AutoSpam", Settings.AutoSpam)
-    Settings.AutoSpam = spam
-    if spam then System.auto_spam.start() else System.auto_spam.stop() end
-    Settings.ManualSpam = false
-    System.manual_spam.stop()
-    Settings.Triggerbot = false
-    System.triggerbot.disable()
-    SaveSettings()
-end
-
-task.defer(function()
-    task.wait(0.2)
-    ApplyParryMode(Settings.ParryMode)
-    ApplyCurve(System.__config.__curve_names[Settings.CurveType])
-    ApplySpamMode(Settings.AutoSpamMode)
-    SyncFeatureStates()
-    System.manual_spam.stop()
-    System.triggerbot.disable()
-    Settings.ManualSpam = false
-    Settings.Triggerbot = false
-    if Library._config and Library._config._flags then
-        if Library._config._flags["UI_ManualSpamModule"] then Library._config._flags["UI_ManualSpamModule"].checked = false end
-        if Library._config._flags["UI_TriggerbotModule"] then Library._config._flags["UI_TriggerbotModule"].checked = false end
-        if Library._config._flags["ManualSpam"] then Library._config._flags["ManualSpam"].checked = false end
-        if Library._config._flags["Triggerbot"] then Library._config._flags["Triggerbot"].checked = false end
-    end
-    SaveSettings()
-end)
-
-
-local function update_randomized_accuracy()
-    if not System.__properties.__humanizer_enabled then return end
-    local props = System.__properties
-    local now = os.clock()
-    if now < props.__humanizer_last_update + props.__humanizer_next_change then return end
-
-    props.__humanizer_last_update = now
-    local ping = tonumber(tostring(getgenv()._ZX_PingCache or 0):match("%d+")) or 0
-    local min_h = math.clamp(props.__humanizer_min_accuracy, 1, 50)
-    local max_h = math.clamp(props.__humanizer_max_accuracy, 1, 50)
-    if min_h > max_h then min_h, max_h = max_h, min_h end
-
-    local current = math.clamp(props.__accuracy, min_h, max_h)
-    local span = math.max(1, max_h - min_h)
-    local ping_factor = ping >= 90 and 0.75 or (ping <= 50 and 1.25 or 1)
-    local roll = math.random(1, 100)
-    local new_accuracy
-
-    if ping >= 90 then
-        new_accuracy = math.clamp(current + math.random(-1, 1), min_h, max_h)
-    elseif roll <= 45 then
-        new_accuracy = math.clamp(current + math.random(-2, 2), min_h, max_h)
-    elseif roll <= 80 then
-        local drift = math.random(2, math.max(3, math.floor(span * 0.2)))
-        new_accuracy = math.clamp(current + (math.random() < 0.5 and -drift or drift), min_h, max_h)
-    else
-        new_accuracy = math.random(min_h, max_h)
-    end
-
-    props.__accuracy = new_accuracy
-    props.__humanizer_next_change = math.random(70, 140) / 100 / ping_factor
-    props.__divisor_multiplier = 0.75 + (props.__accuracy - 1) * (3 / 99)
-end
-
-task.spawn(function()
-    while task.wait(0.1) do
-        if System.__properties.__humanizer_enabled then
-            pcall(update_randomized_accuracy)
-        end
-    end
-end)
-
-
-
-
-local DetectionTab = main:create_tab("Detection", "rbxassetid://10734951847") -- shield
-local PlayerTab = main:create_tab("Player", "rbxassetid://126017907477623")
-local VisualsTab = main:create_tab("Visuals", "rbxassetid://10723346959")
-local MiscTab = main:create_tab("Misc", "rbxassetid://7733917120")
-local ImmortalTab = main:create_tab("Immortal", "rbxassetid://10734962068") -- skull
-
--- =========================================================
--- Immortal
--- =========================================================
-local backgroundOrbitInitialized = false
-local backgroundOrbitState = { Enabled = false }
-local backgroundOrbitHRP = nil
-local backgroundOrbitCharacterConnection = nil
-
-local function startBackgroundOrbit()
-    backgroundOrbitState.Enabled = true
-
-    if backgroundOrbitInitialized then
-        return
-    end
-
-    backgroundOrbitInitialized = true
-
-    local function onCharacter(char)
-        backgroundOrbitHRP = char:WaitForChild("HumanoidRootPart", 5)
-    end
-
-    backgroundOrbitCharacterConnection =
-        LocalPlayer.CharacterAdded:Connect(onCharacter)
-
-    if LocalPlayer.Character then
-        onCharacter(LocalPlayer.Character)
-    end
-
-    local DesyncTypes = {}
-    local oldIndexCFrame
-
-    if hookmetamethod and newcclosure then
-        oldIndexCFrame = hookmetamethod(game, "__index", newcclosure(function(self, key)
-            if not backgroundOrbitState.Enabled or checkcaller() then
-                return oldIndexCFrame(self, key)
-            end
-
-            if key == "CFrame" and backgroundOrbitHRP and self == backgroundOrbitHRP then
-                return DesyncTypes[1] or oldIndexCFrame(self, key)
-            end
-
-            return oldIndexCFrame(self, key)
-        end))
-    end
-
-    System.__properties.__connections.immortal_orbit =
-        RunService.Heartbeat:Connect(function()
-            if not backgroundOrbitState.Enabled or not backgroundOrbitHRP then
-                return
-            end
-
-            if not backgroundOrbitHRP.Parent then
-                backgroundOrbitHRP = LocalPlayer.Character
-                    and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-
-                if not backgroundOrbitHRP then
-                    return
-                end
-            end
-
-            DesyncTypes[1] = backgroundOrbitHRP.CFrame
-            DesyncTypes[2] = backgroundOrbitHRP.AssemblyLinearVelocity
-
-            local orbitRadius = 20
-            local angleMultiplier = 20
-            local rotAngle = tick() * math.pi * 2 * angleMultiplier / 5
-
-            local pos = Vector3.new(
-                math.cos(rotAngle) * orbitRadius,
-                0,
-                math.sin(rotAngle) * orbitRadius
-            )
-
-            backgroundOrbitHRP.CFrame = DesyncTypes[1] + pos
-            backgroundOrbitHRP.AssemblyLinearVelocity = Vector3.zero
-
-            RunService.RenderStepped:Wait()
-
-            if backgroundOrbitState.Enabled and backgroundOrbitHRP then
-                backgroundOrbitHRP.CFrame = DesyncTypes[1]
-                backgroundOrbitHRP.AssemblyLinearVelocity = DesyncTypes[2]
-            end
-        end)
-
-    System.__properties.__connections.immortal_offset =
-        RunService.Heartbeat:Connect(function()
-            if not backgroundOrbitState.Enabled then
-                return
-            end
-
-            local char = LocalPlayer.Character
-            local hrp = char and char:FindFirstChild("HumanoidRootPart")
-
-            if hrp then
-                hrp.CFrame = hrp.CFrame + Vector3.new(0, 0.01, 0)
-            end
-        end)
-end
-
-local function stopBackgroundOrbit()
-    backgroundOrbitState.Enabled = false
-end
-
-ImmortalTab:create_module({
-    title = "Kittylol Immortal",
-    description = "Enable or disable the immortal system.",
-    flag = "KittylolImmortal",
-    section = "left",
-    callback = function(state)
-        if state then
-            startBackgroundOrbit()
-        else
-            stopBackgroundOrbit()
-        end
-    end
-})
-
-
-local function DetectionSet(key, state)
-    if System and System.__config and System.__config.__detections then
-        System.__config.__detections[key] = state == true
-    end
-end
-
-local GROUP_ID = 12836673
-local MIN_RANK = 10
-local ModActionMode = "Notification"
-local DetectedMods = {}
-local ModMonitorConnection = nil
-
-local function getPlayerRank(plr)
-    local ok, rank = pcall(function()
-        return plr:GetRankInGroup(GROUP_ID)
-    end)
-    return ok and rank or 0
-end
-
-local function showStaffNotification(plr)
-    pcall(function()
-        if Library and Library.SendNotification then
-            Library.SendNotification({
-                title = "Staff Detection",
-                text = "! Staff Joined! " .. plr.Name .. " (Support+)",
-                duration = 5
-            })
-        end
-    end)
-end
-
-local function checkModPlayers()
-    for _, plr in ipairs(Players:GetPlayers()) do
-        if plr ~= LocalPlayer and not DetectedMods[plr.UserId] then
-            local rank = getPlayerRank(plr)
-            if rank >= MIN_RANK then
-                DetectedMods[plr.UserId] = true
-                if ModActionMode == "Notification" then
-                    showStaffNotification(plr)
-                elseif ModActionMode == "Kick" then
-                    pcall(function()
-                        LocalPlayer:Kick("The mod has joined the server! Kicked to avoid ban.")
-                    end)
-                end
-            end
-        end
-    end
-end
-
-local StaffDetectionModule = DetectionTab:create_module({
-    title = "Staff Detection",
-    description = "Detect Bladeball Mod in the server",
-    flag = "ModDetectionModule",
-    section = "left",
-    callback = function(state)
-        if state then
-            if ModMonitorConnection then
-                ModMonitorConnection:Disconnect()
-                ModMonitorConnection = nil
-            end
-            DetectedMods = {}
-            checkModPlayers()
-            ModMonitorConnection = RunService.Heartbeat:Connect(checkModPlayers)
-        else
-            if ModMonitorConnection then
-                ModMonitorConnection:Disconnect()
-                ModMonitorConnection = nil
-            end
-            DetectedMods = {}
-        end
-    end
-})
-
-StaffDetectionModule:create_dropdown({
-    title = "Action Mode",
-    flag = "ModActionMode",
-    options = {"Notification", "Kick"},
-    multi_dropdown = false,
-    maximum_options = 2,
-    callback = function(value)
-        ModActionMode = value
-    end
-})
-
-local InfinityDetectionModule = DetectionTab:create_module({
-    title = "Infinity Detection",
-    description = "Detect infinity balls",
-    flag = "InfinityModule",
-    section = "left",
-    callback = function(state)
-        DetectionSet("__infinity", state)
-        if getgenv().InfinityNotify then
-            pcall(function()
-                Library.SendNotification({
-                    title = "Infinity Detection",
-                    text = state and "ON" or "OFF",
-                    duration = 2
-                })
-            end)
-        end
-    end
-})
-
-InfinityDetectionModule:create_checkbox({
-    title = "Notify",
-    flag = "InfinityNotify",
-    callback = function(value)
-        getgenv().InfinityNotify = value
-    end
-})
-
-DetectionTab:create_module({
-    title = "Death Slash Detection",
-    description = "Detect death slash",
-    flag = "DeathSlashModule",
-    section = "right",
-    callback = function(state)
-        DetectionSet("__deathslash", state)
-    end
-})
-
-DetectionTab:create_module({
-    title = "Time Hole Detection",
-    description = "Detect time hole",
-    flag = "TimeHoleModule",
-    section = "left",
-    callback = function(state)
-        DetectionSet("__timehole", state)
-    end
-})
-
-local SlashesModule = DetectionTab:create_module({
-    title = "Slashes Of Fury Detection",
-    description = "Detect slashes of fury",
-    flag = "SlashesModule",
-    section = "right",
-    callback = function(state)
-        DetectionSet("__slashesoffury", state)
-    end
-})
-
-local MaxParryCount = 36
-local ParryDelay = 0.05
-
-SlashesModule:create_slider({
-    title = "Parry Delay",
-    flag = "ParryDelay",
-    minimum_value = 0.05,
-    maximum_value = 0.250,
-    value = 0.05,
-    round_number = false,
-    callback = function(value)
-        ParryDelay = value
-    end
-})
-
-SlashesModule:create_slider({
-    title = "Max Parry Count",
-    flag = "MaxParryCount",
-    minimum_value = 1,
-    maximum_value = 36,
-    value = 36,
-    round_number = true,
-    callback = function(value)
-        MaxParryCount = value
-    end
-})
-
-local DribbleModule = DetectionTab:create_module({
-    title = "Dribble Detection",
-    description = "Toggle Dribble Ball detection",
-    flag = "DribbleDetectionModule",
-    section = "right",
-    callback = function(state)
-        getgenv().DribbleDetection = state
-        DetectionSet("__dribble", state)
-        if getgenv().DribbleNotify then
-            pcall(function()
-                Library.SendNotification({
-                    title = "Dribble Detection",
-                    text = state and "ON" or "OFF",
-                    duration = 2
-                })
-            end)
-        end
-    end
-})
-
-DribbleModule:create_checkbox({
-    title = "Notify",
-    flag = "DribbleNotify",
-    callback = function(value)
-        getgenv().DribbleNotify = value
-    end
-})
-
-DetectionTab:create_module({
-    title = "Anti-Phantom",
-    description = "Anti-phantom detection",
-    flag = "PhantomModule",
-    section = "left",
-    callback = function(state)
-        DetectionSet("__phantom", state)
-    end
-})
-
-DetectionTab:create_module({
-    title = "Singularity Detection",
-    description = "Blocks parry when Singularity Cape is active",
-    flag = "ZX_SingularityDetection",
-    section = "right",
-    callback = function(state)
-        getgenv().SingularityDetection = state
-        DetectionSet("__singularity", state)
-    end
-})
-
-getgenv().PullDetection = false
-getgenv()._ZX_PullActive = false
-
-pcall(function()
-    local packages = ReplicatedStorage:FindFirstChild("Packages")
-    local index = packages and packages:FindFirstChild("_Index")
-    local netPkg = index and index:FindFirstChild("sleitnick_net@0.1.0")
-    local net = netPkg and netPkg:FindFirstChild("net")
-    local pullRemote = net and (net:FindFirstChild("RE/PlrPulled") or net:FindFirstChild("RE/PlrPulsed"))
-
-    if pullRemote and pullRemote:IsA("RemoteEvent") then
-        pullRemote.OnClientEvent:Connect(function(player)
-            if player == LocalPlayer or (player and player.Name == LocalPlayer.Name) then
-                getgenv()._ZX_PullActive = true
-                task.delay(2, function()
-                    getgenv()._ZX_PullActive = false
-                end)
-            end
-        end)
-    end
-end)
-
-DetectionTab:create_module({
-    title = "Pull Detection",
-    description = "Skips parry during Pull",
-    flag = "PullDetection",
-    section = "right",
-    callback = function(state)
-        getgenv().PullDetection = state
-        DetectionSet("__pull", state)
-    end
-})
-
-pcall(function()
-    local remotes = ReplicatedStorage:FindFirstChild("Remotes")
-    local deathBall = remotes and remotes:FindFirstChild("DeathBall")
-    local infinityBall = remotes and remotes:FindFirstChild("InfinityBall")
-
-    if deathBall and deathBall:IsA("RemoteEvent") then
-        deathBall.OnClientEvent:Connect(function(_, active)
-            System.__properties.__deathslash_active = active == true
-        end)
-    end
-
-    if infinityBall and infinityBall:IsA("RemoteEvent") then
-        infinityBall.OnClientEvent:Connect(function(_, active)
-            System.__properties.__infinity_active = active == true
-        end)
-    end
-end)
-
-pcall(function()
-    local packages = ReplicatedStorage:FindFirstChild("Packages")
-    local index = packages and packages:FindFirstChild("_Index")
-    local netPkg = index and index:FindFirstChild("sleitnick_net@0.1.0")
-    local net = netPkg and netPkg:FindFirstChild("net")
-    if not net then return end
-
-    local timeActivate = net:FindFirstChild("RE/TimeHoleActivate")
-    local timeDeactivate = net:FindFirstChild("RE/TimeHoleDeactivate")
-    local furyActivate = net:FindFirstChild("RE/SlashesOfFuryActivate")
-    local furyEnd = net:FindFirstChild("RE/SlashesOfFuryEnd")
-    local furyParry = net:FindFirstChild("RE/SlashesOfFuryParry")
-    local furyCatch = net:FindFirstChild("RE/SlashesOfFuryCatch")
-
-    if timeActivate and timeActivate:IsA("RemoteEvent") then
-        timeActivate.OnClientEvent:Connect(function(player)
-            if player == LocalPlayer or player == LocalPlayer.Name or (player and player.Name == LocalPlayer.Name) then
-                System.__properties.__timehole_active = true
-            end
-        end)
-    end
-
-    if timeDeactivate and timeDeactivate:IsA("RemoteEvent") then
-        timeDeactivate.OnClientEvent:Connect(function()
-            System.__properties.__timehole_active = false
-        end)
-    end
-
-    if furyActivate and furyActivate:IsA("RemoteEvent") then
-        furyActivate.OnClientEvent:Connect(function(player)
-            if player == LocalPlayer or player == LocalPlayer.Name or (player and player.Name == LocalPlayer.Name) then
-                System.__properties.__slashesoffury_active = true
-                System.__properties.__slashesoffury_count = 0
-            end
-        end)
-    end
-
-    if furyEnd and furyEnd:IsA("RemoteEvent") then
-        furyEnd.OnClientEvent:Connect(function()
-            System.__properties.__slashesoffury_active = false
-            System.__properties.__slashesoffury_count = 0
-        end)
-    end
-
-    if furyParry and furyParry:IsA("RemoteEvent") then
-        furyParry.OnClientEvent:Connect(function()
-            System.__properties.__slashesoffury_count += 1
-        end)
-    end
-
-    if furyCatch and furyCatch:IsA("RemoteEvent") then
-        furyCatch.OnClientEvent:Connect(function()
-            task.spawn(function()
-                while System.__properties.__slashesoffury_active
-                    and System.__properties.__slashesoffury_count < MaxParryCount do
-                    if not System.__config.__detections.__slashesoffury then
-                        break
-                    end
-                    pcall(function()
-                        System.parry.execute()
-                    end)
-                    task.wait(ParryDelay)
-                end
-            end)
-        end)
-    end
-end)
-
-getgenv().DribbleDetection = getgenv().DribbleDetection or false
-getgenv().DribbleNotify = getgenv().DribbleNotify or false
-
-task.spawn(function()
-    while task.wait(0.5) do
-        local enabled = System.__config.__detections.__dribble or getgenv().DribbleDetection
-        if not enabled then
-            System.__properties.__dribble_active = false
-            do end
-        end
-
-        local found = false
-        local balls = workspace:FindFirstChild("Balls")
-        if balls then
-            for _, ball in ipairs(balls:GetChildren()) do
-                local ok = false
-
-                pcall(function()
-                    local attr = ball:GetAttribute("dribble")
-                    if attr == nil then
-                        attr = ball:GetAttribute("Dribble")
-                    end
-                    if attr then ok = true end
-                end)
-
-                if not ok and ball.Name then
-                    if string.find(ball.Name:lower(), "dribble", 1, true) then
-                        ok = true
-                    end
-                end
-
-                if not ok and (ball:FindFirstChild("Dribble") or ball:FindFirstChild("Dribbling")) then
-                    ok = true
-                end
-
-                if ok then
-                    found = true
+local swordInstancesInstance = ReplicatedStorage:WaitForChild("Shared", 9e9):WaitForChild("ReplicatedInstances", 9e9):WaitForChild("Swords", 9e9)
+local swordInstances = require(swordInstancesInstance)
+
+local swordsController
+
+local function findSwordsController()
+    while task.wait() and (not swordsController) do
+        for i,v in getconnections(ReplicatedStorage.Remotes.FireSwordInfo.OnClientEvent) do
+            if v.Function and islclosure(v.Function) then
+                local upvalues = getupvalues(v.Function)
+                if #upvalues == 1 and type(upvalues[1]) == "table" then
+                    swordsController = upvalues[1]
                     break
                 end
             end
         end
-
-        System.__properties.__dribble_active = found
     end
-end)
+end
 
-task.spawn(function()
-    local gradient
-    pcall(function()
-        gradient = LocalPlayer.PlayerGui.Hotbar.Ability.Duration.Fill.UIGradient
-    end)
-    if not gradient then return end
+task.spawn(findSwordsController)
 
-    gradient:GetPropertyChangedSignal("Offset"):Connect(function()
-        if not LocalPlayer.Character then return end
-        local abilities = LocalPlayer.Character:FindFirstChild("Abilities")
-        if not abilities then
-            System.__properties.__singularity_active = false
-            return
-        end
+function getSlashName(swordName)
+    local slashName = swordInstances:GetSword(swordName)
+    return (slashName and slashName.SlashName) or "SlashEffect"
+end
 
-        local d = System.__config.__detections
-        System.__properties.__singularity_active =
-            d.__singularity
-            and LocalPlayer.Character.PrimaryPart
-            and LocalPlayer.Character.PrimaryPart:FindFirstChild("SingularityCape") ~= nil
-
-        if gradient.Offset.Y >= 0.985 then
-            System.__properties.__plr_forc = false
-        else
-            System.__properties.__plr_forc =
-                (d.__forcefield and abilities:FindFirstChild("Forcefield") and abilities.Forcefield.Enabled)
-                or (d.__slashesoffury and abilities:FindFirstChild("Slashes of Fury") and abilities["Slashes of Fury"].Enabled)
-                or (d.__timehole and abilities:FindFirstChild("Time Hole") and abilities["Time Hole"].Enabled)
-                or (d.__deathslash and abilities:FindFirstChild("Death Slash") and abilities["Death Slash"].Enabled)
-                or (d.__infinity and abilities:FindFirstChild("Infinity") and abilities.Infinity.Enabled)
-                or false
-        end
-    end)
-end)
-
-pcall(function()
-    local remotes = ReplicatedStorage:FindFirstChild("Remotes")
-    local phantom = remotes and remotes:FindFirstChild("Phantom")
-    if phantom and phantom:IsA("RemoteEvent") then
-        phantom.OnClientEvent:Connect(function(_, target)
-            if target and target.Name == LocalPlayer.Name then
-                System.__properties.__phantom_active = true
-            end
-        end)
-    end
-end)
-
-task.spawn(function()
-    RunService.Heartbeat:Connect(function()
-        if not System.__properties.__phantom_active then return end
-        if not System.__config.__detections.__phantom then return end
-        local char = LocalPlayer.Character
-        local humanoid = char and char:FindFirstChildOfClass("Humanoid")
-        if not humanoid then return end
-
-        local ball = System.ball.get()
-        if not ball then return end
-
-        if ball:GetAttribute("target") ~= LocalPlayer.Name then
-            System.__properties.__phantom_active = false
-            return
-        end
-
+function setSword()
+    if not getgenv().skinChangerEnabled then return end
+    
+    if setupvalue and rawget then
         pcall(function()
-            humanoid.WalkSpeed = 37.5
-            humanoid:MoveTo(ball.Position)
+            setupvalue(rawget(swordInstances,"EquipSwordTo"),3,false)
         end)
-    end)
+    end
+    
+    if getgenv().changeSwordModel and getgenv().swordModel and getgenv().swordModel ~= "" then
+        pcall(function()
+            swordInstances:EquipSwordTo(LocalPlayer.Character, getgenv().swordModel)
+        end)
+    end
+    
+    if getgenv().changeSwordAnimation and swordsController and getgenv().swordAnimations and getgenv().swordAnimations ~= "" then
+        pcall(function()
+            swordsController:SetSword(getgenv().swordAnimations)
+        end)
+    end
+end
+
+local playParryFunc
+local parrySuccessAllConnection
+
+local function findParryConnections()
+    while task.wait() and not parrySuccessAllConnection do
+        for i,v in getconnections(ReplicatedStorage.Remotes.ParrySuccessAll.OnClientEvent) do
+            if v.Function and getinfo(v.Function).name == "parrySuccessAll" then
+                parrySuccessAllConnection = v
+                playParryFunc = v.Function
+                pcall(function() v:Disable() end)
+            end
+        end
+    end
+end
+
+task.spawn(findParryConnections)
+
+local parrySuccessClientConnection
+local function findClientConnection()
+    while task.wait() and not parrySuccessClientConnection do
+        for i,v in getconnections(ReplicatedStorage.Remotes.ParrySuccessClient.Event) do
+            if v.Function and getinfo(v.Function).name == "parrySuccessAll" then
+                parrySuccessClientConnection = v
+                pcall(function() v:Disable() end)
+            end
+        end
+    end
+end
+
+task.spawn(findClientConnection)
+
+getgenv().slashName = "SlashEffect"
+
+local lastOtherParryTimestamp = 0
+local clashConnections = {}
+
+ReplicatedStorage.Remotes.ParrySuccessAll.OnClientEvent:Connect(function(...)
+    if not playParryFunc then return end
+    
+    local args = {...}
+    if tostring(args[4]) ~= LocalPlayer.Name then
+        lastOtherParryTimestamp = tick()
+    elseif getgenv().skinChangerEnabled and getgenv().changeSwordFX and getgenv().swordFX and getgenv().swordFX ~= "" then
+        if getgenv().slashName then
+            args[1] = getgenv().slashName
+        end
+        args[3] = getgenv().swordFX
+    end
+    return playParryFunc(unpack(args))
 end)
 
-local Runtime = workspace:FindFirstChild("Runtime")
-if Runtime then
-    Runtime.ChildAdded:Connect(function(object)
-        if not System.__config.__detections.__phantom then return end
-        if object.Name ~= "maxTransmission" and object.Name ~= "transmissionpart" then return end
-
-        local weld = object:FindFirstChildWhichIsA("WeldConstraint")
-        local char = LocalPlayer.Character
-        local root = char and char:FindFirstChild("HumanoidRootPart")
-        if not weld or not root or weld.Part1 ~= root then return end
-
-        local currentBall = System.ball.get()
-        pcall(function() weld:Destroy() end)
-
-        if currentBall then
-            System.__properties.__phantom_active = true
-        end
-    end)
+getgenv().updateSword = function()
+    if getgenv().changeSwordFX and getgenv().swordFX and getgenv().swordFX ~= "" then
+        pcall(function()
+            getgenv().slashName = getSlashName(getgenv().swordFX)
+        end)
+    end
+    setSword()
 end
 
-local function create_animation(object, info, value)
-    local animation = game:GetService('TweenService'):Create(object, info, value)
-    animation:Play()
-    task.wait(info.Time)
-    animation:Destroy()
-end
-
-local animation_system = {
-    storage = {},
-    current = nil,
-    track = nil
-}
-
-function animation_system.load_animations()
-    local emotes_folder = game:GetService("ReplicatedStorage").Misc.Emotes
-
-    for _, animation in pairs(emotes_folder:GetChildren()) do
-        if animation:IsA("Animation") and animation:GetAttribute("EmoteName") then
-            local emote_name = animation:GetAttribute("EmoteName")
-            animation_system.storage[emote_name] = animation
-        end
-    end
-end
-
-function animation_system.get_emotes_list()
-    local emotes_list = {}
-
-    for emote_name in pairs(animation_system.storage) do
-        table.insert(emotes_list, emote_name)
-    end
-
-    table.sort(emotes_list)
-    return emotes_list
-end
-
-function animation_system.play(emote_name)
-    local animation_data = animation_system.storage[emote_name]
-
-    if not animation_data or not LocalPlayer.Character then
-        return false
-    end
-
-    local humanoid = LocalPlayer.Character:FindFirstChild("Humanoid")
-    if not humanoid then
-        return false
-    end
-
-    local animator = humanoid:FindFirstChild("Animator")
-    if not animator then
-        return false
-    end
-
-    if animation_system.track then
-        animation_system.track:Stop()
-        animation_system.track:Destroy()
-    end
-
-    animation_system.track = animator:LoadAnimation(animation_data)
-    animation_system.track:Play()
-    animation_system.current = emote_name
-
-    return true
-end
-
-function animation_system.stop()
-    if animation_system.track then
-        animation_system.track:Stop()
-        animation_system.track:Destroy()
-        animation_system.track = nil
-    end
-    animation_system.current = nil
-end
-
-function animation_system.start()
-    if not System.__properties.__connections.animations then
-        System.__properties.__connections.animations = RunService.Heartbeat:Connect(function()
-            if not LocalPlayer.Character or not LocalPlayer.Character.PrimaryPart then
-                return
+task.spawn(function()
+    while task.wait(1) do
+        if getgenv().skinChangerEnabled and getgenv().changeSwordModel and getgenv().swordModel and getgenv().swordModel ~= "" then
+            local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+            if LocalPlayer:GetAttribute("CurrentlyEquippedSword") ~= getgenv().swordModel then
+                setSword()
             end
+            if char and (not char:FindFirstChild(getgenv().swordModel)) then
+                setSword()
+            end
+            for _,v in (char and char:GetChildren()) or {} do
+                if v:IsA("Model") and v.Name ~= getgenv().swordModel then
+                    pcall(function() v:Destroy() end)
+                end
+                task.wait()
+            end
+        end
+    end
+end)
 
-            local speed = LocalPlayer.Character.PrimaryPart.AssemblyLinearVelocity.Magnitude
+-- Configurações iniciais do getgenv()
+getgenv().AutoParryMode = "Remote"
+getgenv().AutoParryNotify = false
+getgenv().CooldownProtection = false
+getgenv().AutoAbility = false
+getgenv().TriggerbotNotify = false
+getgenv().AutoCurveHotkeyNotify = false
+getgenv().AutoCurveHotkeyEnabled = false
+getgenv().InfinityNotify = false
+getgenv().ManualSpamNotify = false
+getgenv().ManualSpamMode = "Remote"
+getgenv().ManualSpamAnimationFix = false
+getgenv().AutoSpamNotify = false
+getgenv().AutoSpamMode = "Remote"
+getgenv().AutoSpamAnimationFix = false
+getgenv().AutoStop = false
+getgenv().CameraEnabled = false
+getgenv().CameraFOV = 70
+getgenv().CharacterModifierEnabled = false
+getgenv().WalkspeedCheckboxEnabled = false
+getgenv().CustomWalkSpeed = 36
+getgenv().JumpPowerCheckboxEnabled = false
+getgenv().CustomJumpPower = 50
+getgenv().SpinbotCheckboxEnabled = false
+getgenv().CustomSpinSpeed = 5
+getgenv().GravityCheckboxEnabled = false
+getgenv().CustomGravity = 196.2
+getgenv().HipHeightCheckboxEnabled = false
+getgenv().CustomHipHeight = 0
+getgenv().InfiniteJumpCheckboxEnabled = false
+getgenv().Walkablesemiimortal = false
+getgenv().WalkablesemiimortalNotify = false
+getgenv().skinChangerEnabled = false
+getgenv().changeSwordModel = true
+getgenv().changeSwordAnimation = true
+getgenv().changeSwordFX = true
+getgenv().swordModel = ""
+getgenv().swordAnimations = ""
+getgenv().swordFX = ""
+getgenv().AutoVote = false
 
-            if speed > 30 and getgenv().AutoStop then
-                if animation_system.track and animation_system.track.IsPlaying then
-                    animation_system.track:Stop()
+-- AUTO PARRY SECTION (Rage Tab)
+local autoparry_section = Tabs.Rage:AddSection("Auto Parry", "shield")
+
+-- Toggle principal do Auto Parry
+local AutoParryToggle = autoparry_section:AddToggle("AutoParryToggle", {
+    Title = "Auto Parry",
+    Description = "Automatically parries ball",
+    Default = false,
+    Callback = function(value)
+        System.__properties.__autoparry_enabled = value
+        if value then
+            System.autoparry.start()
+            if getgenv().AutoParryNotify then
+                Fluent:Notify({
+                    Title = "Auto Parry",
+                    Content = "ON",
+                    Duration = 2
+                })
+            end
+        else
+            System.autoparry.stop()
+            if getgenv().AutoParryNotify then
+                Fluent:Notify({
+                    Title = "Auto Parry",
+                    Content = "OFF",
+                    Duration = 2
+                })
+            end
+        end
+    end
+})
+
+-- Dropdown de modo de parry
+autoparry_section:AddDropdown("ParryMode", {
+    Title = "Parry Mode",
+    Description = "Select parry method",
+    Values = {"Remote", "Keypress"},
+    Default = "Remote",
+    Multi = false,
+    Callback = function(value)
+        getgenv().AutoParryMode = value
+    end
+})
+
+autoparry_section:AddDropdown("Mode curve", {
+    Title = "Mode curve",
+    Description = "Select curve type",
+    Values = System.__config.__curve_names,
+    Default = "Camera",
+    Multi = false,
+    Callback = function(value)
+        for i, name in ipairs(System.__config.__curve_names) do
+            if name == value then
+                System.__properties.__curve_mode = i
+                break
+            end
+        end
+    end
+})
+
+-- Slider de precisão
+autoparry_section:AddSlider("ParryAccuracy", {
+    Title = "Parry Accuracy",
+    Description = "Adjust parry accuracy",
+    Default = 50,
+    Min = 1,
+    Max = 100,
+    Rounding = 1,
+    Callback = function(value)
+        System.__properties.__accuracy = value
+        update_divisor()
+    end
+})
+
+-- Toggle de Randomize Accuracy
+autoparry_section:AddToggle("RandomizeAccuracy", {
+    Title = "Randomize Accuracy (Ping Based)",
+    Description = "Randomizes accuracy based on ping",
+    Default = false,
+    Callback = function(value)
+        System.__properties.__randomized_accuracy_enabled = value
+        if value then
+            update_randomized_accuracy()
+        end
+    end
+})
+
+-- Toggle de animação
+autoparry_section:AddToggle("PlayAnimation", {
+    Title = "Play Animation",
+    Description = "Play grab parry animation",
+    Default = false,
+    Callback = function(value)
+        System.__properties.__play_animation = value
+    end
+})
+
+-- Toggle de proteção de cooldown
+autoparry_section:AddToggle("CooldownProtection", {
+    Title = "Cooldown Protection",
+    Description = "Protect from cooldown",
+    Default = false,
+    Callback = function(value)
+        getgenv().CooldownProtection = value
+    end
+})
+
+-- Toggle de habilidade automática
+autoparry_section:AddToggle("AutoAbility", {
+    Title = "Auto Ability",
+    Description = "Use abilities automatically",
+    Default = false,
+    Callback = function(value)
+        getgenv().AutoAbility = value
+    end
+})
+
+-- Toggle de notificação
+autoparry_section:AddToggle("AutoParryNotify", {
+    Title = "Notify",
+    Description = "Show notifications",
+    Default = false,
+    Callback = function(value)
+        getgenv().AutoParryNotify = value
+    end
+})
+
+-- TRIGGERBOT SECTION
+local triggerbot_section = Tabs.Rage:AddSection("Triggerbot", "target")
+
+triggerbot_section:AddToggle("TriggerbotToggle", {
+    Title = "Triggerbot",
+    Description = "Parries instantly if targeted",
+    Default = false,
+    Callback = function(value)
+        if System.__properties.__is_mobile then
+            if value then
+                if not System.__properties.__mobile_guis.triggerbot then
+                    local triggerbot_mobile = create_mobile_button('Trigger', 0.7, Color3.fromRGB(255, 100, 0))
+                    System.__properties.__mobile_guis.triggerbot = triggerbot_mobile
+                    
+                    local touch_start = 0
+                    local was_dragged = false
+                    
+                    triggerbot_mobile.button.InputBegan:Connect(function(input)
+                        if input.UserInputType == Enum.UserInputType.Touch then
+                            touch_start = tick()
+                            was_dragged = false
+                        end
+                    end)
+                    
+                    triggerbot_mobile.button.InputChanged:Connect(function(input)
+                        if input.UserInputType == Enum.UserInputType.Touch then
+                            if (tick() - touch_start) > 0.1 then
+                                was_dragged = true
+                            end
+                        end
+                    end)
+                    
+                    triggerbot_mobile.button.InputEnded:Connect(function(input)
+                        if input.UserInputType == Enum.UserInputType.Touch and not was_dragged then
+                            System.__properties.__triggerbot_enabled = not System.__properties.__triggerbot_enabled
+                            System.triggerbot.enable(System.__properties.__triggerbot_enabled)
+                            
+                            if System.__properties.__triggerbot_enabled then
+                                triggerbot_mobile.text.Text = "ON"
+                                triggerbot_mobile.text.TextColor3 = Color3.fromRGB(255, 100, 0)
+                            else
+                                triggerbot_mobile.text.Text = "Trigger"
+                                triggerbot_mobile.text.TextColor3 = Color3.fromRGB(255, 255, 255)
+                            end
+                            
+                            if getgenv().TriggerbotNotify then
+                                Fluent:Notify({
+                                    Title = "Triggerbot",
+                                    Content = System.__properties.__triggerbot_enabled and "ON" or "OFF",
+                                    Duration = 2
+                                })
+                            end
+                        end
+                    end)
                 end
             else
-                if animation_system.current and (not animation_system.track or not animation_system.track.IsPlaying) then
-                    animation_system.play(animation_system.current)
-                end
-            end
-        end)
-    end
-end
-
-function animation_system.cleanup()
-    animation_system.stop()
-
-    if System.__properties.__connections.animations then
-        System.__properties.__connections.animations:Disconnect()
-        System.__properties.__connections.animations = nil
-    end
-end
-
-animation_system.load_animations()
-local emotes_data = animation_system.get_emotes_list()
-local selected_animation = emotes_data[1]
-
-local animations_module = PlayerTab:create_module({
-    title = 'Emotes',
-    flag = 'Emotes',
-    description = 'Custom Emotes',
-    section = 'right',
-    callback = function(value)
-        getgenv().Animations = value
-
-        if value then
-            animation_system.start()
-
-            if selected_animation then
-                animation_system.play(selected_animation)
+                System.__properties.__triggerbot_enabled = false
+                System.triggerbot.enable(false)
+                destroy_mobile_gui(System.__properties.__mobile_guis.triggerbot)
+                System.__properties.__mobile_guis.triggerbot = nil
             end
         else
-            animation_system.cleanup()
+            System.__properties.__triggerbot_enabled = value
+            System.triggerbot.enable(value)
+            
+            if getgenv().TriggerbotNotify then
+                Fluent:Notify({
+                    Title = "Triggerbot",
+                    Content = value and "ON" or "OFF",
+                    Duration = 2
+                })
+            end
         end
     end
 })
 
-animations_module:create_checkbox({
-    title = "Auto Stop",
-    flag = "AutoStop",
-    callback = function(value)
-        getgenv().AutoStop = value
+triggerbot_section:AddToggle("TriggerbotNotify", {
+    Title = "Notify",
+    Description = "Show notifications for Triggerbot",
+    Default = false,
+    Callback = function(value)
+        getgenv().TriggerbotNotify = value
     end
 })
 
-local animation_dropdown = animations_module:create_dropdown({
-    title = 'Emote Type',
-    flag = 'Selected_Animation',
-    options = emotes_data,
-    multi_dropdown = false,
-    maximum_options = 10,
-    callback = function(value)
-        selected_animation = value
+-- AUTOCURVE HOTKEY SECTION
+local autocurve_section = Tabs.Rage:AddSection("AutoCurve Hotkey", "keyboard")
 
-        if getgenv().Animations then
-            animation_system.play(value)
+autocurve_section:AddToggle("AutoCurveHotkey", {
+    Title = "AutoCurve Hotkey (Mobile)",
+    Description = "Press 1-6 to change curve (Mobile version)",
+    Default = false,
+    Callback = function(state)
+        getgenv().AutoCurveHotkeyEnabled = state
+        
+        if System.__properties.__is_mobile then
+            if state then
+                -- Implementar seletor de curva móvel se necessário
+            else
+                -- Remover seletor de curva móvel se necessário
+            end
         end
     end
 })
 
-pcall(function()
-    if animation_dropdown.SetValue then
-        animation_dropdown:SetValue(selected_animation)
-    elseif animation_dropdown.Set then
-        animation_dropdown:Set(selected_animation)
+autocurve_section:AddToggle("AutoCurveHotkeyNotify", {
+    Title = "Notify",
+    Description = "Show notifications for curve changes",
+    Default = false,
+    Callback = function(value)
+        getgenv().AutoCurveHotkeyNotify = value
     end
-end)
+})
 
-local CameraToggle = PlayerTab:create_module({
-    title = 'FOV',
-    flag = 'FOV',
+-- DETECTION TAB
+local infinity_section = Tabs.Detection:AddSection("Infinity Detection", "infinity")
+infinity_section:AddToggle("InfinityDetection", {
+    Title = "Infinity Detection",
+    Description = "Detect infinity balls",
+    Default = false,
+    Callback = function(value)
+        System.__config.__detections.__infinity = value
+    end
+})
 
-    description = 'Changes Camera POV',
-    section = 'left',
+infinity_section:AddToggle("InfinityNotify", {
+    Title = "Notify",
+    Description = "Show notifications for infinity detection",
+    Default = false,
+    Callback = function(value)
+        getgenv().InfinityNotify = value
+    end
+})
 
-    callback = function(value)
+local deathslash_section = Tabs.Detection:AddSection("Death Slash Detection", "skull")
+deathslash_section:AddToggle("DeathSlashDetection", {
+    Title = "Death Slash Detection",
+    Description = "Detect death slash",
+    Default = false,
+    Callback = function(value)
+        System.__config.__detections.__deathslash = value
+    end
+})
+
+local timehole_section = Tabs.Detection:AddSection("Time Hole Detection", "clock")
+timehole_section:AddToggle("TimeHoleDetection", {
+    Title = "Time Hole Detection",
+    Description = "Detect time hole",
+    Default = false,
+    Callback = function(value)
+        System.__config.__detections.__timehole = value
+    end
+})
+
+local slashes_section = Tabs.Detection:AddSection("Slashes Of Fury Detection", "swords")
+slashes_section:AddToggle("SlashesOfFuryDetection", {
+    Title = "Slashes Of Fury Detection",
+    Description = "Detect slashes of fury",
+    Default = false,
+    Callback = function(value)
+        System.__config.__detections.__slashesoffury = value
+    end
+})
+
+slashes_section:AddSlider("ParryDelay", {
+    Title = "Parry Delay",
+    Description = "Delay between parries in slashes of fury",
+    Default = 0.05,
+    Min = 0.05,
+    Max = 0.250,
+    Rounding = 2,
+    Callback = function(value)
+        parryDelay = value
+    end
+})
+
+slashes_section:AddSlider("MaxParryCount", {
+    Title = "Max Parry Count",
+    Description = "Maximum parries in slashes of fury",
+    Default = 36,
+    Min = 1,
+    Max = 100,
+    Rounding = 0,
+    Callback = function(value)
+        maxParryCount = value
+    end
+})
+
+local phantom_section = Tabs.Detection:AddSection("Anti-Phantom [BETA]", "ghost")
+phantom_section:AddToggle("AntiPhantom", {
+    Title = "Anti-Phantom [BETA]",
+    Description = "Anti-phantom detection",
+    Default = false,
+    Callback = function(value)
+        System.__config.__detections.__phantom = value
+    end
+})
+
+local manual_spam_section = Tabs.Spam:AddSection("Manual Spam", "zap")
+
+manual_spam_section:AddToggle("ManualSpamToggle", {
+    Title = "Manual Spam",
+    Description = "High-frequency parry spam",
+    Default = false,
+    Callback = function(state)
+        if System.__properties.__is_mobile then
+            if state then
+                if not System.__properties.__mobile_guis.manual_spam then
+                    local manual_spam_mobile = create_mobile_button('Spam', 0.8, Color3.fromRGB(255, 255, 255))
+                    System.__properties.__mobile_guis.manual_spam = manual_spam_mobile
+                    
+                    local manual_touch_start = 0
+                    local manual_was_dragged = false
+                    
+                    manual_spam_mobile.button.InputBegan:Connect(function(input)
+                        if input.UserInputType == Enum.UserInputType.Touch then
+                            manual_touch_start = tick()
+                            manual_was_dragged = false
+                        end
+                    end)
+                    
+                    manual_spam_mobile.button.InputChanged:Connect(function(input)
+                        if input.UserInputType == Enum.UserInputType.Touch then
+                            if (tick() - manual_touch_start) > 0.1 then
+                                manual_was_dragged = true
+                            end
+                        end
+                    end)
+                    
+                    manual_spam_mobile.button.InputEnded:Connect(function(input)
+                        if input.UserInputType == Enum.UserInputType.Touch and not manual_was_dragged then
+                            System.__properties.__manual_spam_enabled = not System.__properties.__manual_spam_enabled
+                            
+                            if System.__properties.__manual_spam_enabled then
+                                System.manual_spam.start()
+                                manual_spam_mobile.text.Text = "ON"
+                                manual_spam_mobile.text.TextColor3 = Color3.fromRGB(0, 255, 100)
+                            else
+                                System.manual_spam.stop()
+                                manual_spam_mobile.text.Text = "Spam"
+                                manual_spam_mobile.text.TextColor3 = Color3.fromRGB(255, 255, 255)
+                            end
+                            
+                            if getgenv().ManualSpamNotify then
+                                Fluent:Notify({
+                                    Title = "Manual Spam",
+                                    Content = System.__properties.__manual_spam_enabled and "ON" or "OFF",
+                                    Duration = 2
+                                })
+                            end
+                        end
+                    end)
+                end
+            else
+                System.__properties.__manual_spam_enabled = false
+                System.manual_spam.stop()
+                destroy_mobile_gui(System.__properties.__mobile_guis.manual_spam)
+                System.__properties.__mobile_guis.manual_spam = nil
+            end
+        else
+            System.__properties.__manual_spam_enabled = state
+            if state then
+                System.manual_spam.start()
+                if getgenv().ManualSpamNotify then
+                    Fluent:Notify({
+                        Title = "Manual Spam",
+                        Content = "ON",
+                        Duration = 2
+                    })
+                end
+            else
+                System.manual_spam.stop()
+                if getgenv().ManualSpamNotify then
+                    Fluent:Notify({
+                        Title = "Manual Spam",
+                        Content = "OFF",
+                        Duration = 2
+                    })
+                end
+            end
+        end
+    end
+})
+
+manual_spam_section:AddToggle("ManualSpamNotify", {
+    Title = "Notify",
+    Description = "Show notifications for manual spam",
+    Default = false,
+    Callback = function(value)
+        getgenv().ManualSpamNotify = value
+    end
+})
+
+manual_spam_section:AddDropdown("ManualSpamMode", {
+    Title = "Mode",
+    Description = "Select spam method",
+    Values = {"Remote", "Keypress"},
+    Default = "Remote",
+    Multi = false,
+    Callback = function(Value)
+        getgenv().ManualSpamMode = Value
+    end
+})
+
+manual_spam_section:AddToggle("ManualSpamAnimationFix", {
+    Title = "Animation Fix",
+    Description = "Fix animation during spam",
+    Default = false,
+    Callback = function(value)
+        getgenv().ManualSpamAnimationFix = value
+    end
+})
+
+local auto_spam_section = Tabs.Spam:AddSection("Auto Spam", "zap")
+
+auto_spam_section:AddToggle("AutoSpamToggle", {
+    Title = "Auto Spam",
+    Description = "Automatically spam parries ball",
+    Default = false,
+    Callback = function(value)
+        System.__properties.__auto_spam_enabled = value
+        if value then
+            System.auto_spam.start()
+            if getgenv().AutoSpamNotify then
+                Fluent:Notify({
+                    Title = "Auto Spam",
+                    Content = "ON",
+                    Duration = 2
+                })
+            end
+        else
+            System.auto_spam.stop()
+            if getgenv().AutoSpamNotify then
+                Fluent:Notify({
+                    Title = "Auto Spam",
+                    Content = "OFF",
+                    Duration = 2
+                })
+            end
+        end
+    end
+})
+
+auto_spam_section:AddToggle("AutoSpamNotify", {
+    Title = "Notify",
+    Description = "Show notifications for auto spam",
+    Default = false,
+    Callback = function(value)
+        getgenv().AutoSpamNotify = value
+    end
+})
+
+auto_spam_section:AddDropdown("AutoSpamMode", {
+    Title = "Mode",
+    Description = "Select spam method",
+    Values = {"Remote", "Keypress"},
+    Default = "Remote",
+    Multi = false,
+    Callback = function(Value)
+        getgenv().AutoSpamMode = Value
+    end
+})
+
+auto_spam_section:AddToggle("AutoSpamAnimationFix", {
+    Title = "Animation Fix",
+    Description = "Fix animation during auto spam",
+    Default = false,
+    Callback = function(value)
+        getgenv().AutoSpamAnimationFix = value
+    end
+})
+
+auto_spam_section:AddSlider("ParryThreshold", {
+    Title = "Parry Threshold",
+    Description = "Threshold for auto spam",
+    Default = 2.5,
+    Min = 0,
+    Max = 10,
+    Rounding = 1,
+    Callback = function(value)
+        System.__properties.__spam_threshold = value
+    end
+})
+
+auto_spam_section:AddSlider("DistanceMultiplier", {
+    Title = "Distance Multiplier",
+    Description = "Distance multiplier for auto spam",
+    Default = 0.3,
+    Min = 0.3,
+    Max = 3.0,
+    Rounding = 1,
+    Callback = function(value)
+        System.__properties.__auto_spam_distance_multiplier = value
+    end
+})
+
+-- PLAYER TAB
+local avatar_section = Tabs.Player:AddSection("Avatar Changer", "user")
+
+local __flags = {}
+local __players = cloneref(game:GetService('Players'))
+local __localplayer = __players.LocalPlayer
+
+local function __apparence(__name)
+    local s, e = pcall(function()
+        local __id = __players:GetUserIdFromNameAsync(__name)
+        return __players:GetHumanoidDescriptionFromUserId(__id)
+    end)
+
+    if not s then
+        return nil
+    end
+
+    return e
+end
+
+local function __set(__name, __char)
+    if not __name or __name == '' then
+        return
+    end
+    
+    local __hum = __char and __char:WaitForChild('Humanoid', 5)
+
+    if not __hum then
+        return
+    end
+
+    local __desc = __apparence(__name)
+    
+    if not __desc then
+        warn("Failed to get appearance for: " .. tostring(__name))
+        return
+    end
+
+    __localplayer:ClearCharacterAppearance()
+    __hum:ApplyDescriptionClientServer(__desc)
+end
+
+avatar_section:AddToggle("AvatarChanger", {
+    Title = "Avatar Changer",
+    Description = "Change your avatar to another player",
+    Default = false,
+    Callback = function(val)
+        __flags['Skin Changer'] = val
+
+        if val then
+            local __char = __localplayer.Character
+
+            if __char and __flags['name'] then
+                __set(__flags['name'], __char)
+            end
+
+            __flags['loop'] = __localplayer.CharacterAdded:Connect(function(char)
+                task.wait(.75)
+                if __flags['name'] then
+                    __set(__flags['name'], char)
+                end
+            end)
+        else
+            if __flags['loop'] then
+                __flags['loop']:Disconnect()
+                __flags['loop'] = nil
+
+                local __char = __localplayer.Character
+
+                if __char then
+                    __set(__localplayer.Name, __char)
+                end
+            end
+        end
+    end
+})
+
+avatar_section:AddInput("TargetUsername", {
+    Title = "Target Username",
+    Placeholder = "Enter Username...",
+    Default = "",
+    Callback = function(val)
+        __flags['name'] = val
+        
+        if __flags['Skin Changer'] and val ~= '' then
+            local __char = __localplayer.Character
+            if __char then
+                __set(val, __char)
+            end
+        end
+    end
+})
+
+-- FOV SECTION
+local fov_section = Tabs.Player:AddSection("FOV", "maximize")
+
+fov_section:AddToggle("FOV", {
+    Title = "FOV",
+    Description = "Changes Camera POV",
+    Default = false,
+    Callback = function(value)
         getgenv().CameraEnabled = value
-        local Camera = game:GetService("Workspace").CurrentCamera
-
+        local Camera = workspace.CurrentCamera
+    
         if value then
             getgenv().CameraFOV = getgenv().CameraFOV or 70
             Camera.FieldOfView = getgenv().CameraFOV
-
+                
             if not getgenv().FOVLoop then
-                getgenv().FOVLoop = game:GetService("RunService").RenderStepped:Connect(function()
+                getgenv().FOVLoop = RunService.RenderStepped:Connect(function()
                     if getgenv().CameraEnabled then
                         Camera.FieldOfView = getgenv().CameraFOV
                     end
@@ -2208,7 +2202,7 @@ local CameraToggle = PlayerTab:create_module({
             end
         else
             Camera.FieldOfView = 70
-
+                
             if getgenv().FOVLoop then
                 getgenv().FOVLoop:Disconnect()
                 getgenv().FOVLoop = nil
@@ -2217,45 +2211,43 @@ local CameraToggle = PlayerTab:create_module({
     end
 })
 
-CameraToggle:create_slider({
-    title = 'Camera FOV',
-    flag = 'Camera_FOV',
-
-    maximum_value = 120,
-    minimum_value = 50,
-    value = 70,
-
-    round_number = true,
-
-    callback = function(value)
-        getgenv().CameraFOV = value
+fov_section:AddSlider("CameraFOV", {
+    Title = "Camera FOV",
+    Description = "Adjust camera field of view",
+    Default = 70,
+    Min = 50,
+    Max = 120,
+    Rounding = 1,
+    Callback = function(Value)
+        getgenv().CameraFOV = Value
         if getgenv().CameraEnabled then
-            game:GetService("Workspace").CurrentCamera.FieldOfView = value
+            workspace.CurrentCamera.FieldOfView = Value
         end
     end
 })
 
-local CharacterModifier = PlayerTab:create_module({
-    title = 'Character',
-    flag = 'CharacterModifier',
-    description = 'Changes various character properties',
-    section = 'right',
+-- CHARACTER MODIFIER SECTION
+local character_section = Tabs.Player:AddSection("Character", "user")
 
-    callback = function(value)
+character_section:AddToggle("CharacterModifier", {
+    Title = "Character Modifier",
+    Description = "Changes various character properties",
+    Default = false,
+    Callback = function(value)
         getgenv().CharacterModifierEnabled = value
 
         if value then
             if not getgenv().CharacterConnection then
                 getgenv().OriginalValues = {}
                 getgenv().spinAngle = 0
-
+                
                 getgenv().CharacterConnection = RunService.Heartbeat:Connect(function()
                     local char = LocalPlayer.Character
                     if not char then return end
-
+                    
                     local humanoid = char:FindFirstChild("Humanoid")
                     local root = char:FindFirstChild("HumanoidRootPart")
-
+                    
                     if humanoid then
                         if not getgenv().OriginalValues.WalkSpeed then
                             getgenv().OriginalValues.WalkSpeed = humanoid.WalkSpeed
@@ -2264,11 +2256,11 @@ local CharacterModifier = PlayerTab:create_module({
                             getgenv().OriginalValues.HipHeight = humanoid.HipHeight
                             getgenv().OriginalValues.AutoRotate = humanoid.AutoRotate
                         end
-
+                        
                         if getgenv().WalkspeedCheckboxEnabled then
                             humanoid.WalkSpeed = getgenv().CustomWalkSpeed or 36
                         end
-
+                        
                         if getgenv().JumpPowerCheckboxEnabled then
                             if humanoid.UseJumpPower then
                                 humanoid.JumpPower = getgenv().CustomJumpPower or 50
@@ -2276,7 +2268,7 @@ local CharacterModifier = PlayerTab:create_module({
                                 humanoid.JumpHeight = getgenv().CustomJumpHeight or 7.2
                             end
                         end
-
+                        
                         if getgenv().HipHeightCheckboxEnabled then
                             humanoid.HipHeight = getgenv().CustomHipHeight or 0
                         end
@@ -2291,7 +2283,7 @@ local CharacterModifier = PlayerTab:create_module({
                             end
                         end
                     end
-
+                    
                     if getgenv().GravityCheckboxEnabled and getgenv().CustomGravity then
                         workspace.Gravity = getgenv().CustomGravity
                     end
@@ -2301,11 +2293,11 @@ local CharacterModifier = PlayerTab:create_module({
             if getgenv().CharacterConnection then
                 getgenv().CharacterConnection:Disconnect()
                 getgenv().CharacterConnection = nil
-
+                
                 local char = LocalPlayer.Character
                 if char then
                     local humanoid = char:FindFirstChild("Humanoid")
-
+                    
                     if humanoid and getgenv().OriginalValues then
                         humanoid.WalkSpeed = getgenv().OriginalValues.WalkSpeed or 16
                         if humanoid.UseJumpPower then
@@ -2317,14 +2309,14 @@ local CharacterModifier = PlayerTab:create_module({
                         humanoid.AutoRotate = getgenv().OriginalValues.AutoRotate or true
                     end
                 end
-
+                
                 workspace.Gravity = 196.2
-
+                
                 if getgenv().InfiniteJumpConnection then
                     getgenv().InfiniteJumpConnection:Disconnect()
                     getgenv().InfiniteJumpConnection = nil
                 end
-
+                
                 getgenv().OriginalValues = nil
                 getgenv().spinAngle = nil
             end
@@ -2332,12 +2324,13 @@ local CharacterModifier = PlayerTab:create_module({
     end
 })
 
-CharacterModifier:create_checkbox({
-    title = "Infinite Jump",
-    flag = "InfiniteJumpCheckbox",
-    callback = function(value)
+character_section:AddToggle("InfiniteJump", {
+    Title = "Infinite Jump",
+    Description = "Enable infinite jumping",
+    Default = false,
+    Callback = function(value)
         getgenv().InfiniteJumpCheckboxEnabled = value
-
+        
         if value and getgenv().CharacterModifierEnabled then
             if not getgenv().InfiniteJumpConnection then
                 getgenv().InfiniteJumpConnection = UserInputService.JumpRequest:Connect(function()
@@ -2358,14 +2351,13 @@ CharacterModifier:create_checkbox({
     end
 })
 
-CharacterModifier:create_divider({})
-
-CharacterModifier:create_checkbox({
-    title = "Spin",
-    flag = "SpinbotCheckbox",
-    callback = function(value)
+character_section:AddToggle("Spinbot", {
+    Title = "Spin",
+    Description = "Enable spinbot",
+    Default = false,
+    Callback = function(value)
         getgenv().SpinbotCheckboxEnabled = value
-
+        
         if not value and getgenv().CharacterModifierEnabled then
             local char = LocalPlayer.Character
             if char and char:FindFirstChild("Humanoid") and getgenv().OriginalValues then
@@ -2375,27 +2367,25 @@ CharacterModifier:create_checkbox({
     end
 })
 
-CharacterModifier:create_slider({
-    title = 'Spin Speed',
-    flag = 'CustomSpinSpeed',
-    maximum_value = 50,
-    minimum_value = 1,
-    value = 5,
-    round_number = true,
-
-    callback = function(value)
-        getgenv().CustomSpinSpeed = value
+character_section:AddSlider("SpinSpeed", {
+    Title = "Spin Speed",
+    Description = "Spin rotation speed",
+    Default = 5,
+    Min = 1,
+    Max = 50,
+    Rounding = 1,
+    Callback = function(Value)
+        getgenv().CustomSpinSpeed = Value
     end
 })
 
-CharacterModifier:create_divider({})
-
-CharacterModifier:create_checkbox({
-    title = "Walk Speed",
-    flag = "WalkspeedCheckbox",
-    callback = function(value)
+character_section:AddToggle("WalkSpeed", {
+    Title = "Walk Speed",
+    Description = "Enable custom walk speed",
+    Default = false,
+    Callback = function(value)
         getgenv().WalkspeedCheckboxEnabled = value
-
+        
         if not value and getgenv().CharacterModifierEnabled then
             local char = LocalPlayer.Character
             if char and char:FindFirstChild("Humanoid") and getgenv().OriginalValues then
@@ -2405,34 +2395,32 @@ CharacterModifier:create_checkbox({
     end
 })
 
-CharacterModifier:create_slider({
-    title = 'Walk Speed Value',
-    flag = 'CustomWalkSpeed',
-    maximum_value = 500,
-    minimum_value = 16,
-    value = 36,
-    round_number = true,
-
-    callback = function(value)
-        getgenv().CustomWalkSpeed = value
-
+character_section:AddSlider("WalkSpeedValue", {
+    Title = "Walk Speed Value",
+    Description = "Custom walk speed value",
+    Default = 36,
+    Min = 16,
+    Max = 500,
+    Rounding = 1,
+    Callback = function(Value)
+        getgenv().CustomWalkSpeed = Value
+        
         if getgenv().CharacterModifierEnabled and getgenv().WalkspeedCheckboxEnabled then
             local char = LocalPlayer.Character
             if char and char:FindFirstChild("Humanoid") then
-                char.Humanoid.WalkSpeed = value
+                char.Humanoid.WalkSpeed = Value
             end
         end
     end
 })
 
-CharacterModifier:create_divider({})
-
-CharacterModifier:create_checkbox({
-    title = "Jump Power",
-    flag = "JumpPowerCheckbox",
-    callback = function(value)
+character_section:AddToggle("JumpPower", {
+    Title = "Jump Power",
+    Description = "Enable custom jump power",
+    Default = false,
+    Callback = function(value)
         getgenv().JumpPowerCheckboxEnabled = value
-
+        
         if not value and getgenv().CharacterModifierEnabled then
             local char = LocalPlayer.Character
             if char and char:FindFirstChild("Humanoid") and getgenv().OriginalValues then
@@ -2447,71 +2435,67 @@ CharacterModifier:create_checkbox({
     end
 })
 
-CharacterModifier:create_slider({
-    title = 'Jump Power Value',
-    flag = 'CustomJumpPower',
-    maximum_value = 200,
-    minimum_value = 50,
-    value = 50,
-    round_number = true,
-
-    callback = function(value)
-        getgenv().CustomJumpPower = value
-        getgenv().CustomJumpHeight = value * 0.144
-
+character_section:AddSlider("JumpPowerValue", {
+    Title = "Jump Power Value",
+    Description = "Custom jump power value",
+    Default = 50,
+    Min = 50,
+    Max = 200,
+    Rounding = 1,
+    Callback = function(Value)
+        getgenv().CustomJumpPower = Value
+        getgenv().CustomJumpHeight = Value * 0.144
+        
         if getgenv().CharacterModifierEnabled and getgenv().JumpPowerCheckboxEnabled then
             local char = LocalPlayer.Character
             if char and char:FindFirstChild("Humanoid") then
                 local humanoid = char.Humanoid
                 if humanoid.UseJumpPower then
-                    humanoid.JumpPower = value
+                    humanoid.JumpPower = Value
                 else
-                    humanoid.JumpHeight = value * 0.144
+                    humanoid.JumpHeight = Value * 0.144
                 end
             end
         end
     end
 })
 
-CharacterModifier:create_divider({})
-
-CharacterModifier:create_checkbox({
-    title = "Gravity",
-    flag = "GravityCheckbox",
-    callback = function(value)
+character_section:AddToggle("Gravity", {
+    Title = "Gravity",
+    Description = "Enable custom gravity",
+    Default = false,
+    Callback = function(value)
         getgenv().GravityCheckboxEnabled = value
-
+        
         if not value and getgenv().CharacterModifierEnabled then
             workspace.Gravity = 196.2
         end
     end
 })
 
-CharacterModifier:create_slider({
-    title = 'Gravity Value',
-    flag = 'CustomGravity',
-    maximum_value = 400.0,
-    minimum_value = 0,
-    value = 196.2,
-    round_number = true,
-
-    callback = function(value)
-        getgenv().CustomGravity = value
-
+character_section:AddSlider("GravityValue", {
+    Title = "Gravity Value",
+    Description = "Custom gravity value",
+    Default = 196.2,
+    Min = 0,
+    Max = 400.0,
+    Rounding = 1,
+    Callback = function(Value)
+        getgenv().CustomGravity = Value
+        
         if getgenv().CharacterModifierEnabled and getgenv().GravityCheckboxEnabled then
-            workspace.Gravity = value
+            workspace.Gravity = Value
         end
     end
 })
 
-CharacterModifier:create_divider({})
-
-CharacterModifier:create_checkbox({
-    title = "Hip Height",
-    flag = "HipHeightCheckbox",
-    callback = function(value)
+character_section:AddToggle("HipHeight", {
+    Title = "Hip Height",
+    Description = "Enable custom hip height",
+    Default = false,
+    Callback = function(value)
         getgenv().HipHeightCheckboxEnabled = value
-
+        
         if not value and getgenv().CharacterModifierEnabled then
             local char = LocalPlayer.Character
             if char and char:FindFirstChild("Humanoid") and getgenv().OriginalValues then
@@ -2521,66 +2505,55 @@ CharacterModifier:create_checkbox({
     end
 })
 
-CharacterModifier:create_slider({
-    title = 'Hip Height Value',
-    flag = 'CustomHipHeight',
-    maximum_value = 20,
-    minimum_value = -5,
-    value = 0,
-    round_number = true,
-
-    callback = function(value)
-        getgenv().CustomHipHeight = value
-
+character_section:AddSlider("HipHeightValue", {
+    Title = "Hip Height Value",
+    Description = "Custom hip height value",
+    Default = 0,
+    Min = -5,
+    Max = 20,
+    Rounding = 1,
+    Callback = function(Value)
+        getgenv().CustomHipHeight = Value
+        
         if getgenv().CharacterModifierEnabled and getgenv().HipHeightCheckboxEnabled then
             local char = LocalPlayer.Character
             if char and char:FindFirstChild("Humanoid") then
-                char.Humanoid.HipHeight = value
+                char.Humanoid.HipHeight = Value
             end
         end
     end
 })
 
-
-local ability_esp = {
-    __config = {
-        gui_name = "AbilityESPGui",
-        gui_size = UDim2.new(0, 200, 0, 40),
-        studs_offset = Vector3.new(0, 3.2, 0),
-        text_color = Color3.fromRGB(255, 255, 255),
-        stroke_color = Color3.fromRGB(0, 0, 0),
-        font = Enum.Font.GothamBold,
-        text_size = 14,
-        update_rate = 1/30
-    },
-
-    __state = {
-        active = false,
-        players = {},
-        update_task = nil
-    }
+-- VISUALS TAB - Ability ESP
+local ability_esp = {  
+    __config = {  
+        gui_name = "AbilityESPGui",  
+        gui_size = UDim2.new(0, 200, 0, 40),  
+        studs_offset = Vector3.new(0, 3.2, 0),  
+        text_color = Color3.fromRGB(255, 255, 255),  
+        stroke_color = Color3.fromRGB(0, 0, 0),  
+        font = Enum.Font.GothamBold,  
+        text_size = 14,  
+        update_rate = 1/30  
+    },  
+      
+    __state = {  
+        active = false,  
+        players = {},  
+        update_task = nil  
+    }  
 }
 
-function ability_esp.create_billboard(player)
+function ability_esp.create_billboard(player)  
     local character = player.Character
-    if not character or not character.Parent then
-        return nil
-    end
+    if not character then return nil end  
 
     local humanoid = character:FindFirstChild("Humanoid")
-    if not humanoid then
-        return nil
-    end
-
     local head = character:FindFirstChild("Head")
-    if not head then
-        return nil
-    end
+    if not humanoid or not head then return nil end
 
     local existing = head:FindFirstChild(ability_esp.__config.gui_name)
-    if existing then
-        existing:Destroy()
-    end
+    if existing then existing:Destroy() end
 
     local billboard = Instance.new("BillboardGui")
     billboard.Name = ability_esp.__config.gui_name
@@ -2592,202 +2565,77 @@ function ability_esp.create_billboard(player)
 
     local label = Instance.new("TextLabel")
     label.Size = UDim2.new(1, 0, 1, 0)
-    label.BackgroundTransparency = 1
+    label.BackgroundTransparency = 1  
     label.TextColor3 = ability_esp.__config.text_color
     label.TextStrokeColor3 = ability_esp.__config.stroke_color
     label.TextStrokeTransparency = 0.5
     label.Font = ability_esp.__config.font
     label.TextSize = ability_esp.__config.text_size
-    label.TextWrapped = true
-    label.TextXAlignment = Enum.TextXAlignment.Center
-    label.TextYAlignment = Enum.TextYAlignment.Center
     label.Parent = billboard
-
-    humanoid.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
 
     return label, billboard
 end
 
 function ability_esp.update_label(player, label)
-    if not player or not player.Parent or not label or not label.Parent then
-        return false
-    end
+    if not player or not label then return false end
 
-    local character = player.Character
-    if not character or not character.Parent or not character:FindFirstChild("Humanoid") then
-        return false
-    end
-
-    if ability_esp.__state.active then
-        label.Visible = true
+    if ability_esp.__state.active then  
+        label.Visible = true  
         local ability_name = player:GetAttribute("EquippedAbility")
-        label.Text = ability_name and
-            (player.DisplayName .. "  [" .. ability_name .. "]") or
-            player.DisplayName
-    else
-        label.Visible = false
-    end
-
+        label.Text = ability_name and (player.DisplayName .. "  [" .. ability_name .. "]") or player.DisplayName
+    else  
+        label.Visible = false  
+    end  
+    
     return true
 end
 
 function ability_esp.setup_character(player)
-    if not ability_esp.__state.active then
-        return
-    end
-
     task.wait(0.1)
 
     local character = player.Character
-    if not character or not character.Parent or not character:FindFirstChild("Humanoid") then
-        return
-    end
+    if not character then return end
 
     local label, billboard = ability_esp.create_billboard(player)
-    if not label then
-        return
-    end
+    if not label then return end
 
     if not ability_esp.__state.players[player] then
         ability_esp.__state.players[player] = {}
-    end
+    end  
 
-    ability_esp.__state.players[player].label = label
-    ability_esp.__state.players[player].billboard = billboard
-    ability_esp.__state.players[player].character = character
-
-    local char_connection = character.AncestryChanged:Connect(function()
-        if not character.Parent then
-            if ability_esp.__state.players[player] then
-                if ability_esp.__state.players[player].billboard then
-                    ability_esp.__state.players[player].billboard:Destroy()
-                end
-                ability_esp.__state.players[player].label = nil
-                ability_esp.__state.players[player].billboard = nil
-                ability_esp.__state.players[player].character = nil
-            end
-        end
-    end)
-
-    if not System.__properties.__connections.ability_esp then
-        System.__properties.__connections.ability_esp = {}
-    end
-
-    if not System.__properties.__connections.ability_esp[player] then
-        System.__properties.__connections.ability_esp[player] = {}
-    end
-
-    System.__properties.__connections.ability_esp[player].char_removing = char_connection
+    ability_esp.__state.players[player].label = label  
+    ability_esp.__state.players[player].billboard = billboard  
+    ability_esp.__state.players[player].character = character  
 end
 
 function ability_esp.add_player(player)
-    if player == LocalPlayer then
-        return
-    end
+    if player == LocalPlayer then return end
 
-    if ability_esp.__state.players[player] then
-        ability_esp.remove_player(player)
-    end
-
-    if not System.__properties.__connections.ability_esp then
-        System.__properties.__connections.ability_esp = {}
-    end
-
-    if not System.__properties.__connections.ability_esp[player] then
-        System.__properties.__connections.ability_esp[player] = {}
-    end
-
-    local char_added_connection = player.CharacterAdded:Connect(function()
+    player.CharacterAdded:Connect(function()
         ability_esp.setup_character(player)
     end)
 
-    System.__properties.__connections.ability_esp[player].char_added = char_added_connection
-
-    if player.Character then
+    if player.Character then  
         task.spawn(function()
-            ability_esp.setup_character(player)
+            ability_esp.setup_character(player)  
         end)
     end
 end
 
-function ability_esp.remove_player(player)
-    if System.__properties.__connections.ability_esp and System.__properties.__connections.ability_esp[player] then
-        for _, connection in pairs(System.__properties.__connections.ability_esp[player]) do
-            if connection and connection.Connected then
-                connection:Disconnect()
-            end
-        end
-        System.__properties.__connections.ability_esp[player] = nil
-    end
-
-    local player_data = ability_esp.__state.players[player]
-    if player_data then
-        if player_data.billboard then
-            player_data.billboard:Destroy()
-        end
-        ability_esp.__state.players[player] = nil
-    end
-end
-
 function ability_esp.update_loop()
-    while ability_esp.__state.active do
+    while ability_esp.__state.active do  
         task.wait(ability_esp.__config.update_rate)
 
-        local players_to_remove = {}
-
-        for player, player_data in pairs(ability_esp.__state.players) do
-            if not player or not player.Parent then
-                table.insert(players_to_remove, player)
-                do end
-            end
-
-            local character = player.Character
-            if not character or not character.Parent or not character:FindFirstChild("Humanoid") then
-                if player_data.billboard then
-                    player_data.billboard:Destroy()
-                    player_data.billboard = nil
-                    player_data.label = nil
-                end
-                do end
-            end
-
-            if not player_data.billboard or not player_data.label then
-                local label, billboard = ability_esp.create_billboard(player)
-                if label then
-                    player_data.label = label
-                    player_data.billboard = billboard
-                    player_data.character = character
-                end
-            end
-
-            if player_data.label then
-                local success = ability_esp.update_label(player, player_data.label)
-                if not success then
-                    local label, billboard = ability_esp.create_billboard(player)
-                    if label then
-                        player_data.label = label
-                        player_data.billboard = billboard
-                        player_data.character = character
-                    end
-                end
+        for player, data in pairs(ability_esp.__state.players) do
+            if player.Character and data.label then
+                ability_esp.update_label(player, data.label)
             end
         end
-
-        for _, player in ipairs(players_to_remove) do
-            if ability_esp.__state.players[player] then
-                if ability_esp.__state.players[player].billboard then
-                    ability_esp.__state.players[player].billboard:Destroy()
-                end
-                ability_esp.__state.players[player] = nil
-            end
-        end
-    end
-end
+    end  
+end  
 
 function ability_esp.start()
-    if ability_esp.__state.active then
-        return
-    end
+    if ability_esp.__state.active then return end
 
     ability_esp.__state.active = true
     getgenv().AbilityESP = true
@@ -2798,54 +2646,22 @@ function ability_esp.start()
         end
     end
 
-    if not System.__properties.__connections.ability_esp then
-        System.__properties.__connections.ability_esp = {}
-    end
-
-    System.__properties.__connections.ability_esp.player_added = Players.PlayerAdded:Connect(function(player)
-        if ability_esp.__state.active and player ~= LocalPlayer then
-            task.wait(1)
-            ability_esp.add_player(player)
-        end
-    end)
-
     ability_esp.__state.update_task = task.spawn(function()
         ability_esp.update_loop()
     end)
 end
 
 function ability_esp.stop()
-    if not ability_esp.__state.active then
-        return
-    end
+    if not ability_esp.__state.active then return end
 
     ability_esp.__state.active = false
     getgenv().AbilityESP = false
 
-    if ability_esp.__state.update_task then
-        task.cancel(ability_esp.__state.update_task)
-        ability_esp.__state.update_task = nil
+    for _, v in pairs(ability_esp.__state.players) do  
+        if v.billboard then v.billboard:Destroy() end  
     end
 
-    if System.__properties.__connections.ability_esp then
-        for player, connections in pairs(System.__properties.__connections.ability_esp) do
-            if type(connections) == "table" then
-                for _, connection in pairs(connections) do
-                    if connection and connection.Connected then
-                        connection:Disconnect()
-                    end
-                end
-            elseif connections and connections.Connected then
-                connections:Disconnect()
-            end
-        end
-
-        System.__properties.__connections.ability_esp = nil
-    end
-
-    for player in pairs(ability_esp.__state.players) do
-        ability_esp.remove_player(player)
-    end
+    ability_esp.__state.players = {}
 end
 
 function ability_esp.toggle(value)
@@ -2856,738 +2672,404 @@ function ability_esp.toggle(value)
     end
 end
 
-VisualsTab:create_module({
-    title = 'Ability ESP',
-    flag = 'AbilityESP',
-    description = 'Displays Player Abilities',
-    section = 'left',
-    callback = function(value)
+local ability_esp_section = Tabs.Visuals:AddSection("Ability ESP", "eye")
+ability_esp_section:AddToggle("AbilityESP", {  
+    Title = "Ability ESP",  
+    Description = "Displays Player Abilities",  
+    Default = false,  
+    Callback = function(value)
         ability_esp.toggle(value)
+
+        Fluent:Notify({
+            Title = "Ability ESP",
+            Content = value and "Activated" or "Deactivated",
+            Duration = 2
+        })
     end
 })
 
-local HttpService = game:GetService("HttpService")
-local UserInputService = game:GetService("UserInputService")
+-- Ball Velocity
+local ball_velocity_section = Tabs.Visuals:AddSection("Ball Velocity", "gauge")
 
-local save_folder = workspace:FindFirstChild("OwO") or Instance.new("Folder", workspace)
-save_folder.Name = "OwO"
-
-local function load_pos()
-    local file = save_folder:FindFirstChild("ball_ui_pos")
-    if not file then return nil end
-
-    local ok, data = pcall(function()
-        return HttpService:JSONDecode(file.Value)
-    end)
-
-    if ok and data and data.x and data.y then
-        return UDim2.new(0, data.x, 0, data.y)
+function System.create_ball_velocity_gui()
+    if System.__properties.__ball_velocity_gui then
+        System.__properties.__ball_velocity_gui.gui:Destroy()
     end
-
-    return nil
-end
-
-local function save_pos(udim)
-    local data = {
-        x = udim.X.Offset,
-        y = udim.Y.Offset
-    }
-
-    local json = HttpService:JSONEncode(data)
-
-    local file = save_folder:FindFirstChild("ball_ui_pos") or Instance.new("StringValue", save_folder)
-    file.Name = "ball_ui_pos"
-    file.Value = json
-end
-
-
-local ball_velocity = {
-    __config = {
-        gui_name = "BallStatsGui",
-        colors = {
-            background = Color3.fromRGB(18, 18, 18),
-            container = Color3.fromRGB(28, 28, 28),
-            header = Color3.fromRGB(12, 12, 12),
-            text_primary = Color3.fromRGB(255, 255, 255),
-            text_secondary = Color3.fromRGB(170, 170, 170),
-            accent_green = Color3.fromRGB(34, 197, 94),
-            accent_orange = Color3.fromRGB(249, 115, 22),
-            border = Color3.fromRGB(40, 40, 40)
-        }
-    },
-
-    __state = {
-        active = false,
-        gui = nil,
-        ball_data = {},
-        is_dragging = false
-    }
-}
-
-function ball_velocity.create_corner(radius)
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, radius or 8)
-    return corner
-end
-
-function ball_velocity.create_stroke(thickness, color)
-    local stroke = Instance.new("UIStroke")
-    stroke.Thickness = thickness or 1
-    stroke.Color = color or ball_velocity.__config.colors.border
-    return stroke
-end
-
-function ball_velocity.create_gui()
+    
     local gui = Instance.new("ScreenGui")
-    gui.Name = ball_velocity.__config.gui_name
+    gui.Name = "BallVelocityGUI"
     gui.ResetOnSpawn = false
     gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-    gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
-
-    local main_frame = Instance.new("Frame")
-    main_frame.Name = "MainFrame"
-    main_frame.Size = UDim2.new(0, 180, 0, 95)
-    main_frame.Position = load_pos() or UDim2.new(0, 20, 0, 150)
-    main_frame.BackgroundColor3 = ball_velocity.__config.colors.background
-    main_frame.BorderSizePixel = 0
-    main_frame.Parent = gui
-
-    ball_velocity.create_corner(10).Parent = main_frame
-    ball_velocity.create_stroke(1, ball_velocity.__config.colors.border).Parent = main_frame
-
-    local header = Instance.new("Frame")
-    header.Name = "Header"
-    header.Size = UDim2.new(1, 0, 0, 26)
-    header.Position = UDim2.new(0, 0, 0, 0)
-    header.BackgroundColor3 = ball_velocity.__config.colors.header
-    header.BorderSizePixel = 0
-    header.Parent = main_frame
-
-    ball_velocity.create_corner(10).Parent = header
-
+    gui.DisplayOrder = 999
+    
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(0, 220, 0, 80)
+    frame.Position = UDim2.new(0, 10, 0, 10)
+    frame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    frame.BackgroundTransparency = 0.4
+    frame.BorderSizePixel = 0
+    frame.Active = true
+    frame.Selectable = true
+    frame.Draggable = true
+    
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 8)
+    corner.Parent = frame
+    
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = Color3.fromRGB(255, 255, 255)
+    stroke.Thickness = 2
+    stroke.Parent = frame
+    
     local title = Instance.new("TextLabel")
     title.Name = "Title"
-    title.Size = UDim2.new(1, -12, 1, 0)
-    title.Position = UDim2.new(0, 12, 0, 0)
+    title.Size = UDim2.new(1, 0, 0, 20)
+    title.Position = UDim2.new(0, 0, 0, 5)
     title.BackgroundTransparency = 1
-    title.Text = "Ball Stats"
-    title.TextColor3 = ball_velocity.__config.colors.text_primary
-    title.TextSize = 13
+    title.Text = "⚡ Ball Velocity"
+    title.TextColor3 = Color3.fromRGB(255, 255, 255)
     title.Font = Enum.Font.GothamBold
-    title.TextXAlignment = Enum.TextXAlignment.Left
-    title.Parent = header
-
-    local content = Instance.new("Frame")
-    content.Name = "Content"
-    content.Size = UDim2.new(1, -18, 1, -34)
-    content.Position = UDim2.new(0, 9, 0, 30)
-    content.BackgroundTransparency = 1
-    content.Parent = main_frame
-
-    local current_label = Instance.new("TextLabel")
-    current_label.Name = "CurrentLabel"
-    current_label.Size = UDim2.new(1, 0, 0, 14)
-    current_label.Position = UDim2.new(0, 0, 0, 2)
-    current_label.BackgroundTransparency = 1
-    current_label.Text = "Current"
-    current_label.TextColor3 = ball_velocity.__config.colors.text_secondary
-    current_label.TextSize = 10
-    current_label.Font = Enum.Font.Gotham
-    current_label.TextXAlignment = Enum.TextXAlignment.Left
-    current_label.Parent = content
-
-    local current_value = Instance.new("TextLabel")
-    current_value.Name = "CurrentValue"
-    current_value.Size = UDim2.new(1, 0, 0, 20)
-    current_value.Position = UDim2.new(0, 0, 0, 14)
-    current_value.BackgroundTransparency = 1
-    current_value.Text = "0.0"
-    current_value.TextColor3 = ball_velocity.__config.colors.accent_green
-    current_value.TextSize = 16
-    current_value.Font = Enum.Font.GothamBold
-    current_value.TextXAlignment = Enum.TextXAlignment.Left
-    current_value.Parent = content
-
-    local peak_label = Instance.new("TextLabel")
-    peak_label.Name = "PeakLabel"
-    peak_label.Size = UDim2.new(1, 0, 0, 14)
-    peak_label.Position = UDim2.new(0, 0, 0, 36)
-    peak_label.BackgroundTransparency = 1
-    peak_label.Text = "Peak"
-    peak_label.TextColor3 = ball_velocity.__config.colors.text_secondary
-    peak_label.TextSize = 10
-    peak_label.Font = Enum.Font.Gotham
-    peak_label.TextXAlignment = Enum.TextXAlignment.Left
-    peak_label.Parent = content
-
-    local peak_value = Instance.new("TextLabel")
-    peak_value.Name = "PeakValue"
-    peak_value.Size = UDim2.new(1, 0, 0, 20)
-    peak_value.Position = UDim2.new(0, 0, 0, 50)
-    peak_value.BackgroundTransparency = 1
-    peak_value.Text = "0.0"
-    peak_value.TextColor3 = ball_velocity.__config.colors.accent_orange
-    peak_value.TextSize = 16
-    peak_value.Font = Enum.Font.GothamBold
-    peak_value.TextXAlignment = Enum.TextXAlignment.Left
-    peak_value.Parent = content
-
-
-    local drag_start, start_pos
-
-    header.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1
-            or input.UserInputType == Enum.UserInputType.Touch then
-
-            ball_velocity.__state.is_dragging = true
-            drag_start = input.Position
-            start_pos = main_frame.Position
-        end
-    end)
-
-    UserInputService.InputChanged:Connect(function(input)
-        if ball_velocity.__state.is_dragging and
-            (input.UserInputType == Enum.UserInputType.MouseMovement
-            or input.UserInputType == Enum.UserInputType.Touch) then
-
-            local delta = input.Position - drag_start
-            local newpos = UDim2.new(
-                start_pos.X.Scale, start_pos.X.Offset + delta.X,
-                start_pos.Y.Scale, start_pos.Y.Offset + delta.Y
-            )
-
-            main_frame.Position = newpos
-        end
-    end)
-
-    UserInputService.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1
-            or input.UserInputType == Enum.UserInputType.Touch then
-
-            ball_velocity.__state.is_dragging = false
-            save_pos(main_frame.Position)
-        end
-    end)
-
-    return gui, current_value, peak_value
+    title.TextSize = 14
+    title.TextStrokeTransparency = 0.8
+    title.TextStrokeColor3 = Color3.new(0, 0, 0)
+    title.Parent = frame
+    
+    local currentSpeedLabel = Instance.new("TextLabel")
+    currentSpeedLabel.Name = "Text"
+    currentSpeedLabel.Size = UDim2.new(1, -10, 0, 25)
+    currentSpeedLabel.Position = UDim2.new(0, 5, 0, 25)
+    currentSpeedLabel.BackgroundTransparency = 1
+    currentSpeedLabel.Text = "Current: 0"
+    currentSpeedLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    currentSpeedLabel.Font = Enum.Font.GothamBold
+    currentSpeedLabel.TextSize = 16
+    currentSpeedLabel.TextXAlignment = Enum.TextXAlignment.Left
+    currentSpeedLabel.TextStrokeTransparency = 0.7
+    currentSpeedLabel.TextStrokeColor3 = Color3.new(0, 0, 0)
+    currentSpeedLabel.Parent = frame
+    
+    local peakSpeedLabel = Instance.new("TextLabel")
+    peakSpeedLabel.Name = "Text"
+    peakSpeedLabel.Size = UDim2.new(1, -10, 0, 25)
+    peakSpeedLabel.Position = UDim2.new(0, 5, 0, 50)
+    peakSpeedLabel.BackgroundTransparency = 1
+    peakSpeedLabel.Text = "Peak: 0"
+    peakSpeedLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    peakSpeedLabel.Font = Enum.Font.GothamBold
+    peakSpeedLabel.TextSize = 16
+    peakSpeedLabel.TextXAlignment = Enum.TextXAlignment.Left
+    peakSpeedLabel.TextStrokeTransparency = 0.5
+    peakSpeedLabel.TextStrokeColor3 = Color3.new(0, 0, 0)
+    peakSpeedLabel.Parent = frame
+    
+    frame.Parent = gui
+    gui.Parent = CoreGui
+    
+    System.__properties.__ball_velocity_gui = {
+        gui = gui,
+        frame = frame,
+        currentSpeedLabel = currentSpeedLabel,
+        peakSpeedLabel = peakSpeedLabel
+    }
 end
 
-function ball_velocity.start()
-    if ball_velocity.__state.active then return end
-
-    ball_velocity.__state.active = true
-    ball_velocity.__state.ball_data = {}
-
-    local gui, current_value, peak_value = ball_velocity.create_gui()
-    ball_velocity.__state.gui = gui
-
-    System.__properties.__connections.ball_velocity =
-        RunService.Heartbeat:Connect(function()
-
-            local ball = System.ball.get()
-
-            if not ball then
-                current_value.Text = "0.0"
-                peak_value.Text = "0.0"
-                return
-            end
-
-            local zoomies = ball:FindFirstChild("zoomies")
-            if not zoomies then
-                current_value.Text = "0.0"
-                return
-            end
-
-            local velocity = zoomies.VectorVelocity.Magnitude
-
-            ball_velocity.__state.ball_data[ball] =
-                ball_velocity.__state.ball_data[ball] or 0
-
-            if velocity > ball_velocity.__state.ball_data[ball] then
-                ball_velocity.__state.ball_data[ball] = velocity
-            end
-
-            current_value.Text = string.format("%.1f", velocity)
-            peak_value.Text = string.format("%.1f",
-                ball_velocity.__state.ball_data[ball])
-        end)
-end
-
-function ball_velocity.stop()
-    if not ball_velocity.__state.active then return end
-
-    ball_velocity.__state.active = false
-
-    if System.__properties.__connections.ball_velocity then
-        System.__properties.__connections.ball_velocity:Disconnect()
-        System.__properties.__connections.ball_velocity = nil
+function System.update_ball_velocity()
+    if not System.__properties.__ball_velocity_enabled or not System.__properties.__ball_velocity_gui then
+        return
     end
-
-    if ball_velocity.__state.gui then
-        ball_velocity.__state.gui:Destroy()
-        ball_velocity.__state.gui = nil
+    
+    local ball = System.ball.get()
+    if not ball then
+        System.__properties.__ball_velocity_gui.currentSpeedLabel.Text = "Current: 0"
+        return
     end
-
-    ball_velocity.__state.ball_data = {}
+    
+    local ballId = ball:GetFullName()
+    if ballId ~= System.__properties.__last_ball_id then
+        System.__properties.__peak_velocity = 0
+        System.__properties.__last_ball_id = ballId
+    end
+    
+    local zoomies = ball:FindFirstChild('zoomies')
+    if not zoomies then
+        System.__properties.__ball_velocity_gui.currentSpeedLabel.Text = "Current: 0"
+        return
+    end
+    
+    local velocity = zoomies.VectorVelocity
+    local speed = velocity.Magnitude
+    
+    if speed > System.__properties.__peak_velocity then
+        System.__properties.__peak_velocity = speed
+    end
+    
+    System.__properties.__ball_velocity_gui.currentSpeedLabel.Text = string.format("Current: %.1f", speed)
+    System.__properties.__ball_velocity_gui.peakSpeedLabel.Text = string.format("Peak: %.1f", System.__properties.__peak_velocity)
 end
 
-VisualsTab:create_module({
-    title = "Show Ball Velocity",
-    description = "",
-    flag = "ballvelocity",
-    section = "right",
-    callback = function(state)
-        if state then
-            ball_velocity.start()
+ball_velocity_section:AddToggle("BallVelocity", {
+    Title = "Show Ball Velocity",
+    Description = "Display ball velocity stats",
+    Default = false,
+    Callback = function(value)
+        System.__properties.__ball_velocity_enabled = value
+        if value then
+            System.create_ball_velocity_gui()
+            
+            if not System.__properties.__connections.__ball_velocity then
+                System.__properties.__connections.__ball_velocity = RunService.RenderStepped:Connect(function()
+                    System.update_ball_velocity()
+                end)
+            end
+            
+            Fluent:Notify({
+                Title = "Ball Velocity",
+                Content = "Activated",
+                Duration = 2
+            })
         else
-            ball_velocity.stop()
+            if System.__properties.__ball_velocity_gui then
+                System.__properties.__ball_velocity_gui.gui:Destroy()
+                System.__properties.__ball_velocity_gui = nil
+            end
+            
+            if System.__properties.__connections.__ball_velocity then
+                System.__properties.__connections.__ball_velocity:Disconnect()
+                System.__properties.__connections.__ball_velocity = nil
+            end
+            
+            System.__properties.__peak_velocity = 0
+            System.__properties.__last_ball_id = nil
+            
+            Fluent:Notify({
+                Title = "Ball Velocity",
+                Content = "Deactivated",
+                Duration = 2
+            })
         end
     end
 })
 
+local skin_changer_section = Tabs.Misc:AddSection("Skin Changer", "sword")
 
--- =========================================================
--- Misc: all functions moved here from the separated Misc tabs
--- =========================================================
-local Workspace = workspace
-local Connections = {}
-
-local PeakVel = 0
-local Music = nil
-local SelectedSong = "EEYUH!"
-local MusicVolume = 5
-local KorbloxConnection = nil
-local OriginalFaceTexture = nil
-local soundOptions = {
-    ["EEYUH!"] = "rbxassetid://16190782181",
-    ["Skibidi Toilet"] = "rbxassetid://122353792844213",
-    ["DEKUD"] = "rbxassetid://124760595693133",
-    ["Everybody Wants To Rule The World"] = "rbxassetid://87209527034670",
-    ["CHWYKU"] = "rbxassetid://80796352391107",
-    ["ULTCHILL FUNK"] = "rbxassetid://103283136727523",
-    ["VEM VEM CHILL FUNK"] = "rbxassetid://70870883948497",
-    ["Rat Dance Remake"] = "rbxassetid://133496635668044",
-    ["tobreak"] = "rbxassetid://111557295232821",
-    ["Rise to the Horizon"] = "rbxassetid://72573266268313",
-    ["Echoes of the Candy Kingdom"] = "rbxassetid://103040477333590",
-    ["Speed"] = "rbxassetid://125550253895893",
-    ["Lo-fi Chill A"] = "rbxassetid://9043887091",
-    ["Lo-fi Ambient"] = "rbxassetid://129775776987523",
-    ["Tears in the Rain"] = "rbxassetid://129710845038263"
-}
-
-local antiLagModule = MiscTab:create_module({
-      title = "Anti-Lag",
-      flag = "LagReducer",
-      description = "Reduces lag by optimizing graphics",
-      section = "right",
-      callback = function(v)
-          Optimize(v)
-      end
-  })
-  local noRenderModule = MiscTab:create_module({
-      title = "No Render",
-      flag = "NoRender",
-      description = "Disables rendering of certain effects",
-      section = "left",
-      callback = function(value)
-          LocalPlayer.PlayerScripts.EffectScripts.ClientFX.Disabled = value
-          if value then
-              Connections['NoRender'] = Workspace.Runtime.ChildAdded:Connect(function(value)
-                  Debris:AddItem(value, 0)
-              end)
-          else
-              if Connections['NoRender'] then
-                  Connections['NoRender']:Disconnect()
-                  Connections['NoRender'] = nil
-              end
-          end
-      end
-  })
-  local skySettingsModule = MiscTab:create_module({
-      title = "Sky Settings",
-      flag = "skySettings",
-      description = "Lets you change the sky to your liking",
-      section = "left",
-      callback = function(v) end
-  })
-  skySettingsModule:create_dropdown({
-      title = "Sky Box Options",
-      flag = "SkyBoxOptions",
-      options = {"None", "Space Wave", "Space Wave2", "Turquoise Wave", "Dark Night", "Bright Pink", "White Galaxy"},
-      multi_dropdown = false,
-      maximum_options = 999,
-      callback = function(value)
-          local Sky = game.Lighting:FindFirstChildOfClass("Sky") or Instance.new("Sky", game.Lighting)
-          if value == "None" then
-              for _, prop in pairs({"SkyboxBk", "SkyboxDn", "SkyboxFt", "SkyboxLf", "SkyboxRt", "SkyboxUp"}) do
-                  Sky[prop] = ""
-              end
-              game.Lighting.GlobalShadows = true
-          else
-              local SkyboxLoader = loadstring(game:HttpGet("https://raw.githubusercontent.com/Forexium/eclipse/main/Skyboxes.lua", true))()
-              local skyboxData = SkyboxLoader[value]
-              for index, prop in next, {"SkyboxBk", "SkyboxDn", "SkyboxFt", "SkyboxLf", "SkyboxRt", "SkyboxUp"} do
-                  Sky[prop] = "rbxassetid://" .. skyboxData[index]
-              end
-              game.Lighting.GlobalShadows = false
-          end
-      end
-  })
-  local lightingSettingsModule = MiscTab:create_module({
-      title = "Lighting Settings",
-      flag = "lightingSettings",
-      description = "Tweak the lighting to your liking",
-      section = "right",
-      callback = function(v) end
-  })
-  lightingSettingsModule:create_checkbox({
-      title = "Full Bright",
-      flag = "FullBright",
-      callback = function(value)
-          if value then
-              game.Lighting.GlobalShadows = false
-              game.Lighting.Ambient = Color3.new(1, 1, 1)
-          else
-              game.Lighting.GlobalShadows = true
-              game.Lighting.Ambient = Color3.new(0.5, 0.5, 0.5)
-          end
-      end
-  })
-  lightingSettingsModule:create_checkbox({
-      title = "Custom Lighting",
-      flag = "CustomLighting",
-      callback = function(value)
-          if value then
-              game.Lighting.Ambient = Color3.new(1, 1, 1)
-              game.Lighting.Brightness = 2
-          else
-              game.Lighting.Ambient = Color3.new(0.5, 0.5, 0.5)
-              game.Lighting.Brightness = 1
-          end
-      end
-  })
-  lightingSettingsModule:create_slider({
-      title = "Time of Day",
-      flag = "TimeOfDay",
-      maximum_value = 24,
-      minimum_value = 0,
-      value = 12,
-      round_number = true,
-      callback = function(value)
-          game.Lighting.ClockTime = value
-      end
-  })
-  local function ClearHead(char)
-      local head = char:WaitForChild("Head")
-      head.Transparency = 1
-      for _, child in pairs(head:GetChildren()) do
-          if child:IsA("Decal") then
-              child:Destroy()
-          end
-      end
-  end
-  local function ClearHeadless(char)
-      local head = char:FindFirstChild("Head")
-      if head then
-          head.Transparency = 0
-          if OriginalFaceTexture then
-              local face = Instance.new("Decal")
-              face.Name = "face"
-              face.Texture = OriginalFaceTexture
-              face.Parent = head
-          end
-      end
-  end
-  local function Korbloxify(char)
-      if char:FindFirstChild("KorbloxLeg") then return end
-      local rightLeg = char:WaitForChild("Right Leg")
-      rightLeg.Transparency = 1
-      rightLeg.CanCollide = false
-      local korbloxLeg = Instance.new("Part")
-      korbloxLeg.Name = "KorbloxLeg"
-      korbloxLeg.Size = rightLeg.Size
-      korbloxLeg.Anchored = true
-      korbloxLeg.CanCollide = false
-      korbloxLeg.Parent = char
-      local mesh = Instance.new("SpecialMesh")
-      mesh.MeshId = "http://www.roblox.com/asset/?id=12917863813"
-      mesh.TextureId = "http://roblox.com/asset/?id=12917863954"
-      mesh.Scale = Vector3.new(1.5, 1.5, 1.5)
-      mesh.Parent = korbloxLeg
-      task.delay(0, function()
-          if char and char.Parent then
-              KorbloxConnection = RunService.RenderStepped:Connect(function()
-                  if rightLeg and korbloxLeg then
-                      korbloxLeg.CFrame = rightLeg.CFrame * CFrame.Angles(0, math.rad(180), 0) * CFrame.new(0, 0.5, 0)
-                  else
-                      KorbloxConnection:Disconnect()
-                      KorbloxConnection = nil
-                  end
-              end)
-          end
-      end)
-  end
-  local function ClearKorblox(char)
-      if KorbloxConnection then
-          KorbloxConnection:Disconnect()
-          KorbloxConnection = nil
-      end
-      local korbloxLeg = char:FindFirstChild("KorbloxLeg")
-      if korbloxLeg then
-          korbloxLeg:Destroy()
-      end
-      local rightLeg = char:FindFirstChild("Right Leg")
-      if rightLeg then
-          rightLeg.Transparency = 0
-          rightLeg.CanCollide = true
-      end
-  end
-  local function EnsureModifications()
-      local char = LocalPlayer.Character
-      if not char then return end
-      local head = char:FindFirstChild("Head")
-      if head then
-          head.Transparency = 1
-          for _, child in pairs(head:GetChildren()) do
-              if child:IsA("Decal") then
-                  child:Destroy()
-              end
-          end
-      end
-      local rightLeg = char:FindFirstChild("Right Leg")
-      if rightLeg then
-          rightLeg.Transparency = 1
-          rightLeg.CanCollide = false
-      end
-      if not char:FindFirstChild("KorbloxLeg") then
-          Korbloxify(char)
-      end
-  end
-  local korbloxHeadlessModule = MiscTab:create_module({
-      title = "Korblox & Headless",
-      flag = "korbloxHeadlessModule",
-      description = "Enable Korblox & Headless",
-      section = "left",
-      callback = function(value)
-          local character = LocalPlayer.Character
-          if not character then return end
-          if value then
-              local head = character:FindFirstChild("Head")
-              if head then
-                  local face = head:FindFirstChild("face")
-                  if face and face:IsA("Decal") then
-                      OriginalFaceTexture = face.Texture
-                  end
-              end
-              ClearHead(character)
-              if HeadDecalConnection then HeadDecalConnection:Disconnect() end
-              HeadDecalConnection = head.ChildAdded:Connect(function(child)
-                  if child:IsA("Decal") then
-                      child:Destroy()
-                  end
-              end)
-              Korbloxify(character)
-              if not Check_Refresh then
-                  Check_Refresh = RunService.Heartbeat:Connect(EnsureModifications)
-              end
-          else
-              if HeadDecalConnection then
-                  HeadDecalConnection:Disconnect()
-                  HeadDecalConnection = nil
-              end
-              ClearHeadless(character)
-              ClearKorblox(character)
-              if Check_Refresh then
-                  Check_Refresh:Disconnect()
-                  Check_Refresh = nil
-              end
-              OriginalFaceTexture = nil
-          end
-      end
-  })
-
-  local musicModule = MiscTab:create_module({
-      title = "Music Player",
-      flag = "musicModule",
-      description = "Play music in game",
-      section = "right",
-      callback = function(v) end
-  })
-  musicModule:create_checkbox({
-      title = "Enable Music",
-      flag = "EnableMusic",
-      callback = function(v)
-          if v then
-              if not Music then
-                  Music = Instance.new("Sound")
-                  Music.Parent = Workspace
-                  Music.Looped = true
-              end
-              Music.SoundId = soundOptions[SelectedSong]
-              Music.Volume = MusicVolume
-              Music:Play()
-          else
-              if Music then
-                  Music:Stop()
-              end
-          end
-      end
-  })
-  musicModule:create_slider({
-      title = "Volume",
-      flag = "MusicVolume",
-      maximum_value = 10,
-      minimum_value = 1,
-      value = 5,
-      round_number = true,
-      callback = function(value)
-          MusicVolume = value
-          if Music then
-              Music.Volume = value
-          end
-      end
-  })
-
-
-musicModule:create_dropdown({
-    title = "Song Choice",
-    flag = "SongChoice",
-    options = {"EEYUH!", "Skibidi Toilet", "DEKUD", "Everybody Wants To Rule The World", "CHWYKU", "ULTCHILL FUNK", "VEM VEM CHILL FUNK", "Grasp the Light", "tobreak", "Rise to the Horizon", "Echoes of the Candy Kingdom", "Speed", "Lo-fi Chill A", "Lo-fi Ambient", "Tears in the Rain"},
-    multi_dropdown = false,
-    maximum_options = 999,
-    callback = function(value)
-        SelectedSong = value
-        if Music then
-            Music.SoundId = soundOptions[value]
-            Music:Play()
+skin_changer_section:AddToggle("SkinChanger", {
+    Title = "Skin Changer",
+    Description = "Change sword skins",
+    Default = false,
+    Callback = function(value)
+        getgenv().skinChangerEnabled = value
+        if value then
+            getgenv().updateSword()
+            Fluent:Notify({
+                Title = "Skin Changer",
+                Content = "Enabled",
+                Duration = 2
+            })
+        else
+            Fluent:Notify({
+                Title = "Skin Changer",
+                Content = "Disabled",
+                Duration = 2
+            })
         end
     end
 })
 
-local mainLocalPlayer = Players.LocalPlayer
-local speedGui = Instance.new("ScreenGui")
-speedGui.Name = "//////////////"
-speedGui.Parent = mainLocalPlayer.PlayerGui
-speedGui.ResetOnSpawn = false
-
-local speedLabel = Instance.new("TextLabel")
-speedLabel.Name = "//////////////"
-speedLabel.Size = UDim2.new(0, 200, 0, 50)
-speedLabel.Position = UDim2.new(1, -210, 0, 10)
-speedLabel.AnchorPoint = Vector2.new(1, 0)
-speedLabel.BackgroundTransparency = 1
-speedLabel.TextColor3 = Color3.new(1, 1, 1)
-speedLabel.TextSize = 20
-speedLabel.Font = Enum.Font.GothamBlack
-speedLabel.TextXAlignment = Enum.TextXAlignment.Right
-speedLabel.TextYAlignment = Enum.TextYAlignment.Top
-speedLabel.Text = ""
-speedLabel.Parent = speedGui
-
-local lobbySpeedGui = Instance.new("ScreenGui")
-lobbySpeedGui.Name = "//////////////"
-lobbySpeedGui.Parent = mainLocalPlayer.PlayerGui
-lobbySpeedGui.ResetOnSpawn = false
-
-local lobbySpeedLabel = Instance.new("TextLabel")
-lobbySpeedLabel.Name = "//////////////"
-lobbySpeedLabel.Size = UDim2.new(0, 200, 0, 50)
-lobbySpeedLabel.Position = UDim2.new(1, -210, 0, 60)
-lobbySpeedLabel.AnchorPoint = Vector2.new(1, 0)
-lobbySpeedLabel.BackgroundTransparency = 1
-lobbySpeedLabel.TextColor3 = Color3.new(1, 1, 1)
-lobbySpeedLabel.TextSize = 20
-lobbySpeedLabel.Font = Enum.Font.GothamBlack
-lobbySpeedLabel.TextXAlignment = Enum.TextXAlignment.Right
-lobbySpeedLabel.TextYAlignment = Enum.TextYAlignment.Top
-lobbySpeedLabel.Text = ""
-lobbySpeedLabel.Parent = lobbySpeedGui
-
-local curveGui = Instance.new("ScreenGui")
-curveGui.Name = "//////////////"
-curveGui.Parent = mainLocalPlayer.PlayerGui
-curveGui.ResetOnSpawn = false
-
-local curveLabel = Instance.new("TextLabel")
-curveLabel.Name = "//////////////"
-curveLabel.Size = UDim2.new(0, 200, 0, 50)
-curveLabel.Position = UDim2.new(1, -210, 0, 70)
-curveLabel.AnchorPoint = Vector2.new(1, 0)
-curveLabel.BackgroundTransparency = 1
-curveLabel.TextColor3 = Color3.new(1, 1, 1)
-curveLabel.TextSize = 20
-curveLabel.Font = Enum.Font.GothamBlack
-curveLabel.TextXAlignment = Enum.TextXAlignment.Right
-curveLabel.TextYAlignment = Enum.TextYAlignment.Top
-curveLabel.Text = ""
-curveLabel.Parent = curveGui
-
-local function GetLobbyBall()
-    for _, instance in pairs(Workspace.TrainingBalls:GetChildren()) do
-        if instance:IsA("BasePart") and instance:GetAttribute("realBall") then
-            instance.CanCollide = false
-            return instance
+skin_changer_section:AddToggle("ChangeSwordModel", {
+    Title = "Change Sword Model",
+    Description = "Change sword model",
+    Default = true,
+    Callback = function(value)
+        getgenv().changeSwordModel = value
+        if getgenv().skinChangerEnabled then
+            getgenv().updateSword()
         end
     end
-    return nil
+})
+
+skin_changer_section:AddInput("SwordModelName", {
+    Title = "Sword Model Name",
+    Placeholder = "Enter Sword Model Name...",
+    Default = "",
+    Callback = function(text)
+        getgenv().swordModel = text
+        if getgenv().skinChangerEnabled and getgenv().changeSwordModel then
+            getgenv().updateSword()
+        end
+    end
+})
+
+skin_changer_section:AddToggle("ChangeSwordAnimation", {
+    Title = "Change Sword Animation",
+    Description = "Change sword animations",
+    Default = true,
+    Callback = function(value)
+        getgenv().changeSwordAnimation = value
+        if getgenv().skinChangerEnabled then
+            getgenv().updateSword()
+        end
+    end
+})
+
+skin_changer_section:AddInput("SwordAnimationName", {
+    Title = "Sword Animation Name",
+    Placeholder = "Enter Sword Animation Name...",
+    Default = "",
+    Callback = function(text)
+        getgenv().swordAnimations = text
+        if getgenv().skinChangerEnabled and getgenv().changeSwordAnimation then
+            getgenv().updateSword()
+        end
+    end
+})
+
+skin_changer_section:AddToggle("ChangeSwordFX", {
+    Title = "Change Sword FX",
+    Description = "Change sword effects",
+    Default = true,
+    Callback = function(value)
+        getgenv().changeSwordFX = value
+        if getgenv().skinChangerEnabled then
+            getgenv().updateSword()
+        end
+    end
+})
+
+skin_changer_section:AddInput("SwordFXName", {
+    Title = "Sword FX Name",
+    Placeholder = "Enter Sword FX Name...",
+    Default = "",
+    Callback = function(text)
+        getgenv().swordFX = text
+        if getgenv().skinChangerEnabled and getgenv().changeSwordFX then
+            getgenv().updateSword()
+        end
+    end
+})
+
+-- NO RENDER SECTION
+local no_render_section = Tabs.Misc:AddSection("No Render", "eye-off")
+
+local Connections_Manager = {}
+
+no_render_section:AddToggle("NoRender", {
+    Title = "No Render",
+    Description = "Disables rendering of effects",
+    Default = false,
+    Callback = function(state)
+        local effectScripts = LocalPlayer.PlayerScripts:FindFirstChild("EffectScripts")
+        if effectScripts then
+            local clientFX = effectScripts:FindFirstChild("ClientFX")
+            if clientFX then
+                clientFX.Disabled = state
+            end
+        end
+
+        if state then
+            Connections_Manager['No Render'] = workspace.Runtime.ChildAdded:Connect(function(Value)
+                Debris:AddItem(Value, 0)
+            end)
+        else
+            if Connections_Manager['No Render'] then
+                Connections_Manager['No Render']:Disconnect()
+                Connections_Manager['No Render'] = nil
+            end
+        end
+    end
+})
+
+-- BOTÃO MÓVEL PARA UI
+local mobile_ui_button = nil
+
+local function create_mobile_ui_button()
+    if mobile_ui_button then
+        mobile_ui_button.gui:Destroy()
+    end
+    
+    local gui = Instance.new('ScreenGui')
+    gui.Name = 'angeliMobileUIButton'
+    gui.ResetOnSpawn = false
+    gui.IgnoreGuiInset = true
+    gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    gui.DisplayOrder = 9999
+    
+    local button = Instance.new('TextButton')
+    button.Size = UDim2.new(0, 50, 0, 50)
+    button.Position = UDim2.new(0.95, -25, 0.05, 0)
+    button.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+    button.BackgroundTransparency = 0.3
+    button.AnchorPoint = Vector2.new(0.5, 0.5)
+    button.Draggable = true
+    button.AutoButtonColor = true
+    button.ZIndex = 10000
+    
+    local corner = Instance.new('UICorner')
+    corner.CornerRadius = UDim.new(1, 0)
+    corner.Parent = button
+    
+    local stroke = Instance.new('UIStroke')
+    stroke.Color = Color3.fromRGB(255, 255, 255)
+    stroke.Thickness = 2
+    stroke.Transparency = 0.3
+    stroke.Parent = button
+    
+    local text = Instance.new('TextLabel')
+    text.Size = UDim2.new(1, 0, 1, 0)
+    text.BackgroundTransparency = 1
+    text.Text = "R"
+    text.Font = Enum.Font.GothamBold
+    text.TextSize = 24
+    text.TextColor3 = Color3.fromRGB(255, 255, 255)
+    text.ZIndex = 10001
+    text.Parent = button
+    
+    button.MouseButton1Click:Connect(function()
+        Window:Minimize(not Window.Minimized)
+    end)
+    
+    button.Parent = gui
+    gui.Parent = CoreGui
+    
+    mobile_ui_button = {gui = gui, button = button}
+    return mobile_ui_button
 end
 
-LocalPlayer.CharacterAdded:Connect(function(char)
-    task.wait(0.1)
-    local camera = Workspace.CurrentCamera
-    if camera then
-        camera.FieldOfView = Library._config._flags["FieldOfViewValue"]
-    end
-end)
+-- Criar botão móvel se for mobile
+if System.__properties.__is_mobile then
+    task.spawn(function()
+        task.wait(2)
+        create_mobile_ui_button()
+    end)
+end
 
+-- SETTINGS TAB
+-- Configurar SaveManager e InterfaceManager
+SaveManager:SetLibrary(Fluent)
+InterfaceManager:SetLibrary(Fluent)
 
-main:load()
+-- Ignorar configurações de tema (gerenciadas separadamente)
+SaveManager:IgnoreThemeSettings()
 
--- =========================================================
--- Obsidian Theme / Save Manager
--- =========================================================
-local SettingsTab = Window:AddTab({
-    Name = "Settings",
-    Icon = "settings",
-    Description = "Kittylol configuration and theme settings."
+-- Definir pastas para salvar configurações
+InterfaceManager:SetFolder("angeli")
+SaveManager:SetFolder("angeli/configs")
+
+-- Construir seções de Interface e Config na aba Settings
+InterfaceManager:BuildInterfaceSection(Tabs.Settings)
+SaveManager:BuildConfigSection(Tabs.Settings)
+
+Window:SelectTab(1)
+
+-- Carregar configuração automática se existir
+SaveManager:LoadAutoloadConfig()
+
+-- Notificação inicial
+Fluent:Notify({
+    Title = "ENRIQUE PAID",
+    Content = "Loaded successfully! (Dual Bypass System - Virtual Input First Parry)",
+    Duration = 5
 })
 
-pcall(function()
-    if ThemeManager and ThemeManager.SetLibrary then
-        ThemeManager:SetLibrary(Library)
-        ThemeManager:SetFolder("Kittylol")
-        if ThemeManager.ApplyToTab then
-            ThemeManager:ApplyToTab(SettingsTab)
-        end
-    end
-end)
+print("River loaded with Fluent UI and Dual Bypass System!")
 
-pcall(function()
-    if SaveManager and SaveManager.SetLibrary then
-        SaveManager:SetLibrary(Library)
-        SaveManager:SetFolder("Kittylol")
-        SaveManager:IgnoreThemeSettings()
-        SaveManager:SetIgnoreIndexes({})
-        SaveManager:BuildConfigSection(SettingsTab)
-    end
-end)
-
-pcall(function()
-    if SaveManager and SaveManager.LoadAutoloadConfig then
-        task.defer(function()
-            task.wait(0.25)
-            SaveManager:LoadAutoloadConfig()
-        end)
-    end
-end)
-
--- ENRIQUE PAID DISCORD
-pcall(function()
-    Library:Notify({
-        Title = "ENRIQUE PAID",
-        Description = "Discord: discord.gg/jEA49UNC",
-        Time = 5
-    })
-end)
-
+end) -- Fim do task.spawn para carregamento assíncrono da UI
