@@ -21441,6 +21441,7 @@ do
             if h then h.WalkSpeed = getgenv().ENQ_WS2_V or 50 end end)
             end) else if getgenv()._ENQ_WS2_Conn then getgenv()._ENQ_WS2_Conn:Disconnect(); getgenv()._ENQ_WS2_Conn = nil end
             pcall(function() LocalPlayer.Character:FindFirstChildOfClass("Humanoid").WalkSpeed = 16 end)
+        end
         end,})
 
     P:create_module({title = "JumpPower V2", description = "Enhanced jump power", flag = "ENQ_JP2",
@@ -21450,6 +21451,7 @@ do
             if h then h.UseJumpPower = true; h.JumpPower = getgenv().ENQ_JP2_V or 100 end end)
             end) else if getgenv()._ENQ_JP2_Conn then getgenv()._ENQ_JP2_Conn:Disconnect(); getgenv()._ENQ_JP2_Conn = nil end
             pcall(function() local h = LocalPlayer.Character:FindFirstChildOfClass("Humanoid"); h.UseJumpPower = true; h.JumpPower = 50 end)
+        end
         end,})
 
     P:create_module({title = "NoClip V2", description = "Enhanced noclip", flag = "ENQ_NC2",
@@ -21597,7 +21599,7 @@ do
         callback = function(state)
             if state then pcall(function() local h = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
             h.UseJumpPower = true; h.JumpPower = 200 end)
-            else pcall(function() LocalPlayer.Character:FindFirstChildOfClass("Humanoid").JumpPower = 50) end
+            else pcall(function() LocalPlayer.Character:FindFirstChildOfClass("Humanoid").JumpPower = 50 end) end
         end,})
 
     P:create_module({title = "Gravity Control", description = "Custom gravity", flag = "ENQ_GravCtrl",
@@ -22078,51 +22080,36 @@ do
 end
 
 
-return Library
-
 
     -- ENRIQUE FREE DISCORD
     task.delay(3, function()
         pcall(function()
-            Library:Notify({
-                Title = "ENRIQUE FREE",
-                Description = "Discord: discord.gg/jEA49UNC",
-                Time = 5
-            })
+            Library:Notify({Title = "ENRIQUE FREE", Description = "discord.gg/jEA49UNC", Time = 5})
         end)
     end)
-end)
-
-    end)
-end)
-
--- ENRIQUE FREE IMAGE
-task.delay(1, function()
-    pcall(function()
-        local coreGui = (gethui and gethui()) or game:GetService("CoreGui")
-        for _, gui in pairs(coreGui:GetChildren()) do
-            if gui:IsA("ScreenGui") then
-                local mf = gui:FindFirstChild("Main", true)
-                if mf then
-                    local img = Instance.new("ImageLabel")
-                    img.Name = "ENRIQUEImage"
-                    img.Size = UDim2.new(0, 36, 0, 36)
-                    img.Position = UDim2.new(1, -46, 0, 6)
-                    img.BackgroundTransparency = 1
-                    img.Image = "rbxassetid://16014323157"
-                    img.ScaleType = Enum.ScaleType.Fit
-                    img.Parent = mf
-                    Instance.new("UICorner", img).CornerRadius = UDim.new(0, 8)
+    -- ENRIQUE FREE IMAGE
+    task.delay(1, function()
+        pcall(function()
+            local coreGui = (gethui and gethui()) or game:GetService("CoreGui")
+            for _, gui in pairs(coreGui:GetChildren()) do
+                if gui:IsA("ScreenGui") then
+                    local mf = gui:FindFirstChild("Main", true)
+                    if mf then
+                        local img = Instance.new("ImageLabel")
+                        img.Name = "ENRIQUEImage"
+                        img.Size = UDim2.new(0, 36, 0, 36)
+                        img.Position = UDim2.new(1, -46, 0, 6)
+                        img.BackgroundTransparency = 1
+                        img.Image = "rbxassetid://16014323157"
+                        img.ScaleType = Enum.ScaleType.Fit
+                        img.Parent = mf
+                        Instance.new("UICorner", img).CornerRadius = UDim.new(0, 8)
+                    end
+                    break
                 end
-                break
             end
-        end
+        end)
     end)
-end)
 
--- ENRIQUE FREE DISCORD
-task.delay(3, function()
-    pcall(function()
-        Library:Notify({Title = "ENRIQUE FREE", Description = "Discord: discord.gg/jEA49UNC", Time = 5})
-    end)
+end)
 end)
