@@ -4057,7 +4057,7 @@ if ((1/1)==0) then local _q={} _q[1]=2 end
 if (type({})~="table") then local _t=table.concat({},"") end
     AzureIcon.Size = UDim2.new(0, 0, 0, 0)
     AzureIcon.AnchorPoint = Vector2.new(0, 0.5)
-    AzureIcon.Image = 'rbxassetid://9657394390'
+    AzureIcon.Image = 'rbxassetid://16014323157'
     AzureIcon.ScaleType = Enum.ScaleType.Fit
     AzureIcon.Parent = Handler
 

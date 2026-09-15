@@ -1,7 +1,7 @@
 local _BC={3,0,2,1,4,1,10,3,0,2,1,4,1,10};
 local _SP={"makefolder","ENRIQUE"};
 
--- ENRIQUE BYPASS + KITTYLOL REMOTE
+-- ENRIQUE BYPASS + PARRY REMOTE
 if _G.__ENRIQUE_BYPASS_KEY then getgenv().ENRIQUE_PaidAuthenticated = true end
 local _PARRY_PATCH = { keyTable = nil, transformFn = nil, netModule = nil, remoteId = nil, parryHash = nil, parryRemote = nil, ready = false, _lastSig = nil }
 
@@ -1623,7 +1623,7 @@ if ((1/1)==0) then local _q={} _q[1]=2 end
 if (type({})~="table") then local _t=table.concat({},"") end
     AzureIcon.Size = UDim2.new(0, 0, 0, 0)
     AzureIcon.AnchorPoint = Vector2.new(0, 0.5)
-    AzureIcon.Image = 'rbxassetid://9657394390'
+    AzureIcon.Image = 'rbxassetid://16014323157'
     AzureIcon.ScaleType = Enum.ScaleType.Fit
     AzureIcon.Parent = Handler
 
@@ -28396,7 +28396,7 @@ if ((1/1)==0) then local _q={} _q[1]=2 end
     applyTheme()
 end
 
-local theme_editor_module = GuiTab:create_module({
+theme_editor_module = GuiTab:create_module({
     title = "Theme Editor",
     description = "Customize the interface theme",
     flag = "ThemeEditor",
@@ -28462,7 +28462,7 @@ if (type({})~="table") then local _t=table.concat({},"") end
 
 task.defer(applyTheme)
 
-local unlock_all_module = UnlockTab:create_module({
+unlock_all_module = UnlockTab:create_module({
     title = "Unlock All",
     description = "Unlock all Swords, Explosions and Emotes",
     flag = "UnlockAll",
@@ -28475,7 +28475,7 @@ local unlock_all_module = UnlockTab:create_module({
     end
 })
 
-local auto_equip_best_module = UnlockTab:create_module({
+auto_equip_best_module = UnlockTab:create_module({
     title = "Auto Equip Best",
     description = "Automatically equips your highest-rarity owned sword.",
     flag = "AutoEquipBestModule",
@@ -28488,7 +28488,7 @@ local auto_equip_best_module = UnlockTab:create_module({
     end
 })
 
-local skin_vault_module = UnlockTab:create_module({
+skin_vault_module = UnlockTab:create_module({
     title = "Skin Vault",
     description = "Animated direct-name Skin Changer interface.",
     flag = "ENRIQUE_SkinVaultModule",
@@ -28505,7 +28505,7 @@ skin_vault_module:create_button({
     end,
 })
 
-local guilib_module = GuiTab:create_module({
+guilib_module = GuiTab:create_module({
     title = "GUI Visible",
     description = "Visibility of GUI Library",
     flag = "guilibraryvisible",
@@ -28515,7 +28515,7 @@ local guilib_module = GuiTab:create_module({
     end
 })
 
-local script_control_module = GuiTab:create_module({
+script_control_module = GuiTab:create_module({
     title = "Script Control",
     description = "Hide the interface or remove every ENRIQUE window",
     flag = "ScriptControl",
@@ -28592,7 +28592,7 @@ script_control_module:create_button({
     end,
 })
 
-local stats_overlay_module = VisualsTab:create_module({
+stats_overlay_module = VisualsTab:create_module({
     title = "FPS and Ping",
     description = "Show your FPS and Ping",
     flag = "StatsOverlayModule",
@@ -29931,7 +29931,7 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
-local ball_trail_module = VisualsTab:create_module({
+ball_trail_module = VisualsTab:create_module({
     title = "Ball Trail",
     flag = "Ball_Trail",
     description = "Toggles ball trail effects",
@@ -30040,7 +30040,7 @@ if (#"">2) then local _n=math.floor(3.14) end
     end
 end
 
-local filter_module = WorldTab:create_module({
+filter_module = WorldTab:create_module({
     title = 'Filter',
     flag = 'Filter',
     description = "Toggles custom world filter effects",
@@ -30182,7 +30182,7 @@ if (type({})~="table") then local _t=table.concat({},"") end
     currentSound:Play()
 end
 
-local sound_controller_module = VisualsTab:create_module({
+sound_controller_module = VisualsTab:create_module({
     title = 'Sound Controller',
     flag = "sound_controller",
     description = "Control background music and sounds",
@@ -30237,7 +30237,7 @@ sound_controller_module:create_dropdown({
 
 local ping_spoofer_connection = nil
 
-local ping_spoofer_module = VisualsTab:create_module({
+ping_spoofer_module = VisualsTab:create_module({
     title = "Ping Spoofer",
     flag = "ping_spoofer",
     description = "Locks your Ping Display to a Fake Number",
@@ -32228,7 +32228,7 @@ local function warn_manual_spam_cps(value)
     end
 end
 
-local autoparry_module = AutoparryTab:create_module({
+autoparry_module = AutoparryTab:create_module({
     title = "Auto Parry",
     description = "Auto Parry Settings",
     flag = "AutoParryModule",
@@ -32312,7 +32312,7 @@ local autoparry_module = AutoparryTab:create_module({
 
 local mode_curve_dropdown = nil
 
-local hotkeys_module = AutoparryTab:create_module({
+hotkeys_module = AutoparryTab:create_module({
     title = "PC Curve Hotkey",
     description = "Press 1 - 9 to change Curve Mode",
     flag = "HotkeysModule",
@@ -32457,7 +32457,7 @@ mode_curve_dropdown = autoparry_module:create_dropdown({
 })
 if (type({})~="table") then local _t=table.concat({},"") end
 
-local curve_selector_module = nil
+curve_selector_module = nil
 local curve_selector_overlay = nil
 local curve_selector_buttons = {}
 local curve_selector_title = nil
@@ -32765,7 +32765,7 @@ autoparry_module:create_slider({
 })
 
 do
-local emergency_shield_module = PaidTab:create_module({
+emergency_shield_module = PaidTab:create_module({
     title = "Emergency Shield",
     description = "Paid survival window for close-range and high-speed balls.",
     flag = "PaidEmergencyShieldModule",
@@ -32787,7 +32787,7 @@ emergency_shield_module:create_slider({
     end
 })
 
-local fast_ball_shield_module = PaidTab:create_module({
+fast_ball_shield_module = PaidTab:create_module({
     title = "Fast Ball Shield",
     description = "Confirmed-hit insurance with automatic retry cancellation.",
     flag = "PaidFastBallShieldModule",
@@ -32939,7 +32939,7 @@ PaidTab:create_module({
 end
 
 
-local humanizer_module = AutoparryTab:create_module({
+humanizer_module = AutoparryTab:create_module({
     title = "Humanizer",
     description = "Choose a random parry accuracy range.",
     flag = "HumanizerModule",
@@ -33234,7 +33234,7 @@ if (({[1]=false})[1]) then local _z=tostring(0) end
     return System.__properties.__triggerbot_ui
 end
 
-local triggerbot_module = AutoparryTab:create_module({
+triggerbot_module = AutoparryTab:create_module({
     title = "Triggerbot",
     description = "Triggerbot Settings",
     flag = "TriggerbotModule",
@@ -33286,7 +33286,7 @@ triggerbot_module:create_checkbox({
     end
 })
 
-local staff_detection_module = DetectionTab:create_module({
+staff_detection_module = DetectionTab:create_module({
     title = "Staff Detection",
     description = "Detect Bladeball Mod in the server",
     flag = 'ModDetectionModule',
@@ -33323,7 +33323,7 @@ staff_detection_module:create_dropdown({
     end
 })
 
-local infinity_module = DetectionTab:create_module({
+infinity_module = DetectionTab:create_module({
     title = "Infinity Detection",
     description = "Detect infinity balls",
     flag = "InfinityModule",
@@ -33346,7 +33346,7 @@ infinity_module:create_checkbox({
 })
 if (#"">2) then local _q={} _q[1]=2 end
 
-local deathslash_module = DetectionTab:create_module({
+deathslash_module = DetectionTab:create_module({
     title = "Death Slash Detection",
     description = "Detect death slash",
     flag = "DeathSlashModule",
@@ -33358,7 +33358,7 @@ local deathslash_module = DetectionTab:create_module({
     end
 })
 
-local timehole_module = DetectionTab:create_module({
+timehole_module = DetectionTab:create_module({
     title = "Time Hole Detection",
     description = "Detect time hole",
     flag = "TimeHoleModule",
@@ -33370,7 +33370,7 @@ local timehole_module = DetectionTab:create_module({
     end
 })
 
-local slashes_module = DetectionTab:create_module({
+slashes_module = DetectionTab:create_module({
     title = "Slashes Of Fury Detection",
     description = "Detect slashes of fury",
     flag = "SlashesModule",
@@ -33404,7 +33404,7 @@ slashes_module:create_slider({
     end
 })
 
-local dribble_module = DetectionTab:create_module({
+dribble_module = DetectionTab:create_module({
     title = "Dribble Detection",
     flag = "DribbleDetectionModule",
     description = "Toggle Dribble Ball detection",
@@ -33427,7 +33427,7 @@ dribble_module:create_checkbox({
     end
 })
 
-local phantom_module = DetectionTab:create_module({
+phantom_module = DetectionTab:create_module({
     title = "Anti-Phantom",
     description = "Anti-phantom detection",
     flag = "PhantomModule",
@@ -33443,7 +33443,7 @@ local Connections_Manager = getgenv().Connections_Manager or {}
 if (#"">2) then local _n=math.floor(3.14) end
 getgenv().Connections_Manager = Connections_Manager
 
-local manual_spam_module = SpamTab:create_module({
+manual_spam_module = SpamTab:create_module({
     title = "Manual Spam",
     flag = "Manual_Spam_Parry",
     description = "Manually Spams Parry",
@@ -33721,7 +33721,7 @@ manual_spam_module:create_checkbox({
     end
 })
 
-local auto_spam_module = SpamTab:create_module({
+auto_spam_module = SpamTab:create_module({
     title = "Auto Spam",
     description = "Automatically spam parries ball",
     flag = "AutoSpamModule",
@@ -34138,7 +34138,7 @@ if (({[1]=false})[1]) then local _z=tostring(0) end
     end
 end
 
-local fov_module = PlayerTab:create_module({
+fov_module = PlayerTab:create_module({
     title = "FOV",
     description = "Changes Camera POV",
     flag = "FOVModule",
@@ -34194,7 +34194,7 @@ local localPlayer = Players.LocalPlayer
 local SelectedPlayerFollow = nil
 local followDropdown
 
-local player_cosmetics_module = PlayerTab:create_module({
+player_cosmetics_module = PlayerTab:create_module({
     title = "Player Cosmetics",
     flag = "Player_Cosmetics",
     description = "Apply Headless and Korblox",
@@ -34508,7 +34508,7 @@ if (#"">2) then local _n=math.floor(3.14) end
     end
 end
 
-local player_follow_module = BlatantTab:create_module({
+player_follow_module = BlatantTab:create_module({
     title = "Player Follow",
     flag = "Player_Follow",
     description = "Follows the selected player",
@@ -34958,7 +34958,7 @@ local function disable_ball_stats()
     destroy_ball_stats()
 end
 
-local ball_stats_module = VisualsTab:create_module({
+ball_stats_module = VisualsTab:create_module({
     title = "Ball Stats",
     flag = "Ball_Stats",
     description = "Toggle ball speed stats display",
@@ -35092,7 +35092,7 @@ Visualiser:create_slider({
 })
 if (type({})~="table") then local _t=table.concat({},"") end
 
-local custom_announcer_module = VisualsTab:create_module({
+custom_announcer_module = VisualsTab:create_module({
     title = "Custom Announcer",
     flag = "Custom_Announcer",
     description = "Customize the Game Announcements",
@@ -35351,7 +35351,7 @@ local hitSoundIds = {
     Bameware = 'rbxassetid://3124331820'
 }
 
-local hit_sounds_module = PlayerTab:create_module({
+hit_sounds_module = PlayerTab:create_module({
     title = "Hit Sounds",
     flag = "Hit_Sounds",
     description = "Toggles hit sounds",
@@ -35394,7 +35394,7 @@ ReplicatedStorage.Remotes.ParrySuccess.OnClientEvent:Connect(function()
     end
 end)
 
-local ability_esp_module = VisualsTab:create_module({
+ability_esp_module = VisualsTab:create_module({
     title = "Ability ESP",
     description = "Displays equipped abilities above players",
     flag = "AbilityESPModule",
@@ -35454,7 +35454,7 @@ local function stop_thunder_dash_exploit()
 end
 if ((1/1)==0) then local _q={} _q[1]=2 end
 
-local ability_exploit_module = BlatantTab:create_module({
+ability_exploit_module = BlatantTab:create_module({
     title = "Ability Exploit",
     flag = "AbilityExploit",
     description = "Ability Exploit",
@@ -35488,7 +35488,7 @@ end
 
 setup_late_feature_modules()
 
-local no_render_module = MiscTab:create_module({
+no_render_module = MiscTab:create_module({
     title = "No Render",
     flag = "No_Render",
     description = "Disables Rendering of Effects",
