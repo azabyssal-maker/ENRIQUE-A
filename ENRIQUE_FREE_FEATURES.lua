@@ -7,7 +7,7 @@ local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/d
 local Window = Library:CreateWindow({
     Title = "ENRIQUE FREE",
     Footer = "v1.0",
-    Icon = 121663636062758,
+    Icon = 16014323157,
     CornerElements = false,
     NotifySide = "Right",
     ShowCustomCursor = true,
@@ -25,7 +25,7 @@ Library._config._flags = Library._config._flags or {}
 Library.SendNotification = Library.SendNotification or function(info)
     if typeof(info) == "table" then
         return Library:Notify({
-            Title = info.title or info.Title or "Kittylol",
+            Title = info.title or info.Title or "ENRIQUE FREE",
             Description = info.text or info.Description or "",
             Time = info.duration or info.Time or 5,
         })
@@ -208,7 +208,7 @@ local LocalPlayer = Players.LocalPlayer
 local Alive = workspace:FindFirstChild("Alive") or workspace:WaitForChild("Alive")
 local Runtime = workspace:FindFirstChild("Runtime") or Instance.new("Folder")
 
-local ConfigFile = "Kittylol_Config.json"
+local ConfigFile = "ENRIQUE_Config.json"
 local Settings = {}
 
 local function ApplyDefaults()
@@ -952,7 +952,7 @@ function System.triggerbot.disable()
 end
 
 local OverlayGui = Instance.new("ScreenGui")
-OverlayGui.Name = "Kittylol_Overlay"
+OverlayGui.Name = "ENRIQUE_Overlay"
 OverlayGui.ResetOnSpawn = false
 OverlayGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 pcall(function() OverlayGui.Parent = game:GetService("CoreGui") end)
@@ -1191,7 +1191,7 @@ end
 
 local function safe(fn)
     local ok, err = pcall(fn)
-    if not ok then warn("[Kittylol UI] " .. tostring(err)) end
+    if not ok then warn("[ENRIQUE UI] " .. tostring(err)) end
 end
 
 local function ApplyParryMode(val)
@@ -1514,9 +1514,9 @@ local function stopBackgroundOrbit()
 end
 
 ImmortalTab:create_module({
-    title = "Kittylol Immortal",
+    title = "ENRIQUE Immortal",
     description = "Enable or disable the immortal system.",
-    flag = "KittylolImmortal",
+    flag = "ENRIQUEImmortal",
     section = "left",
     callback = function(state)
         if state then
@@ -3525,13 +3525,13 @@ main:load()
 local SettingsTab = Window:AddTab({
     Name = "Settings",
     Icon = "settings",
-    Description = "Kittylol configuration and theme settings."
+    Description = "ENRIQUE configuration and theme settings."
 })
 
 pcall(function()
     if ThemeManager and ThemeManager.SetLibrary then
         ThemeManager:SetLibrary(Library)
-        ThemeManager:SetFolder("Kittylol")
+        ThemeManager:SetFolder("ENRIQUE FREE")
         if ThemeManager.ApplyToTab then
             ThemeManager:ApplyToTab(SettingsTab)
         end
@@ -3541,7 +3541,7 @@ end)
 pcall(function()
     if SaveManager and SaveManager.SetLibrary then
         SaveManager:SetLibrary(Library)
-        SaveManager:SetFolder("Kittylol")
+        SaveManager:SetFolder("ENRIQUE FREE")
         SaveManager:IgnoreThemeSettings()
         SaveManager:SetIgnoreIndexes({})
         SaveManager:BuildConfigSection(SettingsTab)
@@ -3559,7 +3559,7 @@ end)
 
 
 -- ============================================
--- ENRIQUE FEATURES (merged into KITTYLOL)
+-- ENRIQUE FREE FEATURES
 -- ============================================
 task.spawn(function()
     task.wait(2)
