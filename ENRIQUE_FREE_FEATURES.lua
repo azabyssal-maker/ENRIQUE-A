@@ -19063,7 +19063,7 @@ do
             pcall(function() local h = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
             if h then h.WalkSpeed = getgenv().ENQ_WS2_V or 50 end end)
             end) else if getgenv()._ENQ_WS2_Conn then getgenv()._ENQ_WS2_Conn:Disconnect(); getgenv()._ENQ_WS2_Conn = nil end
-            pcall(function() LocalPlayer.Character:FindFirstChildOfClass("Humanoid").WalkSpeed = 16) end
+            pcall(function() LocalPlayer.Character:FindFirstChildOfClass("Humanoid").WalkSpeed = 16 end)
         end,})
 
     P:create_module({title = "JumpPower V2", description = "Enhanced jump power", flag = "ENQ_JP2",
@@ -19072,7 +19072,7 @@ do
             pcall(function() local h = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
             if h then h.UseJumpPower = true; h.JumpPower = getgenv().ENQ_JP2_V or 100 end end)
             end) else if getgenv()._ENQ_JP2_Conn then getgenv()._ENQ_JP2_Conn:Disconnect(); getgenv()._ENQ_JP2_Conn = nil end
-            pcall(function() local h = LocalPlayer.Character:FindFirstChildOfClass("Humanoid"); h.UseJumpPower = true; h.JumpPower = 50) end
+            pcall(function() local h = LocalPlayer.Character:FindFirstChildOfClass("Humanoid"); h.UseJumpPower = true; h.JumpPower = 50 end)
         end,})
 
     P:create_module({title = "NoClip V2", description = "Enhanced noclip", flag = "ENQ_NC2",
