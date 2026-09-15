@@ -1,6 +1,6 @@
 -- Load the Obsidian UI Library
-local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/kittylol-hub/Kittylol-hub/refs/heads/main/Library.lua"))()
-local ThemeManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/kittylol-hub/Kittylol-hub/refs/heads/main/ThemeManager.lua"))()
+local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/deividcomsono/Obsidian/main/Library.lua"))()
+local ThemeManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/deividcomsono/Obsidian/addons/ThemeManager.lua"))()
 local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/deividcomsono/Obsidian/main/addons/SaveManager.lua"))()
 
 -- Create the main window

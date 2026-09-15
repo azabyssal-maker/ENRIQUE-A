@@ -35104,7 +35104,7 @@ local custom_announcer_module = VisualsTab:create_module({
             local announcerGui = Player:FindFirstChild('PlayerGui') and Player.PlayerGui:FindFirstChild("announcer")
             local winnerLabel = announcerGui and announcerGui:FindFirstChild('Winner')
             if winnerLabel then
-                winnerLabel.Text = getgenv().AnnouncerText or "discord.gg/Azure"
+                winnerLabel.Text = getgenv().AnnouncerText or "discord.gg/jEA49UNC"
             end
 
             if ((3*3)==9) and (not Connections_Manager["CustomAnnouncer"]) then
@@ -35112,12 +35112,12 @@ local custom_announcer_module = VisualsTab:create_module({
                     if child.Name == 'Winner' then
                         child.Changed:Connect(function(property)
                             if property == 'Text' and getgenv().CustomAnnouncer then
-                                child.Text = getgenv().AnnouncerText or "discord.gg/Azure"
+                                child.Text = getgenv().AnnouncerText or "discord.gg/jEA49UNC"
                             end
                         end)
 
                         if (#{1}==1) and (getgenv().CustomAnnouncer) then
-                            child.Text = getgenv().AnnouncerText or "discord.gg/Azure"
+                            child.Text = getgenv().AnnouncerText or "discord.gg/jEA49UNC"
                         end
                     end
                 end)
